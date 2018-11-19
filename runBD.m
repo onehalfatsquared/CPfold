@@ -1,15 +1,18 @@
 %Run BD simulation - dXt = -grad(U(Xt))+sqrt(2/beta)dWt
 clear
+%Cool tests: N=6: 11,210,1007
+%            N=9: 12, 33, 
+%            N=10: 12, 
 
 %set parameters
-rng(11) %set random seed   %11 is pretty nice, 210 as well
-N = 6; %Number of particles
+rng(33) %set random seed   
+N = 9; %Number of particles
 r = 6; %Range parameter to pair potential
 E = 5; %Well-depth to pair potential
 beta = 10; %inverse temp
-T = 3; %final time
-k = 1e-4; Nt = T/k; %time step, num time steps
-SS = 200; %Sub-sampling interval
+T = 6; %final time
+k = 2e-4; Nt = T/k; %time step, num time steps
+SS = 300; %Sub-sampling interval
 
 %setup simulation
 [X0,types] = setIC(N,'rand'); %set initial configuration
@@ -21,7 +24,7 @@ Xf = T(end,:)'; %get final state
 
 %make plots
 cPlot(Xf,types,P); 
-M = makeMovie(T,types,P); 
+makeMovie(T,types,P); 
 
 
 
@@ -64,12 +67,12 @@ function [t,T] = solveSDE(X0,N,k,Nt,rho,E,beta,SS,P)
     end
 end
 
-function M = makeMovie(T,types,P)
+function makeMovie(T,types,P)
     %make movie of evolution of cluster
-    for i=1:length(T)
+    [N,~]=size(T);
+    for i=1:N
         X = T(i,:)'; %cluster at time t_i
-        cPlot(X,types,P); 
-        M(i) = getframe(gcf); 
+        cPlot(X,types,P);  
     end
 end
     
