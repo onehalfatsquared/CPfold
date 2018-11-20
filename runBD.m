@@ -4,18 +4,21 @@ clear
 %            N=9: 12, 33, 
 %            N=10: 12, 
 
+%compile mex function for gradient calculation
+mex mGrad.cpp
+
 %set parameters
-rng(33) %set random seed   
-N = 9; %Number of particles
-r = 6; %Range parameter to pair potential
+%rng(35) %set random seed   
+N = 6; %Number of particles
+r = 30; %Range parameter to pair potential
 E = 5; %Well-depth to pair potential
 beta = 10; %inverse temp
-T = 6; %final time
-k = 2e-4; Nt = T/k; %time step, num time steps
+T = 4; %final time
+k = 1e-5; Nt = T/k; %time step, num time steps
 SS = 300; %Sub-sampling interval
 
 %setup simulation
-[X0,types] = setIC(N,'rand'); %set initial configuration
+[X0,types] = setIC(N,'same'); %set initial configuration
 P = createPI(types);          %create interaction matrix
 
 %do simulation
@@ -24,9 +27,7 @@ Xf = T(end,:)'; %get final state
 
 %make plots
 cPlot(Xf,types,P); 
-makeMovie(T,types,P); 
-
-
+M = makeMovie(T,types,P); 
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -56,7 +57,8 @@ function [t,T] = solveSDE(X0,N,k,Nt,rho,E,beta,SS,P)
     end
     for i=1:Nt
         particles = c2p(X); %particle array
-        a = -morseGrad(particles,rho,E,N,P)*k; %det part
+        %a = -morseGrad(particles,rho,E,N,P)*k; %det part
+        a = -mGrad(particles, rho, E, N, full(P))*k;
         b = randn(3*N,1)*sqrt(2/beta*k); %stoch part
         X = X + a + b; %EM step
         %subsample
@@ -67,12 +69,14 @@ function [t,T] = solveSDE(X0,N,k,Nt,rho,E,beta,SS,P)
     end
 end
 
-function makeMovie(T,types,P)
+function M = makeMovie(T,types,P)
     %make movie of evolution of cluster
     [N,~]=size(T);
+    M(N) = struct('cdata',[],'colormap',[]);
     for i=1:N
         X = T(i,:)'; %cluster at time t_i
         cPlot(X,types,P);  
+        M(i) = getframe(gcf); 
     end
 end
     
