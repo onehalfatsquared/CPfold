@@ -1,16 +1,10 @@
 /*********************************************************************
- * Demo.cpp
+ * mGrad.cpp
  *
- * This file shows the basics of setting up a mex file to work with
- * Matlab.  This example shows how to use 2D matricies.  This may
- *
- * Keep in mind:
- * <> Use 0-based indexing as always in C or C++
- * <> Indexing is column-based as in Matlab (not row-based as in C)
- * <> Use linear indexing.  [x*dimy+y] instead of [x][y]
- *
- * For more information, see my site: www.shawnlankton.com
- * by: Shawn Lankton
+ * This mex file computes the gradient of a system of N particles in 3D 
+ * with a Morse interaction potential with given range and depth. 
+ * Includes functionality for up to 3 particle types and variable
+ * interaction strength between particles.   
  *
  ********************************************************************/
 #include <matrix.h>
@@ -18,6 +12,14 @@
 #include <math.h>
 #include <algorithm>
 
+/*
+ * Function:  euDist
+ * --------------------
+ * computes euclidean distance b/w particles i and j. Also gives unit vector
+ *
+ *  particles: N by 3 array of positions. Z: stores unit vector. 
+ *
+ */
 
 double euDist(double* particles, int i, int j, int N, double* Z){
     Z[0] = particles[i]-particles[j];
@@ -29,10 +31,20 @@ double euDist(double* particles, int i, int j, int N, double* Z){
     return R;
 }
 
+/*
+ * Function:  morseEval
+ * --------------------
+ * computes and returns value of Morse potential for distance r, range rho
+ * and well-depth E. 
+ *
+ */
+
 double morseEval(double r, double rho, double E){
     double Y = exp(-(rho) * ((r) - 1));
     return -2 * (rho) * (E) * ( Y*Y -Y);
 }
+
+// Main function 
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
@@ -51,7 +63,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     N_m = mxDuplicateArray(prhs[3]);
     P_m = mxDuplicateArray(prhs[4]);
 
-
 //associate pointers
     particles = mxGetPr(particles_m);
     rho = mxGetPr(rho_m);
@@ -63,14 +74,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     g_m = plhs[0] = mxCreateDoubleMatrix(3*N,1,mxREAL);
     g = mxGetPr(g_m);
 
-//do something
+//compute the gradient
     for(i=0;i<N;i++){
         double* S = new double[3]; S[0] = S[1] = S[2] = 0;
         for(j=0;j<N;j++){
             if(j!=i){
                 double* Z = new double[3];
                 double r = euDist(particles, i, j, N, Z);
-                printf("%.4f",r);
                 int minimum = std::min(i,j);
                 int maximum = std::max(i,j);
                 if(P[N*maximum+minimum]==1){

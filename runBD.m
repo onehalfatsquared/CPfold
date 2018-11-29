@@ -1,28 +1,29 @@
 %Run BD simulation - dXt = -grad(U(Xt))+sqrt(2/beta)dWt
 clear
-%Cool tests: N=6: 11,210,1007
-%            N=9: 12, 33, 
-%            N=10: 12, 
+%Cool tests, rng3:  N=6: 11,210,1007
+%                   N=9: 12, 33, 
+%                   N=10: 12, 
 
-%compile mex function for gradient calculation
-mex mGrad.cpp
+try mex mGrad.cpp; catch,  end
 
 %set parameters
-%rng(35) %set random seed   
-N = 6; %Number of particles
-r = 30; %Range parameter to pair potential
-E = 5; %Well-depth to pair potential
+rng(33) %set random seed   
+N = 9; %Number of particles
+r = 6; %Range parameter to pair potential
+K = [20,10,20]; %vector of sticky parameters. (1->1, 1<->2, 2->2). 
 beta = 10; %inverse temp
-T = 4; %final time
-k = 1e-5; Nt = T/k; %time step, num time steps
+T = 3; %final time
+k = 2e-4; Nt = T/k; %time step, num time steps
 SS = 300; %Sub-sampling interval
+method = 1; % SDE solver. 1 -> EM. 2-> RK. 
 
 %setup simulation
-[X0,types] = setIC(N,'same'); %set initial configuration
+[X0,types] = setIC(N,'rng2'); %set initial configuration
 P = createPI(types);          %create interaction matrix
+%Do newton solve for energies, then compute matrix
 
 %do simulation
-[t,T] = solveSDE(X0,N,k,Nt,r,E,beta,SS,P); %get a trajectory
+[t,T] = solveSDE(X0,N,k,Nt,r,E,beta,SS,P,method); %get a trajectory
 Xf = T(end,:)'; %get final state
 
 %make plots
@@ -38,34 +39,23 @@ function [c,types] = setIC(N,type)
     %Set initial condition. particles in a straight line - worm
     c = zeros(3*N,1);
     c(1:3:3*N)=(1:N);
-    %Set distribution of particle types. 3 kinds of particles.
+    %Set distribution of particle types. 
     if type == 'same'
         types = ones(N,1);
-    elseif type == 'rand'
+    elseif type == 'rng3'
         types = randi(3,N,1);
+    elseif type == 'rng2'
+        types = randi(2,N,1);
     end
 end
 
-
-function [t,T] = solveSDE(X0,N,k,Nt,rho,E,beta,SS,P)
+function [t,T] = solveSDE(X0,N,k,Nt,rho,E,beta,SS,P,method)
     %solve SDE with EM. Subsample every SS timesteps. Output trajectory. 
-    X = X0; sample = 1; 
-    %if subsampling, set IC as first sample.
-    if SS~= Nt
-        T(1,:) = X0'; t(1) = 0;
-        sample = 2;
-    end
-    for i=1:Nt
-        particles = c2p(X); %particle array
-        %a = -morseGrad(particles,rho,E,N,P)*k; %det part
-        a = -mGrad(particles, rho, E, N, full(P))*k;
-        b = randn(3*N,1)*sqrt(2/beta*k); %stoch part
-        X = X + a + b; %EM step
-        %subsample
-        if mod(i,SS)==0
-            T(sample,:) = X'; t(sample) = (i-1)*k;
-            sample = sample+1;
-        end
+    % method 1 -> EM. method 2 -> RK scheme. 
+    if method == 1
+        [t,T] = EM(X0,N,k,Nt,rho,E,beta,SS,P);
+    elseif method == 2
+        [t,T] = RK(X0,N,k,Nt,rho,E,beta,SS,P); 
     end
 end
 
