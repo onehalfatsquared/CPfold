@@ -1,8 +1,8 @@
 /*********************************************************************
- * mGrad.cpp
+ * mEval.cpp
  *
- * This mex file computes the gradient of a system of N particles in 3D 
- * with a Morse interaction potential with given range and depth. 
+ * This mex file computes the  potential for a system of N particles  
+ * in 3D with a Morse interaction potential with given range and depth. 
  * Includes functionality for up to 3 particle types and variable
  * interaction strength between particles.   
  *
@@ -39,7 +39,7 @@ double euDist(double* particles, int i, int j, int N, double* Z){
  *
  */
 
-double morseEval(double r, double rho, double E){
+double morseP(double r, double rho, double E){
     double Y = exp(-(rho) * ((r) - 1));
     return -2 * (rho) * (E) * ( Y*Y -Y);
 }
@@ -50,8 +50,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
 
 //declare variables
-    mxArray *particles_m, *rho_m, *E_m, *N_m, *P_m, *g_m;
-    double *particles, *rho, *E, *P, *g;
+    mxArray *particles_m, *rho_m, *E_m, *N_m, *P_m, *u_m;
+    double *particles, *rho, *E, *P, *u;
     const double rep = 3;
     int N;
     int i,j;
@@ -71,13 +71,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     P = mxGetPr(P_m);
 
 //associate outputs
-    g_m = plhs[0] = mxCreateDoubleMatrix(3*N,1,mxREAL);
-    g = mxGetPr(g_m);
+    u_m = plhs[0] = mxCreateDoubleScalar(1);
+    u = (mxGetPr(u_m));
 
 //compute the gradient
+    double S = 0; 
     for(i=0;i<N;i++){
-        double* S = new double[3]; S[0] = S[1] = S[2] = 0;
-        for(j=0;j<N;j++){
+        for(j=i+1;j<N;j++){
             if(j!=i){
                 double* Z = new double[3];
                 double r = euDist(particles, i, j, N, Z);
@@ -85,19 +85,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                 int maximum = std::max(i,j);
                 if(P[N*maximum+minimum]==1){
                     double Eeff = E[N*maximum+minimum];
-                    for(int k=0; k<3;k++)
-                        S[k] = S[k] + morseEval(r, *rho, Eeff) * Z[k];
+                    S += morseP(r, *rho, Eeff); 
                 }
                 else if(r<1){
-                    for(int k=0; k<3;k++)
-                        S[k] = S[k] - rep * Z[k] / (r*r);
+                    S -= rep/r; 
                 }
               delete []Z;
             }
         }
-      for(int k=0; k<3;k++)
-            g[3*i+k] = S[k];
-      delete []S;
     }
+    *u = S; 
 }
 

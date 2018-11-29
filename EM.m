@@ -4,8 +4,8 @@ function [t,T] = EM(X0,N,k,Nt,rho,E,beta,SS,P)
     X = X0; sample = 1; 
     %if subsampling, set IC as first sample.
     if SS~= Nt
-        L = Nt/SS+1;  %Number of sample points
-        T = zeros(L,3*N); t = zeros(1,N); %initialize storage
+        L = round(Nt/SS)+1;  %Number of sample points
+        T = zeros(L,3*N); t = zeros(1,L); %initialize storage
         T(1,:) = X0'; t(1) = 0; %set first sample to IC
         sample = 2;  
     end
@@ -14,7 +14,7 @@ function [t,T] = EM(X0,N,k,Nt,rho,E,beta,SS,P)
     for i=1:Nt
         particles = c2p(X); %particle array
         %a = -morseGrad(particles,rho,E,N,P)*k; %det part
-        a = -mGrad(particles, rho, E, N, full(P))*k;
+        a = -mGrad(particles, rho, E, N, P)*k;
         b = randn(3*N,1)*sqrt(2/beta*k); %stoch part
         X = X + a + b; %EM step
         %subsample

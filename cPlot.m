@@ -18,8 +18,8 @@ function [] = cPlot(x,types,P)
     
     %options for plotting cluster
     opts = struct('srad',0.1,'lcolr',0.7*[1,1,1],'lrad',0.03,...
-    'scolr',color,'salph',0.7,'ifgrid',0,...
-    'iftight',1,'az',20,'el',18,'zth',-0.5,'special',Z);
+    'scolr',color,'salph',0.7,'ifgrid',0,'ax',[-N,N,-N/2,N/2,-N/3,N/3]/2,...
+    'iftight',0,'az',20,'el',18,'zth',-0.5,'special',Z);
 
     %plot the cluster
     plotcluster2b(x,opts); 

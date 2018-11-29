@@ -4,8 +4,8 @@ function [t,T] = RK(X0,N,k,Nt,rho,E,beta,SS,P)
     X = X0; sample = 1; 
     %if subsampling, set IC as first sample.
     if SS~= Nt
-        L = round(Nt/SS)+1;  %Number of sample points
-        T = zeros(L,3*N); t = zeros(1,L); %initialize storage
+        L = Nt/SS+1;  %Number of sample points
+        T = zeros(L,3*N); t = zeros(1,N); %initialize storage
         T(1,:) = X0'; t(1) = 0; %set first sample to IC
         sample = 2;  
     end
@@ -18,19 +18,21 @@ function [t,T] = RK(X0,N,k,Nt,rho,E,beta,SS,P)
         particles = c2p(Xtilde);         %particle array
         
         %predictor step, evaluate Gk, get Xstar
-        g0 = mGrad(particles, rho, E, N, P);       %force at Xtilde
+        g0 = mGrad(particles, rho, E, N, P); %force at Xtilde
         x1 = Xtilde - 2/3*k*g0;                    %compute step
-        g1 = mGrad(c2p(x1), rho, E, N, P);         %force at x1
+        g1 = mGrad(c2p(x1), rho, E, N, P);   %force at x1
         Gk = -1/4*g0 -3/4*g1;                      %RK formula
         Xstar = 2*Xtilde - X +k*Gk;                %proposed move       
         
         %corrector step, compute acc prob, update
         eta = xi + sqrt(2*k)*Gk;
-        U0 = mEval(c2p(X), rho, E, N, P);
-        U1 = mEval(c2p(Xstar), rho, E, N, P);
-        alpha = min(1,exp(-beta*((eta'*eta-xi'*xi)/2+U1-U0))); %acc prob
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        %write function in C to compute morse potential
+        U0 = mEval();
+        U1 = mEval();
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        alpha = min(1,exp(-beta*((eta.^2-xi.^2)/2+U1-U0))); %acc prob
         gamma = (rand<alpha);                      %bernouli rv
-        gamma = 1;                                 %???? if not, alpha = 0..
         X = gamma*Xstar + (1-gamma)*X;             %update positions
         
         %subsample

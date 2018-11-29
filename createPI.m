@@ -10,5 +10,4 @@ function [P] = createPI(types)
             end
         end
     end   
-    P = sparse(P);      %store as sparse matrix
 end
