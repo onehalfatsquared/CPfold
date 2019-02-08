@@ -1,7 +1,7 @@
 function g = morseGrad(particles,rho,E,N,P)
     %evaluate gradient of morse potential for each particle
-    g = zeros(3*N,1); %initialize storage for gradient
-    rep = 3; %repulsion coeff
+    g = zeros(2*N,1); %initialize storage for gradient
+    rep = 0; %repulsion coeff
     for i = 1:N
         S = 0; %initialize sum
         for j = 1:N
@@ -19,6 +19,6 @@ function g = morseGrad(particles,rho,E,N,P)
                 end
             end
         end
-        g(3*(i-1)+1:3*i) = S;
+        g(2*(i-1)+1:2*i) = S;
     end
 end
