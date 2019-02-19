@@ -11,7 +11,7 @@ N = 7; %Number of particles
 r = 40; %Range parameter to pair potential
 K = [1,1,1]; %vector of sticky parameters. (1->1, 1<->2, 2->2). 
 beta = 1; %inverse temp
-T = 0.6; %final time
+T = 0.1; %final time
 frames = 150;  %Number of frames in visualization
 method = 1; % SDE solver. 1 -> EM. 2-> RK. 
 
@@ -26,7 +26,7 @@ Xf = T(end,:)'; %get final state
 
 %make plots
 cPlot(Xf,types,P); 
-M = makeMovie(t,T,types,P); 
+%M = makeMovie(t,T,types,P); 
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
