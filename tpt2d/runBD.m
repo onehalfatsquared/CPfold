@@ -8,17 +8,17 @@ clear
 %set parameters
 %rng(33) %set random seed   
 N = 7; %Number of particles
-r = 45; %Range parameter to pair potential
+r = 40; %Range parameter to pair potential
 K = [1,1,1]; %vector of sticky parameters. (1->1, 1<->2, 2->2). 
-beta = 10; %inverse temp
-T = 50; %final time
+beta = 1; %inverse temp
+T = 0.6; %final time
 frames = 150;  %Number of frames in visualization
 method = 1; % SDE solver. 1 -> EM. 2-> RK. 
 
 %setup simulation
 [X0,types] = setIC(N,'same'); %set initial configuration
 P = ones(N);          %create interaction matrix
-E = ones(N); 
+E = ones(N)*10; 
 
 %do simulation
 [t,T] = solveSDE(X0,N,T,r,E,beta,P,method,frames); %get a trajectory
@@ -51,7 +51,7 @@ function [t,T] = solveSDE(X0,N,T,rho,E,beta,P,method,frames)
     %solve SDE with EM. Subsample every SS timesteps. Output trajectory. 
     % method 1 -> EM. method 2 -> RK scheme. 
     if method == 1
-        k = 1e-5; Nt = round(T/k); %time step, num time steps
+        k = 5e-6; Nt = round(T/k); %time step, num time steps
         SS = round(Nt/frames); %Sub-sampling interval
         [t,T] = EM(X0,N,k,Nt,rho,E,beta,SS,P);
     elseif method == 2 %Not sure if working correctly. 

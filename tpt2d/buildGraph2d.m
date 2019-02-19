@@ -6,7 +6,7 @@ function DB = buildGraph2d(N)
     %coordinates?) 
     
     %Check if database exists for this value of N
-    filename = strcat('N', num2str(N), '.mat'); 
+    filename = strcat('N', num2str(N), 'DB.mat'); 
     if exist(filename, 'file')
         %file exists, load it
         tempL = load(filename); %temporarily load struct 
@@ -115,6 +115,9 @@ function DB = buildGraph2d(N)
             end
         end
     end 
+    
+    %set coordinates of worm
+    DB{end,4} = [1:N; zeros(1,N)]';
 end
     
 
