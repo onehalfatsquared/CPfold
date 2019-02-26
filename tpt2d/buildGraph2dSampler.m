@@ -1,4 +1,4 @@
-function [DB,T] = buildGraph2dSampler(N)
+function [DB,T,resets] = buildGraph2dSampler(N)
     %create the graph and other properties by starting in a worm state,
     %having a strong backbone and weak other bonds, run BD sim for a long
     %time, keep track of states, connections, 
@@ -8,11 +8,12 @@ function [DB,T] = buildGraph2dSampler(N)
     beta = 1; %inverse temp
     method = 1; % SDE solver. 1 -> EM. 2-> RK. 
     DT = 0.01;   %time increment after to check for bond formation
-    Kh = 300;    %large sticky parameter, for backbone
+    Kh = 1850;    %large sticky parameter, for backbone
     Kl = 0.1;     %small sticky parameter, for other bonds
     state = 1;    %index of worm state 1
     timer = 0;    %keep track of time since last transition
     samples = 1000; %number of samples to run for
+    resets = [];  %record times BD sim breaks
     
     %import the graph structure and transition times
     %Check if database exists for this value of N
@@ -36,10 +37,10 @@ function [DB,T] = buildGraph2dSampler(N)
         [~,Xf] = solveSDE(X0, N, DT, r, E, beta, P, method);
         
         %check if state is new or not
-        [state, DB, T, timer] = checkState(Xf, state, DB, T, timer, DT);
+        [state, DB, T, timer, Xf, resets] = checkState(Xf, state, DB, T, timer, DT, resets);
         
         %update starting state
-        X0 = Xf'
+        X0 = Xf';
         counter = counter + 1
 %         cPlot(Xf,types,P); 
 %         pause()
@@ -101,19 +102,31 @@ function [A, b] = getAdj(clust)
     end
 end
 
-function [new_state, DB, T, timer] = checkState(X, prev_state, DB, T, timer, DT)
+function [new_state, DB, T, timer, X, resets] = checkState(X, prev_state, DB, T, timer, DT, resets)
     %check if the current state is changed from the previous.
     %if so, check if seen before and update quantities
     
     %first, update timer by DT
     timer = timer + DT; %gives current time
     
-    %get old and new adj matrices, compare
+    %check if new state is connected
     oldA = DB{prev_state,1}; [newA, bonds] = getAdj(X); tol = 1e-5;
+    N = length(diag(newA));
+    if sum(diag(newA,1)) ~= N-1
+        %core bonds broken, reset to starting config
+        X = zeros(2*N,1)';
+        X(1:2:2*N)=(1:N);
+        timer = 0; new_state = 1;
+        resets = [resets prev_state];
+        return
+    end
+    
+    %get old and new adj matrices, compare
     if sum(sum(abs(oldA-newA))) < tol
         %matrices are the same
         DB{prev_state,2} = DB{prev_state,2} + 1;
         new_state = prev_state;
+        DB{new_state,5} = X;
         return
     else
         %matrices are not the same. Check if seen before by bonds
@@ -126,6 +139,7 @@ function [new_state, DB, T, timer] = checkState(X, prev_state, DB, T, timer, DT)
                     %matrices are the same
                     new_state = i;
                     DB{new_state,2} = DB{new_state,2} + 1;
+                    DB{new_state, 5} = X;
                     %check if connection exists
                     if any(DB{new_state,4} == prev_state) == 0
                         %not connected, make 2 way connection
@@ -141,6 +155,7 @@ function [new_state, DB, T, timer] = checkState(X, prev_state, DB, T, timer, DT)
         end
         %if this point is reached, newA is not in DB. Add it
         new_state = L+1;
+        DB{new_state,5} = X;
         DB{new_state,1} = newA; DB{new_state,2} = 1; DB{new_state,3} = bonds;
         DB{new_state,4} = []; DB{new_state,4} = [DB{new_state,4} prev_state];
         DB{prev_state,4} = [DB{prev_state,4} new_state];
