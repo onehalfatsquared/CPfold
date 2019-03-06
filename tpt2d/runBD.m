@@ -11,8 +11,8 @@ N = 7; %Number of particles
 r = 40; %Range parameter to pair potential
 K = [1,1,1]; %vector of sticky parameters. (1->1, 1<->2, 2->2). 
 beta = 1; %inverse temp
-T = 0.1; %final time
-frames = 150;  %Number of frames in visualization
+T = 0.01; %final time
+frames = 61;  %Number of frames in visualization
 method = 1; % SDE solver. 1 -> EM. 2-> RK. 
 
 %setup simulation
@@ -22,7 +22,7 @@ E = ones(N)*10;
 
 %do simulation
 [t,T] = solveSDE(X0,N,T,r,E,beta,P,method,frames); %get a trajectory
-Xf = T(end,:)'; %get final state
+Xf = T(end-1,:)'; %get final state
 
 %make plots
 cPlot(Xf,types,P); 
