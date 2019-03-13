@@ -15,6 +15,7 @@ function [t,T] = EM(X0,N,k,Nt,rho,E,beta,SS,P)
         particles = c2p(X); %particle array
         %a = -morseGrad(particles,rho,E,N,P)*k; %det part
         a = -mGrad(particles, rho, E, N, P)*k;
+        
         b = randn(2*N,1)*sqrt(2/beta*k); %stoch part
         X = X + a + b; %EM step
         %subsample

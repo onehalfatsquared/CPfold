@@ -1,4 +1,4 @@
-function [Num,Den,Pembed] = estimateMFPTsingle(N, state)
+function [Num,Den,Pembed] = estimateMFPTsingle(N, state, Num, Den, Pembed)
     %estimate the mean first passage time from state i to j, where state j
     %has more bonds than state i (time for diffusion to bring particles in
     %range). Uses one long trajectory
@@ -12,8 +12,6 @@ function [Num,Den,Pembed] = estimateMFPTsingle(N, state)
     timer = 0;    %keep track of time since last transition
     samples = 2000; %number of samples to run for
     eq = 50;     %number of equilibration steps
-    Pembed = zeros(700,1);      %vector to store number of times each state was hit
-    Num = 0; Den = 0; %sum for num and denom of estimator
     
     %import the graph structure and transition times
     %Check if database exists for this value of N
@@ -27,11 +25,11 @@ function [Num,Den,Pembed] = estimateMFPTsingle(N, state)
   
     %setup simulation
     Eh = stickyNewton(8,r,Kh);
-    [start, types, P, E] = setupBD(N, Eh);
+    [start, ~, P, E] = setupBD(N, Eh);
     
     %do simulation 
     %equilibrate the trajectory
-    eq_count = 0; new_state = 0; reflect = 0; X0 = start;
+    eq_count = 0; X0 = start;
     while eq_count < eq
         %run BD for DT seconds
         [~,Xf] = solveSDE(X0, N, DT, r, E, beta, P, method);
@@ -128,8 +126,8 @@ function [new_state, timer, reflect, reset] = checkState(X, prev_state, DB, time
     N = length(diag(newA));
     if sum(diag(newA,1)) ~= N-1
         %core bonds broken, reflect to starting config
-        new_state = 0;
-        reset = 1 
+        new_state = 0; timer = timer - 1;
+        reset = 1;
         return
     end
     
