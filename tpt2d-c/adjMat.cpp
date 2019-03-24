@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stdio.h>
 #include "bDynamics.h"
 namespace bd{
 
@@ -10,8 +11,8 @@ int toIndex(int r, int c, long m) {
 
 void index2ij(int index, int N, int& i, int& j) {
   // map a row index 1-d array into (i,j) 
-  j = index % N;
-  i = index / N;
+  i = index % N;
+  j = index / N;
 }
 
 int checkConnected(int* M, int N) {
@@ -38,7 +39,7 @@ int checkSame(int* M1, int* M2, int N) {
 	return 1;
 }
 
-void getAdj(double* X, int N, int*& M) {
+void getAdj(double* X, int N, int* M) {
 	//get the adjacnecy matrix from a cluster X
 	int i, j; double tol = 1e-5;
 	double* particles = new double[2*N]; double* Z = new double[2];
@@ -48,7 +49,7 @@ void getAdj(double* X, int N, int*& M) {
 		if (j > i) {
 			double d = euDist(particles, i, j, N, Z);
 			if (d < 1.1 + tol) {
-				M[index] = d; M[toIndex(j,i,N)] = d;
+				M[index] = 1; M[toIndex(j,i,N)] = 1;
 			}
 		}
 	}

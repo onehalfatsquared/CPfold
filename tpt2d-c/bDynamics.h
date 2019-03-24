@@ -1,5 +1,6 @@
 #pragma once
 namespace bd { 
+class Database;
 
 //particle and potential stuff
 //evaluate euclidean distance 
@@ -22,7 +23,7 @@ int toIndex(int r, int c, long m);
 void index2ij(int index, int N, int& i, int& j);
 int checkConnected(int* M, int N);
 int checkSame(int* M1, int* M2, int N);
-void getAdj(double* X, int N, int& M);
+void getAdj(double* X, int N, int* M);
 
 //time integration stuff
 //use em scheme to solve sde
@@ -33,14 +34,16 @@ void solveSDE(double* X0, int N, double T, int rho, double beta,
 							double* E, int* P, int method);
 
 //sampling stuff
-void estimateMFPT(int N, int state, double Num, double Den, double* PM);
+void estimateMFPT(int N, int state, Database* db);
 void setupSim(int N, double Eh, int*& P, double*& E);
-void equilibrate(double* X, int state, int eq, int N, double DT, int rho, double* E, 
-										double beta, int* P, int method);
-void runTrajectory(double* X, int state, int samples, int N, double DT, int rho, double* E, 
-					double beta, int* P, int method, double Num, double Den, double* PM );
-void checkState(double* X, int N, int state, int new_state, ??? db, int timer,
-							 int reset, int reflect);
+void equilibrate(double* X, Database* DB, int state, int eq, int N, double DT,
+													int rho, double* E, double beta, int* P, int method);
+void runTrajectory(double* X, Database* DB, int state, int samples, int N, 
+	double DT, int rho, double* E, double beta, int* P, int method, int& Num, 
+																									int& Den, int* PM );
+void checkState(double* X, int N, int state, int new_state, Database* db, int& timer,
+							 int& reset, int& reflect);
+void extractAM(int N, int state, int* AM, Database* db);
 
 
 

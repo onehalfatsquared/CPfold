@@ -2,14 +2,22 @@
 #include <stdio.h>
 #include <string.h>
 #include "bDynamics.h"
+#include "database.h"
 namespace bd{
 
 
+void extractAM(int N, int state, int* AM, Database* db) {
+	//extracts the adjacency matrix of state from the database
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++) {
+			AM[i*N+j] = (*db)[state].isInteracting(i,j,N);
+		}
+	}
+}
 
 
-
-void checkState(double* X, int N, int state, int new_state, ??? db, int timer,
-							 int reset, int reflect) {
+void checkState(double* X, int N, int state, int new_state, Database* db, int& timer,
+							 int& reset, int& reflect) {
 	//check if state is different than prev step. if so, do various things
 
 	//update timer
@@ -17,9 +25,9 @@ void checkState(double* X, int N, int state, int new_state, ??? db, int timer,
 
 	//get adjacnecy matrix of the current state
 	int* M = new int[N*N]; for (int i = 0; i < N*N; i++) M[i]=0;
-	getAdj(double* X, int N, int*& M);
+	getAdj(X, N, M);
 
-	//check if state connected
+	//check if state is connected
 	int C = checkConnected(M, N);
 	if (C == 0) {//not connected
 		reset = 1; timer -= 1;
@@ -28,41 +36,66 @@ void checkState(double* X, int N, int state, int new_state, ??? db, int timer,
 	}
 
 	//compare old and new state, check if same
-	int* old = ?; //todo
+	int* old = new int[N*N]; for (int i = 0; i < N*N; i++) old[i]=0;
+	extractAM(N, state, old, db);
 	int S = checkSame(old, M, N);
+
 	if (S == 1) {//same matrix
-		delete []M; // delete old as well? todo
+		delete []M; delete []old;
 		return;
 	}
 	else {//not the same, find matrix in database
-		//todo
-
+		printf("state change occured\n");
+		for (int i = 0; i < (*db).getNumStates(); i++) {
+			extractAM(N, i, old, db);
+			S = checkSame(old, M, N); 
+			if (S == 1) {//found matrix
+				printf("state change found in db, new state: %d, bonds = %d\n", i, (*db)[i].getBonds());
+				new_state = i;
+				reflect = 1;
+				delete []M; delete []old;
+				return;
+			}
+		}
 	}
 }
 
 
-void runTrajectory(double* X, int state, int samples, int N, double DT, int rho, double* E, 
-					double beta, int* P, int method, double Num, double Den, double* PM ) {
-	//run the trajectory, record data.
+void runTrajectory(double* X, Database* db, int state, int samples, int N, 
+	double DT, int rho, double* E, double beta, int* P, int method, int& Num, 
+																											int& Den, int* PM ) {
+	//run the trajectory, update mfpt estimates
+
+	//intiailize temp storage and set parameters
 	double* temp = new double[2*N]; memcpy(temp, X, 2*N*sizeof(double));
 	int reset; int reflect; int new_state = state; int hit = 0; int max_it = 1e6;
+	int timer = 0; 
+
+	//solve sde and update
 	for (int i = 0; i < max_it; i++) {
 		reset = 0; reflect = 0;
+		//solve SDE
 		solveSDE(X, N, DT, rho, beta, E, P, method);
 		//check if state changed
-		checkState(X, N, state, new_state, ?, timer, reset, reflect);
+		checkState(X, N, state, new_state, db, timer, reset, reflect);
 		if (reflect == 0 && reset == 0) {//no hit, proceed
 			memcpy(temp, X, 2*N*sizeof(double)); // copy x to temp
 		}
-		else if (reflect == 1) {//hit state, update estimates
-			Den += timer; Num += timer*(timer+1)/2.0; timer = 0;
+		else if (reflect == 1) {//hit new state, update estimates
+			Den += timer; Num += timer*(timer+1)/2.0; 
 			PM[new_state] += 1;
 			memcpy(X, temp, 2*N*sizeof(double));//copy temp to x -> reset step
+			timer = 0; hit +=1;
 		}
 		else {//chain broke, reset previous config
 			memcpy(X, temp, 2*N*sizeof(double));//copy temp to x -> reset step
 		}
+		//if we reach desired number of samples, break
+		if (hit == samples) {
+			break;
+		}
 	}
+	//free the temp memory
 	delete []temp;
 }
 
@@ -71,16 +104,22 @@ void runTrajectory(double* X, int state, int samples, int N, double DT, int rho,
 
 
 
-void equilibrate(double* X, int state, int eq, int N, double DT, int rho, double* E, 
-										double beta, int* P, int method) {
+void equilibrate(double* X, Database* db, int state, int eq, int N, double DT, 
+													int rho, double* E, double beta, int* P, int method) {
 	//perform eq steps to equilibrate the trajectory. do not record data
+
+	//initialize temp storage and set parameters;
 	double* temp = new double[2*N]; memcpy(temp, X, 2*N*sizeof(double));
-	int reset; int reflect; int new_state = state;
+	int reset; int reflect; int new_state = state; int timer = 0;
+
+	//solve the SDE and update
 	for (int i = 0; i < eq; i++) {
 		reset = 0; reflect = 0;
+		//solve the sde
 		solveSDE(X, N, DT, rho, beta, E, P, method);
 		//check if state changed
-		checkState(X, N, state, new_state, ?, timer, reset, reflect);
+		checkState(X, N, state, new_state, db, timer, reset, reflect);
+		//if state changed, reflect back. otherwise continue
 		if (reflect == 0 && reset == 0) {
 			memcpy(temp, X, 2*N*sizeof(double)); // copy x to temp
 		}
@@ -88,6 +127,7 @@ void equilibrate(double* X, int state, int eq, int N, double DT, int rho, double
 			memcpy(X, temp, 2*N*sizeof(double));//copy temp to x -> reset step
 		}
 	}
+	//free the temp memory
 	delete []temp;
 }
 
@@ -101,42 +141,54 @@ void setupSim(int N, double Eh, int*& P, double*& E) {
 }
 
 
-void estimateMFPT(int N, int state) {
+void estimateMFPT(int N, int state, Database* db) {
 	/*estimate mean first passage time starting in state and going to state with
 	one additional bond. Uses parallel implementations of a single walker with
 	long trajectory.*/
 
 	//set parameters
 	int rho = 40; double beta = 1; double DT = 0.01; int Kh = 1850;
-	int method = 1; int timer = 0; 
-	int samples = 2000; int eq = 200; 
+	int method = 1; //solve SDEs with EM
+	int samples = 20; //number of hits per walker for estimator
+	int eq = 200; //number of steps to equilibrate for
+	
 
 	//quantities to update
-	double Num; double Den; double* PM;
-
-	//import structure
-	//todo
+	int Num = (*db)[state].getNumerator(); 
+	int Den = (*db)[state].getDenominator(); 
+	int* PM = new int[(*db).getNumStates()];
+	for (int i = 0; i < (*db).getNumStates(); i++) {
+		PM[i] = (*db)[state].getP(i);
+	}
 
 	//setup simulation
-	double Eh = stickyNewton(8, rho, Kh);
+	double Eh = stickyNewton(8, rho, Kh); //get energy corresponding to kappa
 	//initialize interaction matrices
 	int* P = new int[N*N]; double* E = new double[N*N];
 	setupSim(N, Eh, P, E);
 
 	//get starting structures
-	//todo
+	Cluster c = (*db)[state].getRandomIC();
+
+	//cluster structs to arrays
+	double* X = new double[2*N];
+	c.makeArray2d(X, N);
 
 	//equilibrate the trajectories
-	//fn
+	equilibrate(X, db, state, eq, N, DT, rho, E, beta, P, method);
 
 	//run BD
-	
+	runTrajectory(X, db, state, samples, N, DT, rho, E, beta, P, method, Num, Den, PM );
+
+	//print out final state and estimates - debug
+	for (int i = 0; i < 2*N; i++) printf("%f\n", X[i]);
+	printf("%d, %d, \n", Num, Den);
 
 
 
 
 	//free memory
-	delete []E; delete []P;
+	delete []E; delete []P; delete []PM; delete []X;
 
 
 }
