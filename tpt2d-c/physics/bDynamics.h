@@ -41,7 +41,7 @@ void equilibrate(double* X, Database* DB, int state, int eq, int N, double DT,
 void runTrajectory(double* X, Database* DB, int state, int samples, int N, 
 	double DT, int rho, double* E, double beta, int* P, int method, int& Num, 
 																									int& Den, int* PM );
-void checkState(double* X, int N, int state, int new_state, Database* db, int& timer,
+void checkState(double* X, int N, int state, int& new_state, Database* db, int& timer,
 							 int& reset, int& reflect);
 void extractAM(int N, int state, int* AM, Database* db);
 

@@ -3,6 +3,7 @@
 #include <string.h>
 #include "bDynamics.h"
 #include "database.h"
+#include <omp.h>
 namespace bd{
 
 
@@ -16,7 +17,7 @@ void extractAM(int N, int state, int* AM, Database* db) {
 }
 
 
-void checkState(double* X, int N, int state, int new_state, Database* db, int& timer,
+void checkState(double* X, int N, int state, int& new_state, Database* db, int& timer,
 							 int& reset, int& reflect) {
 	//check if state is different than prev step. if so, do various things
 
@@ -45,12 +46,12 @@ void checkState(double* X, int N, int state, int new_state, Database* db, int& t
 		return;
 	}
 	else {//not the same, find matrix in database
-		printf("state change occured\n");
+		printf("state change occured\n"); //debug line
 		for (int i = 0; i < (*db).getNumStates(); i++) {
 			extractAM(N, i, old, db);
 			S = checkSame(old, M, N); 
 			if (S == 1) {//found matrix
-				printf("state change found in db, new state: %d, bonds = %d\n", i, (*db)[i].getBonds());
+				printf("state change found in db, new state: %d, bonds = %d\n", i, (*db)[i].getBonds()); //debug line
 				new_state = i;
 				reflect = 1;
 				delete []M; delete []old;
@@ -100,10 +101,6 @@ void runTrajectory(double* X, Database* db, int state, int samples, int N,
 }
 
 
-
-
-
-
 void equilibrate(double* X, Database* db, int state, int eq, int N, double DT, 
 													int rho, double* E, double beta, int* P, int method) {
 	//perform eq steps to equilibrate the trajectory. do not record data
@@ -132,7 +129,6 @@ void equilibrate(double* X, Database* db, int state, int eq, int N, double DT,
 }
 
 
-
 void setupSim(int N, double Eh, int*& P, double*& E) {
 	//initialize the interaction matrices - all interacting, strong bonds
 	for (int i = 0; i < N*N; i++) {
@@ -149,16 +145,24 @@ void estimateMFPT(int N, int state, Database* db) {
 	//set parameters
 	int rho = 40; double beta = 1; double DT = 0.01; int Kh = 1850;
 	int method = 1; //solve SDEs with EM
-	int samples = 20; //number of hits per walker for estimator
+	int samples = 50; //number of hits per walker for estimator
 	int eq = 200; //number of steps to equilibrate for
 	
 
-	//quantities to update
-	int Num = (*db)[state].getNumerator(); 
-	int Den = (*db)[state].getDenominator(); 
-	int* PM = new int[(*db).getNumStates()];
-	for (int i = 0; i < (*db).getNumStates(); i++) {
-		PM[i] = (*db)[state].getP(i);
+	//quantities to update - old estimates
+	int num_states = db->getNumStates();
+	int num = (*db)[state].getNumerator(); 
+	int den = (*db)[state].getDenominator(); 
+	int* pm = new int[num_states];
+	for (int i = 0; i < num_states; i++) {
+		pm[i] = (*db)[state].getP(i);
+	}
+
+	//quantities to update - new estimates
+	int NUM = 0; int DEN = 0;
+	int* PM = new int[num_states];
+	for (int i = 0; i < num_states; i++) {
+		PM[i] = 0;
 	}
 
 	//setup simulation
@@ -166,6 +170,10 @@ void estimateMFPT(int N, int state, Database* db) {
 	//initialize interaction matrices
 	int* P = new int[N*N]; double* E = new double[N*N];
 	setupSim(N, Eh, P, E);
+
+	//open parallel region
+	#pragma omp parallel reduction(+:NUM, DEN, PM[:num_states])
+	{
 
 	//get starting structures
 	Cluster c = (*db)[state].getRandomIC();
@@ -178,26 +186,33 @@ void estimateMFPT(int N, int state, Database* db) {
 	equilibrate(X, db, state, eq, N, DT, rho, E, beta, P, method);
 
 	//run BD
-	runTrajectory(X, db, state, samples, N, DT, rho, E, beta, P, method, Num, Den, PM );
+	runTrajectory(X, db, state, samples, N, DT, rho, E, beta, P, method, NUM, DEN, PM );
 
-	//print out final state and estimates - debug
-	for (int i = 0; i < 2*N; i++) printf("%f\n", X[i]);
-	printf("%d, %d, \n", Num, Den);
+	//free cluster memory
+	delete []X;
 
+	//end parallel region
+	}
 
+	//combine estimates
+	num += NUM; den += DEN;
+	for (int i = 0; i < num_states; i++) {
+		pm[i] += PM[i];
+	}
+
+	//print out final estimates - debug
+	/*
+	printf("%d, %d, \n", num, den);
+	for (int i = 0; i < num_states; i++) {
+		if (pm[i]>0)
+			printf("%d, %d\n", pm[i], i);
+	}
+	*/
 
 
 	//free memory
-	delete []E; delete []P; delete []PM; delete []X;
-
-
+	delete []E; delete []P; delete []PM; delete []pm;
 }
-
-
-
-
-
-
 
 
 

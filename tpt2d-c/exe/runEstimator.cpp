@@ -19,7 +19,7 @@ int main(int argc, char* argv[]) {
 	bd::Database* db = bd::readData(infile);
 
 	//call the estimator
-	bd::estimateMFPT(db->getN(), 111, db);
+	bd::estimateMFPT(db->getN(), 0, db);
 
 	//output stuff
 	//std::cout << *db;
