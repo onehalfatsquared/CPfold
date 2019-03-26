@@ -29,9 +29,8 @@ int main(int argc, char* argv[]) {
 
 
 
-
+	//free memory - delete database
 	delete db;
 
 	return 0;
-
 }
