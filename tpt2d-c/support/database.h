@@ -14,6 +14,7 @@
 		num - the numerator in an mfpt estimator
 		den - the denominator in an mfpt estimator
 		P - un-normalized transition probabilites out of this state - 1 by num_clusters (known)
+		mfpt - num/den*delta_t
 */
 
 namespace bd {
@@ -34,15 +35,20 @@ class State{
 		int getNumerator() const {return num;}
 		int getDenominator() const {return denom;}
 		int getP(int i) const {return P[i];}
+		double getMFPT() const {return mfpt;}
 		int sumP(int num_states) const;
 
+		//quantities to update - is this ok?
+		int num, denom;
+		int* P;
+		double mfpt;
+
 		//print function
-		std::ostream& print(std::ostream&, int) const;
+		std::ostream& print(std::ostream&, int, int) const;
 
 	private:
 		int freq, bond;
-		int num, denom;
-		bool* am; int* P;
+		bool* am; 
 		int num_coords; 
 		Cluster* coordinates; 
 

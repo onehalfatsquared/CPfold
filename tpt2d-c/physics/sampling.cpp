@@ -145,7 +145,7 @@ void estimateMFPT(int N, int state, Database* db) {
 	//set parameters
 	int rho = 40; double beta = 1; double DT = 0.01; int Kh = 1850;
 	int method = 1; //solve SDEs with EM
-	int samples = 50; //number of hits per walker for estimator
+	int samples = 1000; //number of hits per walker for estimator
 	int eq = 200; //number of steps to equilibrate for
 	
 
@@ -164,6 +164,7 @@ void estimateMFPT(int N, int state, Database* db) {
 	for (int i = 0; i < num_states; i++) {
 		PM[i] = 0;
 	}
+	double mfpt = 0;
 
 	//setup simulation
 	double Eh = stickyNewton(8, rho, Kh); //get energy corresponding to kappa
@@ -198,6 +199,15 @@ void estimateMFPT(int N, int state, Database* db) {
 	num += NUM; den += DEN;
 	for (int i = 0; i < num_states; i++) {
 		pm[i] += PM[i];
+	}
+	mfpt = (num * DT) / den;
+
+	//update database
+	(*db)[state].mfpt = mfpt;
+	(*db)[state].num = num;
+	(*db)[state].denom = den;
+	for (int i = 0; i < num_states; i++) {
+		(*db)[state].P[i] = pm[i];
 	}
 
 	//print out final estimates - debug

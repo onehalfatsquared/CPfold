@@ -1,8 +1,8 @@
 #include <cstdlib>
 #include <stdio.h>
 #include <iostream>
-#include "bDynamics.h"
 #include "database.h"
+#include "tpt.h"
 
 
 
@@ -18,12 +18,14 @@ int main(int argc, char* argv[]) {
 	//get the database here
 	bd::Database* db = bd::readData(infile);
 
-	//call the estimator
-	bd::estimateMFPT(db->getN(), 0, db);
+	//specify initial and target states. Can be many. 
+	int initial; int target;
 
-	//output stuff
-	//std::cout << *db;
-	printf("mfpt = %f\n", (*db)[0].getMFPT());
+	//run tpt function
+	bd::performTPT(db->getN(), initial, target, db);
+	
+
+
 
 
 

@@ -8,6 +8,8 @@ add_subdirectory(support)
 include_directories(support)
 add_subdirectory(physics)
 include_directories(physics)
+add_subdirectory(tpt)
+include_directories(tpt)
 add_subdirectory(exe)
 
 file(COPY input DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/exe)

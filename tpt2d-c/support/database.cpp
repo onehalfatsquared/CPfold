@@ -8,7 +8,7 @@ namespace bd {
 State::State() {
 	am = NULL; coordinates = NULL; P = NULL;
 	freq = 0; bond = 0; num = 0; denom = 0;
-	num_coords = 0;
+	num_coords = 0; mfpt = 0;
 }
 
 //state deconstructor
@@ -108,6 +108,7 @@ Database* readData(std::string& filename) {
 			for (int i = 0; i < num_lines; i ++) {
 				s.P[i] = 0;
 			}
+			s.mfpt = 0;
 		}
 		else if (extra == 'Y') {//mfpt estimates exist, read in
 			in_str >> s.num;
@@ -116,6 +117,7 @@ Database* readData(std::string& filename) {
 			for (int i = 0; i < num_lines; i ++) {
 				in_str >> s.P[i];
 			}
+			in_str >> s.mfpt;
 		}
 
 		//next state
@@ -125,8 +127,8 @@ Database* readData(std::string& filename) {
 	return database;
 }
 
-//write function to output the updated database to a file
-std::ostream& State::print(std::ostream& out_str, int N) const {
+//write functions to output the updated database to a file
+std::ostream& State::print(std::ostream& out_str, int N, int num_states) const {
 	for (int i = 0; i < N*N; i++) {
 		out_str << am[i] << ' ';
 	}
@@ -138,14 +140,20 @@ std::ostream& State::print(std::ostream& out_str, int N) const {
 			out_str << coordinates[i][j].x << ' ' << coordinates[i][j].y << ' ';
 		}
 	}
-	out_str << "N\n";
+	out_str << "Y" << ' ';
+	out_str << num << ' ';
+	out_str << denom << ' ';
+	for (int i = 0; i < num_states; i++) {
+		out_str << P[i] << ' ';
+	}
+	out_str << mfpt << '\n';
 }
 
 std::ostream& operator<<(std::ostream& out_str, const Database& db) {
 	out_str << db.N << '\n';
 	out_str << db.num_states << '\n';
 	for (int i = 0; i < db.num_states; i++) {
-		db[i].print(out_str, db.N);
+		db[i].print(out_str, db.N, db.num_states);
 	}
 }
 
