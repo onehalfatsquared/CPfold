@@ -17,7 +17,7 @@ function [] = cPlot(x,types,P)
     temp = reshape(x, 2, N);
     temp = temp'; temp(:,3) = zeros(N,1);
     temp = temp'; temp = reshape(temp, 1, 3*N);
-    x = temp'
+    x = temp';
     
             
     %matrix to kill bonds for non-interacting particles

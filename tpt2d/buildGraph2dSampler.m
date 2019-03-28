@@ -12,7 +12,7 @@ function [DB,T,resets] = buildGraph2dSampler(N)
     Kl = 0.1;     %small sticky parameter, for other bonds
     state = 1;    %index of worm state 1
     timer = 0;    %keep track of time since last transition
-    samples = 1000000; %number of samples to run for
+    samples = 100000; %number of samples to run for
     resets = [];  %record times BD sim breaks
     
     %import the graph structure and transition times
@@ -52,8 +52,8 @@ function [c, types, P, E] = setupBD(N, Eh, El)
     %create initial configuration and parameters to bd simulation
     %create worm
     c = zeros(2*N,1);
-    %c(1:2:2*N)=(1:N);
-    c(1:2:2*N) = (N:-1:1);
+    c(1:2:2*N)=(1:N);
+    %c(1:2:2*N) = (N:-1:1);
     
     %create types
     types = ones(N,1);    %all particles are the same type
