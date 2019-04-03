@@ -21,7 +21,7 @@ int main(int argc, char* argv[]) {
 	//call the estimator
 	bd::estimateMFPT(db->getN(), 0, db);
 
-	//output stuff
+	//output stuff - for debug
 	//std::cout << *db;
 	printf("mfpt = %f\n", (*db)[0].getMFPT());
 

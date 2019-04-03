@@ -3,4 +3,4 @@ set(SOURCES
 	)
 
 add_library(tpt ${SOURCES})
-target_link_libraries(tpt physics support)
+target_link_libraries(tpt nauty physics support)
