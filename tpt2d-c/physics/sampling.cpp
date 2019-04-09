@@ -38,6 +38,7 @@ void checkState(double* X, int N, int state, int& new_state, Database* db, int& 
 
 	//compare old and new state, check if same
 	int* old = new int[N*N]; for (int i = 0; i < N*N; i++) old[i]=0;
+	int old_bonds = (*db)[state].getBonds();
 	extractAM(N, state, old, db);
 	int S = checkSame(old, M, N);
 
@@ -46,18 +47,25 @@ void checkState(double* X, int N, int state, int& new_state, Database* db, int& 
 		return;
 	}
 	else {//not the same, find matrix in database
-		printf("state change occured\n"); //debug line
+		//printf("state change occured\n"); //debug line
 		for (int i = 0; i < (*db).getNumStates(); i++) {
 			extractAM(N, i, old, db);
 			S = checkSame(old, M, N); 
 			if (S == 1) {//found matrix
-				printf("state change found in db, new state: %d, bonds = %d\n", i, (*db)[i].getBonds()); //debug line
-				new_state = i;
-				reflect = 1;
+				int new_bonds = (*db)[i].getBonds();
+				if (new_bonds == old_bonds + 1 || (old_bonds == 10 && new_bonds ==12 )) {//keep these
+					//printf("state change found in db, new state: %d, bonds = %d\n", i, new_bonds); //debug line
+					new_state = i; reflect = 1;
+				}
+				else {// 2 states at once transition. just delete this sample
+					reset = 1; timer = 0;
+				}
 				delete []M; delete []old;
 				return;
 			}
 		}
+		printf("State not found in database\n\n\n\n\n\n\n");
+		reset = 1; timer = 0;
 	}
 }
 
@@ -147,7 +155,6 @@ void estimateMFPT(int N, int state, Database* db) {
 	int method = 1; //solve SDEs with EM
 	int samples = 1000; //number of hits per walker for estimator
 	int eq = 200; //number of steps to equilibrate for
-	
 
 	//quantities to update - old estimates
 	int num_states = db->getNumStates();
@@ -165,6 +172,9 @@ void estimateMFPT(int N, int state, Database* db) {
 		PM[i] = 0;
 	}
 	double mfpt = 0;
+
+	//output start message
+	printf("Beginning Estimator for state %d out of %d\n.", state, num_states);
 
 	//setup simulation
 	double Eh = stickyNewton(8, rho, Kh); //get energy corresponding to kappa

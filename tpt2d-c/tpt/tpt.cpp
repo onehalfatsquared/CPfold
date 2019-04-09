@@ -3,6 +3,7 @@
 #include <string.h>
 #include <vector>
 #include <../Eigen/Dense>
+#include "point.h"
 #include "database.h"
 #include "bDynamics.h"
 #include "tpt.h"
@@ -25,6 +26,21 @@ void buildNautyGraph(int N, int M, int state, Database* db, graph* g) {
 			}
 		}
 	} 
+}
+
+bool checkIsomorphic(int N, int M, graph* g1, graph* g2) {
+	//check if two canonically labeled graphs are isomorphic
+
+	size_t k;
+	for (k = 0; k < M*(size_t)N; ++k) {
+			if (g1[k] != g2[k]) { //label is different, return 0
+				return 0;
+			}
+		}
+		if (k == M*(size_t)N) { //graphs are isomorphic, return 1
+			return 1;
+		}
+
 }
 
 
@@ -55,13 +71,7 @@ void findIsomorphic(int N, int num_states, int state, Database* db, std::vector<
 		densenauty(g2, lab2, ptn, orbits, &options, &stats, M, N, cg2);
 
 		/* Compare canonically labelled graphs */
-		size_t k;
-		for (k = 0; k < M*(size_t)N; ++k) {
-			if (cg1[k] != cg2[k]) {
-				break;
-			}
-		}
-		if (k == M*(size_t)N) { //graphs are isomorphic, add to iso
+		if (checkIsomorphic(N, M, cg1, cg2) == 1) { //graphs are isomorphic, add to iso
 			iso.push_back(i);
 		}
 	} 
@@ -69,6 +79,9 @@ void findIsomorphic(int N, int num_states, int state, Database* db, std::vector<
 
 void computeCommittor(double* q, double* T, int num_states, int initial, std::vector<int> targets) {
 	//set up and solve equation for the committor function
+
+	//ex
+	//num_states = 4; initial = 0; targets[0]=3;
 
 	//initialize the matrix and vectors
 	Eigen::MatrixXd TM(num_states,num_states); 
@@ -82,6 +95,13 @@ void computeCommittor(double* q, double* T, int num_states, int initial, std::ve
 		TM(i) = T[i]; 
 	}
 	b.fill(0.0);
+
+	//ex
+	/*TM << -1,1,0,0,
+				0.25,-1,0.75,0,
+				0,0.25,-1,0.75,
+				0,0,1,-1;
+	*/
 
 	//loop over initial and target states. edit corresponding rows.
 	//initial
@@ -115,6 +135,9 @@ void computeCommittor(double* q, double* T, int num_states, int initial, std::ve
 	for (int i = 0; i < x.size(); i++) {
 		q[i] = x(i);
 	}
+
+	//ex
+	//for (int i = 0; i < x.size(); i++) printf("%f\n", x(i));
 }
 
 
@@ -170,6 +193,57 @@ void createTransitionMatrix(double* T, int num_states, Database* db) {
 	}
 }
 
+void makeNM(int N, int state, Database* db, Eigen::VectorXd x, Eigen::MatrixXd& J, Eigen::VectorXd& F) {
+	//make the matrix and vector to solve for Newtons method
+
+	double XD, YD;
+	int count = 0;
+
+	//loop over and construct system
+	for (int i = 0; i <N; i ++) {
+		for (int j = 0; j < N; j++) {
+			if ((*db)[state].isInteracting(i,j,N)) {
+				XD = x(2*i) - x(2*j);
+				YD = x(2*i+1) - x(2*j+1);
+				F(count) = XD*XD + YD*YD -1.0;
+				J(count, 2*i) = 2*XD; J(count, 2*j) = -2*XD;
+				J(count, 2*i+1) = 2*YD; J(count, 2*j+1) = -2*YD;
+			}
+		}
+	}
+
+}
+
+void checkPhysicalState(int N, int state, Database* db) {
+	//check if a state is physical - use as start point in Newtons method
+
+	//get the number of bonds
+	int b = (*db)[state].getBonds();
+
+	//initialize the matrix and vectors
+	Eigen::MatrixXd J(b,2*N); 
+	Eigen::VectorXd F(b); 
+	Eigen::VectorXd dx(2*N);  
+	Eigen::VectorXd x(2*N); 
+
+	//fill x and dx
+	Cluster xc = (*db)[state].getRandomIC();
+	for (int i = 0; i < N; i++) {
+		x(2*i) = xc.points[i].x; x(2*i+1) = xc.points[i].y;
+	}
+	dx.fill(0.0);
+
+
+	//fill F and J. do solve with svd decomp.
+	for (int iter = 0; iter < 25; iter++) {
+		makeNM(N, state, db, x, J, F);
+		dx = J.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(-F);
+		x = x+dx;
+	}
+
+	//compare initial and post newton adjacency matrix? todo
+}
+
 
 void performTPT(int N, int initial, int target, Database* db, bool getIso) {
 	//perform tpt calculations from initial to target states
@@ -215,6 +289,8 @@ void performTPT(int N, int initial, int target, Database* db, bool getIso) {
 	
 	//solve dirichlet problem for q 
 	computeCommittor(q, T, num_states, initial, targets);
+
+	checkPhysicalState(N, 770, db);
 
 
 

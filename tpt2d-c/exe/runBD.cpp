@@ -7,9 +7,10 @@ int main(int argc, char* argv[]) {
 	//handle input
 	if (argc != 3) {
 		fprintf(stderr, "Usage: %s <N> <T>", argv[0]);
+		return 1;
 	}
 	int N = atoi(argv[1]);
-	double T = atoi(argv[2]);
+	double T = atof(argv[2]);
 
 	//set parameters
 	int rho = 40;

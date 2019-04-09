@@ -118,6 +118,8 @@ Database* readData(std::string& filename) {
 				in_str >> s.P[i];
 			}
 			in_str >> s.mfpt;
+			in_str >> s.Z; 
+			in_str >> s.Zerr;
 		}
 
 		//next state
@@ -146,7 +148,9 @@ std::ostream& State::print(std::ostream& out_str, int N, int num_states) const {
 	for (int i = 0; i < num_states; i++) {
 		out_str << P[i] << ' ';
 	}
-	out_str << mfpt << '\n';
+	out_str << mfpt << ' ';
+	out_str << Z << ' ';
+	out_str << Zerr << '\n';
 }
 
 std::ostream& operator<<(std::ostream& out_str, const Database& db) {

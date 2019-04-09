@@ -18,6 +18,8 @@ int main(int argc, char* argv[]) {
 	//get the database here
 	bd::Database* db = bd::readData(infile);
 
+	//have a code to filter out un-physical states? todo
+
 	//call the estimator
 	bd::estimateMFPT(db->getN(), 0, db);
 

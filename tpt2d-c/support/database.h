@@ -37,11 +37,14 @@ class State{
 		int getP(int i) const {return P[i];}
 		double getMFPT() const {return mfpt;}
 		int sumP(int num_states) const;
+		double getZ() const {return Z;}
+		double getZerr() const {return Zerr;}
 
 		//quantities to update - is this ok?
 		int num, denom;
 		int* P;
 		double mfpt;
+		double Z, Zerr;
 
 		//print function
 		std::ostream& print(std::ostream&, int, int) const;
