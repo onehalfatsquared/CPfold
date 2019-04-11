@@ -1,13 +1,11 @@
 #include <math.h>
 #include <stdio.h>
-#include "nauty.h"
-#include "database.h"
 #include "adjacency.h"
+#include "nauty.h"
 #include <vector>
 #include <../Eigen/Dense>
 namespace bd{
 
-class Database;
 
 int toIndex(int r, int c, long m) {
   //map row and column number into index in 1d array. column indexed
@@ -83,11 +81,11 @@ bool checkIsomorphic(int N, int M, graph* g1, graph* g2) {
 	size_t k;
 	for (k = 0; k < M*(size_t)N; ++k) {
 			if (g1[k] != g2[k]) { //label is different, return 0
-				return false;
+				return 0;
 			}
 		}
 		if (k == M*(size_t)N) { //graphs are isomorphic, return 1
-			return true;
+			return 1;
 		}
 
 }
@@ -110,14 +108,12 @@ void findIsomorphic(int N, int num_states, int state, Database* db, std::vector<
 	options.defaultptn = TRUE;      //ignore any coloring of graph
 
 	//build nauty graph of the state, get canonical labeling
-	EMPTYGRAPH(cg1, M, N);
 	buildNautyGraph(N, M, state, db, g1);
 	densenauty(g1, lab1, ptn, orbits, &options, &stats, M, N, cg1);
 
 	//loop over all states, check if isomorphic
 	for (int i = 0; i < num_states; i++) {
 		//create graph
-		EMPTYGRAPH(cg2, M, N);
 		buildNautyGraph(N, M, i, db, g2);
 		densenauty(g2, lab2, ptn, orbits, &options, &stats, M, N, cg2);
 

@@ -35,6 +35,8 @@ int main(int argc, char* argv[]) {
 	//run tpt function
 	bd::performTPT(db->getN(), initial, target, db, getIso);
 
+	//std::cout << *db;
+
 
 
 

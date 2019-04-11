@@ -21,11 +21,11 @@ int main(int argc, char* argv[]) {
 	//have a code to filter out un-physical states? todo
 
 	//call the estimator
-	bd::estimateMFPT(db->getN(), 0, db);
+	bd::estimateMFPT(db->getN(), 620, db);
 
 	//output stuff - for debug
 	//std::cout << *db;
-	printf("mfpt = %f\n", (*db)[0].getMFPT());
+	//printf("mfpt = %f\n", (*db)[0].getMFPT());
 
 
 

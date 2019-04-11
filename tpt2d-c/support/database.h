@@ -1,5 +1,10 @@
 #pragma once
 #include "point.h"
+#include "pair.h"
+#include "adjacency.h"
+#include "nauty.h"
+#include <../Eigen/Dense>
+#include <vector>
 #include <string>
 
 /*database structure to store all states.
@@ -30,20 +35,22 @@ class State{
 		//accessor functions
 		int getFrequency() const {return freq;}
 		int getBonds() const {return bond;}
+		int getNumCoords() const {return num_coords;}
 		const Cluster& getRandomIC() const;
 		bool isInteracting(int i, int j, int N) const {return am[i*N+j];}
 		int getNumerator() const {return num;}
 		int getDenominator() const {return denom;}
 		int getP(int i) const {return P[i];}
 		double getMFPT() const {return mfpt;}
+		double getSigma() const {return sigma;}
 		int sumP(int num_states) const;
 		double getZ() const {return Z;}
 		double getZerr() const {return Zerr;}
 
-		//quantities to update - is this ok?
+		//quantities to update
 		int num, denom;
 		int* P;
-		double mfpt;
+		double mfpt, sigma;
 		double Z, Zerr;
 
 		//print function
@@ -95,5 +102,12 @@ class Database {
 //read/write data functions
 Database* readData(std::string& filename);
 std::ostream& operator<<(std::ostream&, const Database&);
+
+bool checkPhysicalState(int N, int state, Database* db);
+void makeNM(int N, int state, int b, Database* db, Eigen::VectorXd , Eigen::MatrixXd& , 
+																							     Eigen::VectorXd& , Eigen::VectorXd);
+
+void getPurgeStates(Database* db, std::vector<int>& toPurge);
+
 
 }

@@ -12,71 +12,6 @@ namespace bd{
 
 
 
-void buildNautyGraph(int N, int M, int state, Database* db, graph* g) {
-	//build nauty graph of given state
-
-	//zero out any pre-existing graph
-	EMPTYGRAPH(g, M, N);
-
-	//add edges for every non-zero entry in adjacnecy matrix
-	for (int i = 0; i < N; i++) {
-		for (int j = i+1; j < N; j++) {
-			if ((*db)[state].isInteracting(i,j,N)) {
-				ADDONEEDGE(g, i, j, M);
-			}
-		}
-	} 
-}
-
-bool checkIsomorphic(int N, int M, graph* g1, graph* g2) {
-	//check if two canonically labeled graphs are isomorphic
-
-	size_t k;
-	for (k = 0; k < M*(size_t)N; ++k) {
-			if (g1[k] != g2[k]) { //label is different, return 0
-				return 0;
-			}
-		}
-		if (k == M*(size_t)N) { //graphs are isomorphic, return 1
-			return 1;
-		}
-
-}
-
-
-void findIsomorphic(int N, int num_states, int state, Database* db, std::vector<int>& iso) {
-	//finds all states isomorphic to given state in database. stored to iso.
-
-	//set keywords for nauty
-	int M = SETWORDSNEEDED(N);
-
-	//initialize the nauty graphs and parameters
-	graph g1[N*M]; graph g2[N*M];   //the starting graphs
-	graph cg1[N*M]; graph cg2[N*M]; //graphs with canonical labeling
-	int lab1[N], lab2[N];           //label arrays
-	int ptn[N], orbits[N];          //needed to call functions
-	static DEFAULTOPTIONS_GRAPH(options); //defualt options
-	statsblk stats;                 //nauty statistics of graph
-	options.getcanon = TRUE;        //get canonical labeling
-	options.defaultptn = TRUE;      //ignore any coloring of graph
-
-	//build nauty graph of the state, get canonical labeling
-	buildNautyGraph(N, M, state, db, g1);
-	densenauty(g1, lab1, ptn, orbits, &options, &stats, M, N, cg1);
-
-	//loop over all states, check if isomorphic
-	for (int i = 0; i < num_states; i++) {
-		//create graph
-		buildNautyGraph(N, M, i, db, g2);
-		densenauty(g2, lab2, ptn, orbits, &options, &stats, M, N, cg2);
-
-		/* Compare canonically labelled graphs */
-		if (checkIsomorphic(N, M, cg1, cg2) == 1) { //graphs are isomorphic, add to iso
-			iso.push_back(i);
-		}
-	} 
-}
-
 void computeCommittor(double* q, double* T, int num_states, int initial, std::vector<int> targets) {
 	//set up and solve equation for the committor function
 
@@ -193,57 +128,6 @@ void createTransitionMatrix(double* T, int num_states, Database* db) {
 	}
 }
 
-void makeNM(int N, int state, Database* db, Eigen::VectorXd x, Eigen::MatrixXd& J, Eigen::VectorXd& F) {
-	//make the matrix and vector to solve for Newtons method
-
-	double XD, YD;
-	int count = 0;
-
-	//loop over and construct system
-	for (int i = 0; i <N; i ++) {
-		for (int j = 0; j < N; j++) {
-			if ((*db)[state].isInteracting(i,j,N)) {
-				XD = x(2*i) - x(2*j);
-				YD = x(2*i+1) - x(2*j+1);
-				F(count) = XD*XD + YD*YD -1.0;
-				J(count, 2*i) = 2*XD; J(count, 2*j) = -2*XD;
-				J(count, 2*i+1) = 2*YD; J(count, 2*j+1) = -2*YD;
-			}
-		}
-	}
-
-}
-
-void checkPhysicalState(int N, int state, Database* db) {
-	//check if a state is physical - use as start point in Newtons method
-
-	//get the number of bonds
-	int b = (*db)[state].getBonds();
-
-	//initialize the matrix and vectors
-	Eigen::MatrixXd J(b,2*N); 
-	Eigen::VectorXd F(b); 
-	Eigen::VectorXd dx(2*N);  
-	Eigen::VectorXd x(2*N); 
-
-	//fill x and dx
-	Cluster xc = (*db)[state].getRandomIC();
-	for (int i = 0; i < N; i++) {
-		x(2*i) = xc.points[i].x; x(2*i+1) = xc.points[i].y;
-	}
-	dx.fill(0.0);
-
-
-	//fill F and J. do solve with svd decomp.
-	for (int iter = 0; iter < 25; iter++) {
-		makeNM(N, state, db, x, J, F);
-		dx = J.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(-F);
-		x = x+dx;
-	}
-
-	//compare initial and post newton adjacency matrix? todo
-}
-
 
 void performTPT(int N, int initial, int target, Database* db, bool getIso) {
 	//perform tpt calculations from initial to target states
@@ -290,12 +174,18 @@ void performTPT(int N, int initial, int target, Database* db, bool getIso) {
 	//solve dirichlet problem for q 
 	computeCommittor(q, T, num_states, initial, targets);
 
-	checkPhysicalState(N, 770, db);
+	std::vector<int> v;
+	getPurgeStates(db, v);
 
+	printf("size of v: %d\n", v.size());
 
+	for (size_t i = 0; i < v.size(); i++) printf("%d\n", v[i]);
+
+	printf("test\n");
 
 	//free the memory
 	delete []T; delete []q;
+	printf("test2\n");
 
 }
 

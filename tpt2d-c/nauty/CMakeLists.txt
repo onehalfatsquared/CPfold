@@ -6,4 +6,3 @@ set(SOURCES
 	naurng.c)
 
 add_library(nauty ${SOURCES})
-target_link_libraries(nauty physics support)
