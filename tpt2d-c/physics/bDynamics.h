@@ -38,9 +38,10 @@ void runTrajectoryMFPT(double* X, Database* DB, int state, int samples, int N,
 	double DT, int rho, double* E, double beta, int* P, int method, int& Num, 
 																									int& Den, std::vector<Pair>& PM );
 void updatePM(int new_state, std::vector<Pair>& PM); 
-void combinePairs(std::vector<Pair>& p1, std::vector<Pair> p2);
 void checkState(double* X, int N, int state, int& new_state, Database* db, int& timer,
 							 int& reset, int& reflect);
+void refine(int N, double* X, int* M);
+void makeNM(int N, int* M, Eigen::VectorXd x, Eigen::MatrixXd& J, Eigen::VectorXd& F);
 void extractAM(int N, int state, int* AM, Database* db);
 double sampleSTD(double* X, int n);
 bool findMatrix(int* M, int* old, int old_bonds, int N, Database* db, int& timer, 

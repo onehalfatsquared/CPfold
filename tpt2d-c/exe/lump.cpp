@@ -2,10 +2,11 @@
 #include <stdio.h>
 #include <iostream>
 #include <fstream>
+#include <ctime>
 #include "bDynamics.h"
 #include "database.h"
 
-//MAKE SURE TO RUN THIS ON A PURGED DATA SET EX input/N7Purge.txt
+
 
 int main(int argc, char* argv[]) {
 
@@ -16,33 +17,28 @@ int main(int argc, char* argv[]) {
 	}
 	std::string infile (argv[1]);
 
+	//seed
+	srand( time(NULL));
+
 	//get the database here
 	bd::Database* db = bd::readData(infile);
 
-	int N = db->getN(); int num_states = db->getNumStates();
-
-	//tell user information
+	//print messages to user
 	printf("Database of states has been read.\n");
-	printf("Mean first passage time estimator beginning.\n");
+	printf("Lumping states by adjacency matrix.\n");
 
+	//get the states to purge
+	bd::lumpPerms(db);
 
-	//call estimator over every state, i. if i has 11 bonds (N=7), do nothing.
-	for (int i = 0; i < 1; i++) {
-		if ((*db)[i].getBonds() == 11 && N == 7) {//these states are rigid
-			//do nothing
-		}
-		else{
-			//call the estimator
-			bd::estimateMFPT(N, i, db);
-		}
-	}
+	//purging is done in output
+	printf("Writing lumped states to new file.\n");
 
 	//output stuff - for debug
 	//std::cout << *db;
 
-	//output the mfpt results to file
+	//output the new states to a file
 	std::string out = infile.substr(6,2);
-	out = out + "mfpt.txt";
+	out = out + "Lump.txt";
 	std::ofstream out_str(out);
 	out_str << *db; 
 

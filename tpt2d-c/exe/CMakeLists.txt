@@ -1,7 +1,11 @@
+add_executable(purge purge.cpp)
 add_executable(runBD runBD.cpp)
 add_executable(runEstimator runEstimator.cpp)
+add_executable(lump lump.cpp)
 add_executable(runTPT runTPT.cpp)
 
+target_link_libraries(purge support)
 target_link_libraries(runBD physics support)
 target_link_libraries(runEstimator physics support)
+target_link_libraries(lump nauty support)
 target_link_libraries(runTPT tpt nauty physics support)

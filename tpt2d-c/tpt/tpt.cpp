@@ -15,9 +15,6 @@ namespace bd{
 void computeCommittor(double* q, double* T, int num_states, int initial, std::vector<int> targets) {
 	//set up and solve equation for the committor function
 
-	//ex
-	//num_states = 4; initial = 0; targets[0]=3;
-
 	//initialize the matrix and vectors
 	Eigen::MatrixXd TM(num_states,num_states); 
 	Eigen::VectorXd b(num_states); 
@@ -30,13 +27,6 @@ void computeCommittor(double* q, double* T, int num_states, int initial, std::ve
 		TM(i) = T[i]; 
 	}
 	b.fill(0.0);
-
-	//ex
-	/*TM << -1,1,0,0,
-				0.25,-1,0.75,0,
-				0,0.25,-1,0.75,
-				0,0,1,-1;
-	*/
 
 	//loop over initial and target states. edit corresponding rows.
 	//initial
@@ -70,9 +60,6 @@ void computeCommittor(double* q, double* T, int num_states, int initial, std::ve
 	for (int i = 0; i < x.size(); i++) {
 		q[i] = x(i);
 	}
-
-	//ex
-	//for (int i = 0; i < x.size(); i++) printf("%f\n", x(i));
 }
 
 
@@ -179,13 +166,6 @@ void performTPT(int N, int initial, int target, Database* db, bool getIso) {
 	
 	//solve dirichlet problem for q 
 	computeCommittor(q, T, num_states, initial, targets);
-
-	std::vector<int> v;
-	getPurgeStates(db, v);
-
-	printf("size of v: %d\n", v.size());
-
-	for (size_t i = 0; i < v.size(); i++) printf("%d\n", v[i]);
 
 	//free the memory
 	delete []T; delete []q;

@@ -17,7 +17,7 @@
 		bond - the number of bonds the state has
 		coordinates - an array of sample coordinates in the state - unknown by 2*N;
 		num - the numerator in an mfpt estimator
-		den - the denominator in an mfpt estimator
+		denom - the denominator in an mfpt estimator
 		mfpt - num/den*delta_t
 		sigma - standard deviation of the mfpt estimate
 		num_neighbors - number of states that this state talks to
@@ -55,17 +55,17 @@ class State{
 		std::vector<Pair> getZerr() const {return Zerr;}
 
 		//quantities to update
-		int num, denom;
+		int freq, num, denom;
 		int num_neighbors;
 		double mfpt, sigma;
 		//Pair* P; Pair* Z; Pair* Zerr;
 		std::vector<Pair> P; std::vector<Pair> Z; std::vector<Pair> Zerr;
 
 		//print function
-		std::ostream& print(std::ostream&, int, int) const;
+		std::ostream& print(std::ostream&, int) const;
 
 	private:
-		int freq, bond;
+		int bond;
 		bool* am; 
 		int num_coords; 
 		Cluster* coordinates; 
@@ -88,6 +88,8 @@ class Database {
 		State& operator[](int index) {return states[index];}
 		const State& operator[](int index) const {return states[index];}
 		friend std::ostream& operator<<(std::ostream&, const Database&);
+
+		std::vector<int> toPurge;
 
 		//accessor functions
 		int getN() const {return N;}
@@ -116,6 +118,9 @@ void makeNM(int N, int state, int b, Database* db, Eigen::VectorXd , Eigen::Matr
 																							     Eigen::VectorXd& , Eigen::VectorXd);
 
 void getPurgeStates(Database* db, std::vector<int>& toPurge);
-
+void purgeUnphysical(Database* db);
+void combinePairs(std::vector<Pair>& p1, std::vector<Pair> p2);
+void lumpEntries(Database* db, int state, std::vector<int> perms);
+void lumpPerms(Database* db);
 
 }

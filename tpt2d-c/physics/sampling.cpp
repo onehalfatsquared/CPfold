@@ -18,29 +18,6 @@ double sampleSTD(double* X, int n) {
 	return sqrt(std);
 }
 
-void combinePairs(std::vector<Pair>& p1, std::vector<Pair> p2) {
-	//combines two vectors of pairs into one vector of pairs, p1.
-	//if index is duplicated, the values are summed. 
-
-	int i,j;
-
-	int N = p1.size(); //initial length of p2
-
-	for ( i = 0; i < p2.size(); i++) {
-		int index = p2[i].index; 
-		for ( j = 0; j < N; j++) {
-			if (index == p1[j].index) {//both vectors have this state
-				p1[j].value += p2[i].value;
-				break;
-			}
-		}
-		if (j == N) {//only vector 2 has this, add to vector 1
-			p1.push_back(p2[i]);
-		}
-	}
-}
-
-
 
 void extractAM(int N, int state, int* AM, Database* db) {
 	//extracts the adjacency matrix of state from the database
@@ -49,6 +26,70 @@ void extractAM(int N, int state, int* AM, Database* db) {
 			AM[i*N+j] = (*db)[state].isInteracting(i,j,N);
 		}
 	}
+}
+
+void makeNM(int N, int* M, Eigen::VectorXd x, Eigen::MatrixXd& J, Eigen::VectorXd& F) {
+	//make the matrix and vector to solve for Newtons method
+
+	double XD, YD;
+	int count = 0;
+
+	//loop over and construct system
+	for (int i = 0; i <N; i ++) {
+		for (int j = i+1; j < N; j++) {
+			if (M[toIndex(i,j,N)] == 1) {
+				XD = x(2*i) - x(2*j);
+				YD = x(2*i+1) - x(2*j+1);
+				F(count) = XD*XD + YD*YD -1.0;
+				J(count, 2*i) = 2*XD; J(count, 2*j) = -2*XD;
+				J(count, 2*i+1) = 2*YD; J(count, 2*j+1) = -2*YD;
+				count +=1;
+			}
+		}
+	}
+}
+
+void refine(int N, double* X, int* M) {
+	//refine a potentially unphysical state with NM - fill an adjacency matrix
+
+	//set parameters to newtons method
+	int max_iter = 50;
+	double tol = 1e-8;
+
+	int b = 0; //num bonds
+	for (int i = 0; i < N*N; i++) b+=M[i];
+	b /= 2;
+
+	//initialize the matrix and vectors
+	Eigen::MatrixXd J(b,2*N); 
+	Eigen::VectorXd F(b); 
+	Eigen::VectorXd dx(2*N);  
+	Eigen::VectorXd x(2*N); 
+
+	//initialize x. fill others with zeros.
+	for (int i = 0; i < 2*N; i++) {
+		x(i) = X[i];
+	}
+	dx.fill(0.0); F.fill(0.0); J.fill(0.0);
+
+	//fill F and J. do solve with svd decomp.
+	int iter;
+	for (iter = 0; iter < max_iter; iter++) {
+		makeNM(N, M, x, J, F);
+		dx = J.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(-F);
+		x = x+dx;
+		if (dx.norm() < tol) {
+			break;
+		}
+	}
+
+	//build adjacency matrix
+	for (int i = 0; i < N*N; i++) M[i] = 0;
+	double* XM = new double[2*N]; for (int i = 0; i < 2*N; i++) XM[i]=x(i);
+	getAdj(XM, N, M);
+
+	//free memory
+	delete []XM;
 }
 
 bool findMatrix(int* M, int* old, int old_bonds, int N, Database* db, int& timer, int& reset, int& reflect, 
@@ -105,10 +146,13 @@ void checkState(double* X, int N, int state, int& new_state, Database* db, int& 
 	else {//not the same, find matrix in database
 		S = findMatrix(M, old, old_bonds, N, db, timer, reset, reflect, new_state);
 		if (S == 0) {
-			//most of these are unphysical 11 bond state - map to 12 bond with newton?
-			for (int j = 0; j < 2*N; j++) printf("%f\n", X[j]);
-			printf("State not found in database\n\n\n\n\n\n\n");
-			reset = 1; timer = 0;
+			//may output an unphysical state. refine with newton, check again
+			refine(N, X, M);
+			S = findMatrix(M, old, old_bonds, N, db, timer, reset, reflect, new_state);
+			if (S == 0) { //state still not found after refine, ignore this sample
+				reset = 1; timer = 0;
+				printf("State not found in database\n\n\n\n\n");
+			}
 		}
 		delete []M; delete []old;
 		return;
@@ -218,7 +262,7 @@ void estimateMFPT(int N, int state, Database* db) {
 	//set parameters
 	int rho = 40; double beta = 1; double DT = 0.01; int Kh = 1850;
 	int method = 1; //solve SDEs with EM
-	int samples = 150; //number of hits per walker for estimator
+	int samples = 500; //number of hits per walker for estimator
 	int eq = 200; //number of steps to equilibrate for
 
 	//quantities to update - old estimates

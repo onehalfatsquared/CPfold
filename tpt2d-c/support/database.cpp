@@ -1,5 +1,6 @@
 #include "database.h"
 #include "nauty.h"
+#include <algorithm>
 #include <../Eigen/Dense>
 #include <vector>
 #include <fstream>
@@ -139,7 +140,7 @@ Database* readData(std::string& filename) {
 }
 
 //write functions to output the updated database to a file
-std::ostream& State::print(std::ostream& out_str, int N, int num_states) const {
+std::ostream& State::print(std::ostream& out_str, int N) const {
 	for (int i = 0; i < N*N; i++) {
 		out_str << am[i] << ' ';
 	}
@@ -167,10 +168,18 @@ std::ostream& State::print(std::ostream& out_str, int N, int num_states) const {
 }
 
 std::ostream& operator<<(std::ostream& out_str, const Database& db) {
+	//overload << to print out the database
+
+	//check if any states are being purged
+	int num_purge = db.toPurge.size();
+
+	//print the non-purged states
 	out_str << db.N << '\n';
-	out_str << db.num_states << '\n';
+	out_str << db.num_states - num_purge << '\n';
 	for (int i = 0; i < db.num_states; i++) {
-		db[i].print(out_str, db.N, db.num_states);
+		if (std::find(db.toPurge.begin(), db.toPurge.end(), i) == db.toPurge.end()) {
+			db[i].print(out_str, db.N);
+		}
 	}
 }
 
@@ -208,7 +217,7 @@ bool checkPhysicalState(int N, int state, Database* db) {
 	//check if there are any example coordinates
 	int coord = (*db)[state].getNumCoords();
 	if (coord == 0) {
-		printf("No coordinates\n");
+		//printf("No coordinates\n");
 		return false;
 	}
 
@@ -233,8 +242,8 @@ bool checkPhysicalState(int N, int state, Database* db) {
 	dx.fill(0.0); F.fill(0.0); J.fill(0.0);
 
 	//output starting cluster - debug
-	for (int i =0; i < 2*N; i++) printf("%f\n", x(i));
-	printf("\n");
+	//for (int i =0; i < 2*N; i++) printf("%f\n", x(i));
+	//printf("\n");
 
 
 	//fill F and J. do solve with svd decomp.
@@ -253,10 +262,8 @@ bool checkPhysicalState(int N, int state, Database* db) {
 		printf("State %d, Newton's Method terminated with residual %f\n", state, dx.norm());
 	}
 
-	printf("%d, %d\n", state, iter);
-
 	//output final cluster - debug
-	for (int i =0; i < 2*N; i++) printf("%f\n", x(i));
+	//for (int i =0; i < 2*N; i++) printf("%f\n", x(i));
 
 	//compare initial and post newton adjacency matrix
 
@@ -318,19 +325,144 @@ void getPurgeStates(Database* db, std::vector<int>& toPurge) {
 	int N = db->getN(); int ns = db->getNumStates();
 
 	for (int i = 0; i < ns; i++) {
-		//printf("test says %d\n", checkPhysicalState(N, i, db));
 		if (!checkPhysicalState(N, i, db)) {
-			//state is unphysical, add to purge array.
+			//state is unphysical, but check again to ensure IC not bad
 			if (!checkPhysicalState(N, i, db)) {
-				toPurge.push_back(i);
+				//state is unphysical, but check again to ensure IC not bad
+				if (!checkPhysicalState(N, i, db)) {
+					//state is unphysical. tell user and add to vector
+					printf("State %d is unphysical.\n", i);
+					toPurge.push_back(i);
+				}
 			}
 		}
 	}
 }
 
-void purgeUnphysical() {
+void purgeUnphysical(Database* db) {
 	//write to new file, skip purge states
+
+	//init purge vector
+	std::vector<int> toPurge;
+
+	//get states to purge
+	getPurgeStates(db, toPurge);
+
+	//give to database
+	db->toPurge = toPurge;
+
 }
+
+void combinePairs(std::vector<Pair>& p1, std::vector<Pair> p2) {
+	//combines two vectors of pairs into one vector of pairs, p1.
+	//if index is duplicated, the values are summed. 
+
+	int i,j;
+
+	int N = p1.size(); //initial length of p2
+
+	for ( i = 0; i < p2.size(); i++) {
+		int index = p2[i].index; 
+		for ( j = 0; j < N; j++) {
+			if (index == p1[j].index) {//both vectors have this state
+				p1[j].value += p2[i].value;
+				break;
+			}
+		}
+		if (j == N) {//only vector 2 has this, add to vector 1
+			p1.push_back(p2[i]);
+		}
+	}
+}
+
+void lumpEntries(Database* db, int state, std::vector<int> perms) {
+	//updates the entries of the lumped state 
+
+	int N = db->getN(); int ns = db->getNumStates();
+
+	//basic quantities
+	int freq = (*db)[state].getFrequency();
+	int num = (*db)[state].getNumerator();
+	int denom = (*db)[state].getDenominator();
+	double mfpt = (*db)[state].getMFPT();
+	double sigma = (*db)[state].getSigma();
+	double dt = mfpt * denom / num;
+
+	//state dependent quantities
+	std::vector<Pair> P = (*db)[state].getP();
+	std::vector<Pair> Z = (*db)[state].getZ();
+	std::vector<Pair> Zerr = (*db)[state].getZerr();
+
+	//isomorphism vectors
+	std::vector<int> iso;
+	std::vector<Pair> isoPair;
+
+	for (int i = 0; i < perms.size(); i++) {
+
+		printf("%d, ", perms[i]);
+		//update basic quantities
+		freq += (*db)[perms[i]].getFrequency();
+		num += (*db)[perms[i]].getNumerator();
+		denom += (*db)[perms[i]].getDenominator();
+		mfpt = 1 / (1/mfpt + 1/(*db)[perms[i]].getMFPT()); 
+		sigma = sqrt(sigma*sigma + (*db)[perms[i]].getSigma()*(*db)[perms[i]].getSigma());
+
+		//update state dependent quantities
+		//get quantities for states getting lumped
+		std::vector<Pair> P2 = (*db)[perms[i]].getP();
+		std::vector<Pair> Z2 = (*db)[perms[i]].getZ();
+		std::vector<Pair> Zerr2 = (*db)[perms[i]].getZerr();
+
+		//compute the minimum index of this states isomorphisms
+		isoPair.clear();
+		for (int j = 0; j < P2.size(); j++) {
+			iso.clear();
+			findIsomorphic(N, ns, P2[j].index, db, iso);
+			int min_iso = *std::min_element(iso.begin(), iso.end());
+			isoPair.push_back(Pair(min_iso, P2[j].value));
+			//todo - include Z and Zerr
+		}
+
+		//have the pair vector to update P with. call function to update
+		combinePairs(P, isoPair);
+
+		//write the updates back to the DB
+		(*db)[state].freq = freq;
+		(*db)[state].num = num;
+		(*db)[state].denom = denom;
+		(*db)[state].mfpt = mfpt;
+		(*db)[state].sigma = sigma;
+		(*db)[state].P = P;
+		(*db)[state].Z = Z; // todo
+		(*db)[state].Zerr = Zerr;// todo
+		
+
+	}
+}
+
+
+void lumpPerms(Database* db) {
+	//loop over states, lump perms, get vector of repeated states
+
+	int N = db->getN(); int ns = db->getNumStates();
+	std::vector<int> repeated;
+	std::vector<int> perms;
+
+	for (int i = 0; i < ns; i++) {
+		//check that i is not in repeated list
+		if (std::find(repeated.begin(), repeated.end(), i) == repeated.end()) {
+			findIsomorphic(N, ns, i, db, perms);
+			printf("State %d is a permutation of state ", i);
+			lumpEntries(db, i, perms);
+			printf("\n");
+			repeated.insert(repeated.end(), perms.begin()+1, perms.end());
+			perms.clear();
+		}
+	}
+	db->toPurge = repeated;
+
+}
+
 
 
 
