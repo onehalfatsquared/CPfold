@@ -1,6 +1,7 @@
 #include "database.h"
 #include "nauty.h"
 #include <../Eigen/Dense>
+#include <vector>
 #include <fstream>
 #include <cstdlib>
 namespace bd {
@@ -8,15 +9,17 @@ namespace bd {
 
 //state constructor
 State::State() {
-	am = NULL; coordinates = NULL; P = NULL;
+	am = NULL; coordinates = NULL; 
+	//P = NULL; Z = NULL; Zerr = NULL;
 	freq = 0; bond = 0; num = 0; denom = 0;
-	num_coords = 0; mfpt = 0; Z = 0; Zerr = 0;
-	sigma = 0;
+	num_coords = 0; mfpt = 0; 
+	sigma = 0; num_neighbors = 0;
 }
 
 //state deconstructor
 State::~State() {
-	delete []am; delete []coordinates; delete []P;
+	delete []am; delete []coordinates; //delete []P;
+	//delete []Z; delete []Zerr;
 }
 
 //database constructor
@@ -31,10 +34,10 @@ Database::~Database() {
 }
 
 //sum the entries of s.P
-int State::sumP(int num_states) const{
+int State::sumP() const{
 	int S = 0;
-	for (int i = 0; i < num_states; i++) {
-		S += P[i];
+	for (int i = 0; i < num_neighbors; i++) {
+		S += P[i].value;
 	}
 	return S;
 }
@@ -67,9 +70,11 @@ Database* readData(std::string& filename) {
 
 	bool val; //check if there is another line
 	int coord; //number of sample coordinates for a state
-	int index; //loop over states
+	int index = 0; //loop over states
 	double x, y; //coordinates in a point
 	char extra; //flag for whether mfpt estimates are in file
+	int v1; double v2; //storing index and info in a pair
+	double v3; double v4;
 
 	//call the database class constructor
 	Database* database = new Database(N, num_lines);
@@ -107,22 +112,23 @@ Database* readData(std::string& filename) {
 		if (extra == 'N') {//no mfpt estimates, initialize to 0
 			s.num = 0;
 			s.denom = 0;
-			s.P = new int[num_lines];
-			for (int i = 0; i < num_lines; i ++) {
-				s.P[i] = 0;
-			}
 			s.mfpt = 0;
+			s.sigma = 0;
+			s.num_neighbors = 0;
 		}
 		else if (extra == 'Y') {//mfpt estimates exist, read in
 			in_str >> s.num;
 			in_str >> s.denom;
-			s.P = new int[num_lines];
-			for (int i = 0; i < num_lines; i ++) {
-				in_str >> s.P[i];
-			}
 			in_str >> s.mfpt;
-			in_str >> s.Z; 
-			in_str >> s.Zerr;
+			in_str >> s.sigma; 
+			in_str >> s.num_neighbors;
+
+			for (int i = 0; i < s.num_neighbors; i ++) {
+				in_str >> v1; in_str >> v2; in_str >> v3; in_str >> v4;
+				s.P.push_back(Pair(v1,v2));
+				s.Z.push_back(Pair(v1,v3));
+				s.Zerr.push_back(Pair(v1,v4));
+			}
 		}
 
 		//next state
@@ -148,12 +154,16 @@ std::ostream& State::print(std::ostream& out_str, int N, int num_states) const {
 	out_str << "Y" << ' ';
 	out_str << num << ' ';
 	out_str << denom << ' ';
-	for (int i = 0; i < num_states; i++) {
-		out_str << P[i] << ' ';
-	}
 	out_str << mfpt << ' ';
-	out_str << Z << ' ';
-	out_str << Zerr << '\n';
+	out_str << sigma << ' ';
+	out_str << num_neighbors << ' ';
+	for (int i = 0; i < num_neighbors; i ++) {
+		out_str << P[i].index << ' ' << P[i].value << ' ';
+		out_str << Z[i].value << ' ' << Zerr[i].value << ' ';
+	}
+	
+	out_str << '\n';
+	
 }
 
 std::ostream& operator<<(std::ostream& out_str, const Database& db) {
@@ -216,7 +226,7 @@ bool checkPhysicalState(int N, int state, Database* db) {
 	Eigen::VectorXd x(2*N); 
 
 	//initialize x. fill others with zeros.
-	Cluster xc = (*db)[state].getRandomIC();
+	const Cluster& xc = (*db)[state].getRandomIC();
 	for (int i = 0; i < N; i++) {
 		x(2*i) = xc.points[i].x; x(2*i+1) = xc.points[i].y;
 	}
@@ -263,19 +273,24 @@ bool checkPhysicalState(int N, int state, Database* db) {
 	options.getcanon = TRUE;        //get canonical labeling
 	options.defaultptn = TRUE;      //ignore any coloring of graph
 
+	//initialize arrays
+	for (int i = 0; i < N; i++) {
+		lab1[i] = lab2[i] = ptn[i] = orbits[i] = 0;
+	}
+
 	//build nauty graph of the old state, get canonical labeling
 	buildNautyGraph(N, M, state, db, g1);
 	EMPTYGRAPH(cg1, M, N);
 	densenauty(g1, lab1, ptn, orbits, &options, &stats, M, N, cg1);
 
 	//get adjacnecy matrix of post newton state
-	int* AM = new int[N*N]; 
+	int* AM = new int[N*N]; for (int i = 0; i < N*N; i++) AM[i] = 0;
 	double* X = new double[2*N]; for (int i = 0; i < 2*N; i++) X[i]=x(i);
 	getAdj(X, N, AM);
 
 	//make graph
 	//zero out any pre-existing graph
-	EMPTYGRAPH(g2, M, N); EMPTYGRAPH(cg2, M, N);
+	EMPTYGRAPH(g2, M, N); 
 
 	//add edges for every non-zero entry in adjacnecy matrix
 	for (int i = 0; i < N; i++) {
@@ -302,14 +317,15 @@ void getPurgeStates(Database* db, std::vector<int>& toPurge) {
 
 	int N = db->getN(); int ns = db->getNumStates();
 
-	for (int i = 5; i < 10; i++) {
+	for (int i = 0; i < ns; i++) {
 		//printf("test says %d\n", checkPhysicalState(N, i, db));
 		if (!checkPhysicalState(N, i, db)) {
 			//state is unphysical, add to purge array.
-			toPurge.push_back(i);
+			if (!checkPhysicalState(N, i, db)) {
+				toPurge.push_back(i);
+			}
 		}
 	}
-	printf("loop done\n");
 }
 
 void purgeUnphysical() {

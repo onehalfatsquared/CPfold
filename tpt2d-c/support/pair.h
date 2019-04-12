@@ -24,20 +24,7 @@ struct Pair {
 	Pair(int index_, double value_) : index(index_), value(value_) {}
 };
 
-//create a cluster structure - stores N points
-struct SparseVec {
-	//constructor and destructors
-	SparseVec(int N) {pairs = new Pair[N];}
-	SparseVec() {pairs = NULL;}
-	~SparseVec() {delete []pairs;}
 
-	void setNumPoints(int N) {pairs = new Pair[N];}
-	Pair* pairs;
-
-	//define bracket operators - allows indexing of points
-	Pair& operator[](int index) {return pairs[index];}
-	const Pair& operator[](int index) const {return pairs[index];}
-};
 
 
 

@@ -118,12 +118,18 @@ void createTransitionMatrix(double* T, int num_states, Database* db) {
 		den = (*db)[state].getDenominator(); 
 		//todo
 		mfpt = (*db)[state].getMFPT(); mfpt = 1; //FOR TESTING ONLY. DELETE LATER. NO DATA YET.
-		S = (*db)[state].sumP(num_states); //get normalizing constant for this row
+		S = (*db)[state].sumP(); //get normalizing constant for this row
 		S = 1; //DELETE LATER.
 
 		//loop over row. Copy data into rate matrix
+		/*
 		for (int i = 0; i < num_states; i++) {
 			T[toIndex(state, i, num_states)] = ((*db)[state].getP(i) / S) / mfpt;
+		}
+		*/
+		std::vector<Pair> P = (*db)[state].getP();
+		for (int i = 0; i < P.size(); i++) {
+			T[toIndex(state, P[i].index, num_states)] = (P[i].value / S) / mfpt;
 		}
 	}
 }
@@ -181,11 +187,8 @@ void performTPT(int N, int initial, int target, Database* db, bool getIso) {
 
 	for (size_t i = 0; i < v.size(); i++) printf("%d\n", v[i]);
 
-	printf("test\n");
-
 	//free the memory
 	delete []T; delete []q;
-	printf("test2\n");
 
 }
 

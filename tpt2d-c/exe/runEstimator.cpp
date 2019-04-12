@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <stdio.h>
 #include <iostream>
+#include <fstream>
 #include "bDynamics.h"
 #include "database.h"
 
@@ -18,13 +19,17 @@ int main(int argc, char* argv[]) {
 	//get the database here
 	bd::Database* db = bd::readData(infile);
 
+	printf("Database of states has been read.\n");
+
 	//have a code to filter out un-physical states? todo
 
 	//call the estimator
-	bd::estimateMFPT(db->getN(), 620, db);
+	bd::estimateMFPT(db->getN(), 0, db);
 
 	//output stuff - for debug
 	//std::cout << *db;
+	std::ofstream out_str("N7Result.txt");
+	out_str << *db; 
 	//printf("mfpt = %f\n", (*db)[0].getMFPT());
 
 

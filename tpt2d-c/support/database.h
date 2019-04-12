@@ -18,8 +18,15 @@
 		coordinates - an array of sample coordinates in the state - unknown by 2*N;
 		num - the numerator in an mfpt estimator
 		den - the denominator in an mfpt estimator
-		P - un-normalized transition probabilites out of this state - 1 by num_clusters (known)
 		mfpt - num/den*delta_t
+		sigma - standard deviation of the mfpt estimate
+		num_neighbors - number of states that this state talks to
+		P - un-normalized tranisition probabilities. stored sparsely in pairs
+		Z - ratio of partition functions. sparse pair storage
+		Zerr - standard deviation of partition function estimate
+
+		values appear in this order when reading and writing to file.
+
 */
 
 namespace bd {
@@ -40,18 +47,19 @@ class State{
 		bool isInteracting(int i, int j, int N) const {return am[i*N+j];}
 		int getNumerator() const {return num;}
 		int getDenominator() const {return denom;}
-		int getP(int i) const {return P[i];}
 		double getMFPT() const {return mfpt;}
 		double getSigma() const {return sigma;}
-		int sumP(int num_states) const;
-		double getZ() const {return Z;}
-		double getZerr() const {return Zerr;}
+		int sumP() const;
+		std::vector<Pair> getP() const {return P;}
+		std::vector<Pair> getZ() const {return Z;}
+		std::vector<Pair> getZerr() const {return Zerr;}
 
 		//quantities to update
 		int num, denom;
-		int* P;
+		int num_neighbors;
 		double mfpt, sigma;
-		double Z, Zerr;
+		//Pair* P; Pair* Z; Pair* Zerr;
+		std::vector<Pair> P; std::vector<Pair> Z; std::vector<Pair> Zerr;
 
 		//print function
 		std::ostream& print(std::ostream&, int, int) const;
