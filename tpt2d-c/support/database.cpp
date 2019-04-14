@@ -27,11 +27,15 @@ State::~State() {
 Database::Database(int N_, int num_states_) {
 	N = N_; num_states = num_states_;
 	states = new State[num_states];
+	lumpMap = new int[num_states];
+	for (int i = 0; i < num_states; i++) {
+		lumpMap[i] = i;
+	}
 }
 
 //database deconstructor
 Database::~Database() {
-	delete []states;
+	delete []states; delete []lumpMap;
 }
 
 //sum the entries of s.P
@@ -44,7 +48,7 @@ int State::sumP() const{
 }
 
 //pull a random set of coordinates from the available
-const Cluster& State::getRandomIC() const {//todo fix rng
+const Cluster& State::getRandomIC() const {
 	int rand_state = rand() % num_coords;
 	return coordinates[rand_state];
 }
@@ -140,7 +144,7 @@ Database* readData(std::string& filename) {
 }
 
 //write functions to output the updated database to a file
-std::ostream& State::print(std::ostream& out_str, int N) const {
+std::ostream& State::print(std::ostream& out_str, int N, int* lumpMap) const {
 	for (int i = 0; i < N*N; i++) {
 		out_str << am[i] << ' ';
 	}
@@ -159,7 +163,7 @@ std::ostream& State::print(std::ostream& out_str, int N) const {
 	out_str << sigma << ' ';
 	out_str << num_neighbors << ' ';
 	for (int i = 0; i < num_neighbors; i ++) {
-		out_str << P[i].index << ' ' << P[i].value << ' ';
+		out_str << lumpMap[P[i].index] << ' ' << P[i].value << ' ';
 		out_str << Z[i].value << ' ' << Zerr[i].value << ' ';
 	}
 	
@@ -178,7 +182,7 @@ std::ostream& operator<<(std::ostream& out_str, const Database& db) {
 	out_str << db.num_states - num_purge << '\n';
 	for (int i = 0; i < db.num_states; i++) {
 		if (std::find(db.toPurge.begin(), db.toPurge.end(), i) == db.toPurge.end()) {
-			db[i].print(out_str, db.N);
+			db[i].print(out_str, db.N, db.lumpMap);
 		}
 	}
 }
@@ -359,24 +363,39 @@ void combinePairs(std::vector<Pair>& p1, std::vector<Pair> p2) {
 
 	int i,j;
 
-	int N = p1.size(); //initial length of p2
+	bool flag;
 
 	for ( i = 0; i < p2.size(); i++) {
 		int index = p2[i].index; 
-		for ( j = 0; j < N; j++) {
+		flag = false;
+		for ( j = 0; j < p1.size(); j++) {
 			if (index == p1[j].index) {//both vectors have this state
 				p1[j].value += p2[i].value;
-				break;
+				flag = true;
 			}
 		}
-		if (j == N) {//only vector 2 has this, add to vector 1
+		if (!flag) {//only vector 2 has this, add to vector 1
 			p1.push_back(p2[i]);
 		}
 	}
 }
 
+void getMinIndex(int N, int ns, std::vector<Pair> P, Database* db, 
+									std::vector<int>& iso, std::vector<Pair>& isoPair ) {
+
+	isoPair.clear();
+
+	for (int j = 0; j < P.size(); j++) {
+			iso.clear();
+			findIsomorphic(N, ns, P[j].index, db, iso);
+			int min_iso = *std::min_element(iso.begin(), iso.end());
+			isoPair.push_back(Pair(min_iso, P[j].value));
+			//todo - include Z and Zerr
+		}
+}
+
 void lumpEntries(Database* db, int state, std::vector<int> perms) {
-	//updates the entries of the lumped state 
+	//updates the entries of the lumped state //todo Z and Zerr
 
 	int N = db->getN(); int ns = db->getNumStates();
 
@@ -397,6 +416,9 @@ void lumpEntries(Database* db, int state, std::vector<int> perms) {
 	std::vector<int> iso;
 	std::vector<Pair> isoPair;
 
+	//make new P that contains min isomorphism indexes
+	std::vector<Pair> Pnew; Pnew.clear();
+
 	for (int i = 0; i < perms.size(); i++) {
 
 		printf("%d, ", perms[i]);
@@ -414,27 +436,22 @@ void lumpEntries(Database* db, int state, std::vector<int> perms) {
 		std::vector<Pair> Zerr2 = (*db)[perms[i]].getZerr();
 
 		//compute the minimum index of this states isomorphisms
-		isoPair.clear();
-		for (int j = 0; j < P2.size(); j++) {
-			iso.clear();
-			findIsomorphic(N, ns, P2[j].index, db, iso);
-			int min_iso = *std::min_element(iso.begin(), iso.end());
-			isoPair.push_back(Pair(min_iso, P2[j].value));
-			//todo - include Z and Zerr
-		}
+		getMinIndex(N, ns, P2, db, iso, isoPair);
 
 		//have the pair vector to update P with. call function to update
-		combinePairs(P, isoPair);
+		combinePairs(Pnew, isoPair);
 
-		//write the updates back to the DB
-		(*db)[state].freq = freq;
-		(*db)[state].num = num;
-		(*db)[state].denom = denom;
-		(*db)[state].mfpt = mfpt;
-		(*db)[state].sigma = sigma;
-		(*db)[state].P = P;
-		(*db)[state].Z = Z; // todo
-		(*db)[state].Zerr = Zerr;// todo
+
+	//write the updates back to the DB
+	(*db)[state].freq = freq;
+	(*db)[state].num = num;
+	(*db)[state].denom = denom;
+	(*db)[state].mfpt = mfpt;
+	(*db)[state].sigma = sigma;
+	(*db)[state].num_neighbors = Pnew.size();
+	(*db)[state].P = Pnew;
+	(*db)[state].Z = Z; // todo
+	(*db)[state].Zerr = Zerr;// todo
 		
 
 	}
@@ -447,19 +464,39 @@ void lumpPerms(Database* db) {
 	int N = db->getN(); int ns = db->getNumStates();
 	std::vector<int> repeated;
 	std::vector<int> perms;
+	int* lumpMap = new int[ns]; 
+
+	int count = 0;
 
 	for (int i = 0; i < ns; i++) {
 		//check that i is not in repeated list
 		if (std::find(repeated.begin(), repeated.end(), i) == repeated.end()) {
+			//find iso states, lump them together
 			findIsomorphic(N, ns, i, db, perms);
 			printf("State %d is a permutation of state ", i);
 			lumpEntries(db, i, perms);
 			printf("\n");
+			//add to repeated vector, so they are not called twice
 			repeated.insert(repeated.end(), perms.begin()+1, perms.end());
+			//update lumpMap
+			for (int j = 0; j < perms.size(); j++) {
+				lumpMap[perms[j]] = count;
+			}
+			count += 1;
+			//clear perms vector
 			perms.clear();
 		}
 	}
+	//store the purge vector
 	db->toPurge = repeated;
+	
+	//store lumpMap in DB
+	for (int i = 0; i < ns; i++) {
+		db->lumpMap[i] = lumpMap[i];
+	}
+
+	//free memory
+	delete []lumpMap;
 
 }
 

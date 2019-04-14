@@ -10,6 +10,8 @@
 /*database structure to store all states.
 	  N - number of particles in system
 		num_states - number of known states
+		toPurge - states to not include when writing database to a new file
+		lumpMap - a mapping of all original states to a new index upon lumping
 
 	state structure to store all info about a state.
 		am - adjacency matrix for the state - N by N
@@ -62,7 +64,7 @@ class State{
 		std::vector<Pair> P; std::vector<Pair> Z; std::vector<Pair> Zerr;
 
 		//print function
-		std::ostream& print(std::ostream&, int) const;
+		std::ostream& print(std::ostream&, int, int*) const;
 
 	private:
 		int bond;
@@ -90,6 +92,7 @@ class Database {
 		friend std::ostream& operator<<(std::ostream&, const Database&);
 
 		std::vector<int> toPurge;
+		int* lumpMap;
 
 		//accessor functions
 		int getN() const {return N;}
@@ -122,5 +125,7 @@ void purgeUnphysical(Database* db);
 void combinePairs(std::vector<Pair>& p1, std::vector<Pair> p2);
 void lumpEntries(Database* db, int state, std::vector<int> perms);
 void lumpPerms(Database* db);
+void getMinIndex(int N, int ns, std::vector<Pair> P, Database* db, 
+									std::vector<int>& iso, std::vector<Pair>& isoPair );
 
 }

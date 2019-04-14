@@ -31,10 +31,10 @@ struct Cluster {
 	const Point& operator[](int index) const {return points[index];}
 
 	//functions to go from/to arrays and clusters
-	void makeArray2d(double* array, int N); 
-	void makeCluster2d(double* array, int N);
-	void makeArray3d(double* array, int N); 
-	void makeCluster3d(double* array, int N);
+	void makeArray2d(double* array, int N) const; 
+	void makeCluster2d(double* array, int N) const;
+	void makeArray3d(double* array, int N) const; 
+	void makeCluster3d(double* array, int N) const;
 };
 
 }

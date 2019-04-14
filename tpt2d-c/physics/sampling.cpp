@@ -262,29 +262,17 @@ void estimateMFPT(int N, int state, Database* db) {
 	//set parameters
 	int rho = 40; double beta = 1; double DT = 0.01; int Kh = 1850;
 	int method = 1; //solve SDEs with EM
-	int samples = 500; //number of hits per walker for estimator
+	int samples = 2000; //number of hits per walker for estimator
 	int eq = 200; //number of steps to equilibrate for
 
 	//quantities to update - old estimates
 	int num_states = db->getNumStates();
 	int num = (*db)[state].getNumerator(); 
 	int den = (*db)[state].getDenominator(); 
-	/*
-	int* pm = new int[num_states];
-	for (int i = 0; i < num_states; i++) {
-		pm[i] = (*db)[state].getP(i);
-	}
-	*/
 	std::vector<Pair> pm = (*db)[state].getP();
 
 	//quantities to update - new estimates
 	int NUM = 0; int DEN = 0;
-	/*
-	int* PM = new int[num_states];
-	for (int i = 0; i < num_states; i++) {
-		PM[i] = 0;
-	}
-	*/
 	std::vector<Pair> PM; std::vector<Pair> PMshare;
 	double mfpt = 0;
 	double sigma = 0;
@@ -313,7 +301,7 @@ void estimateMFPT(int N, int state, Database* db) {
 	mfptSamples = new double[num_threads];
 
 	//get starting structures
-	Cluster c = (*db)[state].getRandomIC();
+	const Cluster& c = (*db)[state].getRandomIC();
 
 	//cluster structs to arrays
 	double* X = new double[2*N];

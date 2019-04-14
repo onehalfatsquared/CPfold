@@ -27,8 +27,8 @@ int main(int argc, char* argv[]) {
 
 
 	//call estimator over every state, i. if i has 11 bonds (N=7), do nothing.
-	for (int i = 0; i < 1; i++) {
-		if ((*db)[i].getBonds() == 11 && N == 7) {//these states are rigid
+	for (int i = 0; i < num_states; i++) {
+		if (((*db)[i].getBonds() >= 11 && N == 7) || ((*db)[i].getBonds() >= 9 && N == 6)) {//these states are rigid
 			//do nothing
 		}
 		else{
