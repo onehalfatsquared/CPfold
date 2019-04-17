@@ -10,13 +10,14 @@
 int main(int argc, char* argv[]) {
 
 	//handle input
-	if (argc != 3) {
-		fprintf(stderr, "Usage: <Input File> <draw> %s\n", argv[0]);
+	if (argc != 4) {
+		fprintf(stderr, "Usage: <Input File> <draw> <reduce> %s\n", argv[0]);
 		return 1;
 	}
 	std::string infile (argv[1]);
 
 	int draw = atoi(argv[2]);
+	int reduce = atoi(argv[3]);
 
 	//get the database here
 	bd::Database* db = bd::readData(infile);
@@ -26,7 +27,7 @@ int main(int argc, char* argv[]) {
 	printf("Constructing GraphViz Code.\n");
 
 	//make graphviz code
-	bd::makeGraphViz(db, draw);
+	bd::makeGraphViz(db, draw, reduce);
 
 	//free memory - delete database
 	delete db;
