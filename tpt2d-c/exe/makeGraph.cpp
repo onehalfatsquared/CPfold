@@ -1,3 +1,6 @@
+// example to run dot with:  dot -Tpng N6graphviz.txt -O
+
+
 #include <cstdlib>
 #include <stdio.h>
 #include <iostream>
@@ -10,14 +13,15 @@
 int main(int argc, char* argv[]) {
 
 	//handle input
-	if (argc != 4) {
-		fprintf(stderr, "Usage: <Input File> <draw> <reduce> %s\n", argv[0]);
+	if (argc != 5) {
+		fprintf(stderr, "Usage: <Input File> <draw> <reduce> <flux>%s\n", argv[0]);
 		return 1;
 	}
 	std::string infile (argv[1]);
 
 	int draw = atoi(argv[2]);
 	int reduce = atoi(argv[3]);
+	int flux = atoi(argv[4]);
 
 	//get the database here
 	bd::Database* db = bd::readData(infile);
@@ -27,7 +31,7 @@ int main(int argc, char* argv[]) {
 	printf("Constructing GraphViz Code.\n");
 
 	//make graphviz code
-	bd::makeGraphViz(db, draw, reduce);
+	bd::makeGraphViz(db, draw, reduce, flux);
 
 	//free memory - delete database
 	delete db;

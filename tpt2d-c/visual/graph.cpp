@@ -50,7 +50,7 @@ void makeEdge(std::ofstream& out_str, int source, int target, double edgeWidth, 
 	", label = " + s + "]\n";
 }
 
-void graphP(std::ofstream& out_str, Database* db, int state, std::vector<Pair> P, int draw, int reduce, double normalizer, std::vector<int>& drawn) {
+void graphP(std::ofstream& out_str, Database* db, int state, std::vector<Pair> P, int draw, int reduce, double normalizer, std::vector<int>& drawn, int flux) {
 	//use the data in P for state to make nodes and edges
 
 	//declare variables
@@ -77,13 +77,18 @@ void graphP(std::ofstream& out_str, Database* db, int state, std::vector<Pair> P
 		}
 	}
 
-	double tol = 0.1; //tolerance for printing an edge. 
+	double tol = 0.06; //tolerance for printing an edge. 
 	//print the node and edge to file
 	for (int i = 0; i < P.size(); i++) {
 		if (reduce == 0 || P[i].value/S > tol) {
 			index = P[i].index;
 			printCluster(out_str, index, draw);
-			makeEdge(out_str, state, index, edgeWidth[i], rates[i]);
+			if (flux == 1) {
+				makeEdge(out_str, state, index, edgeWidth[i], P[i].value/S);
+			}
+			else {
+				makeEdge(out_str, state, index, edgeWidth[i], rates[i]);
+			}
 			drawn.push_back(index);
 			rankVec.push_back(index); 
 		}
@@ -91,7 +96,7 @@ void graphP(std::ofstream& out_str, Database* db, int state, std::vector<Pair> P
 	sameRank(out_str, rankVec);
 }
 
-bool downGraph(std::ofstream& out_str, Database* db, int bonds, int draw, int reduce, std::vector<int>& drawn) {
+bool downGraph(std::ofstream& out_str, Database* db, int bonds, int draw, int reduce, std::vector<int>& drawn, int flux) {
 	//search for states with given bonds and construct graph
 
 	//search for states first and get the normalizing constant for rates
@@ -112,7 +117,7 @@ bool downGraph(std::ofstream& out_str, Database* db, int bonds, int draw, int re
 				//check if state has been drawn before edge making
 				if (reduce == 0 || std::find(drawn.begin(), drawn.end(), i) !=drawn.end()) {
  					std::vector<Pair> P = (*db)[i].getP();
-					graphP(out_str, db, i, P, draw, reduce, normalizer, drawn);
+					graphP(out_str, db, i, P, draw, reduce, normalizer, drawn, flux);
 				}
 			}
 		}
@@ -126,7 +131,7 @@ bool downGraph(std::ofstream& out_str, Database* db, int bonds, int draw, int re
 
 
 
-void makeGraphViz(Database* db, int draw, int reduce) {
+void makeGraphViz(Database* db, int draw, int reduce, int flux) {
 	//create a graphviz graph using mfpt data
 
 	//get problem data
@@ -144,7 +149,7 @@ void makeGraphViz(Database* db, int draw, int reduce) {
 
 	//write the graphviz header
 	out_str << "graph mfptN" + std::to_string(N) + " {\n nodesep = 1.5; ranksep = 4; \n";
-	out_str << "edge [ fontcolor=red, fontsize=36];\n";
+	out_str << "edge [ fontcolor=red, fontsize=48];\n";
 
 	//set the minimum number of bonds - N-1
 	int min_bond = N-1; int first = 0;
@@ -165,11 +170,11 @@ void makeGraphViz(Database* db, int draw, int reduce) {
 
 	//get the transition data and make new nodes and edges
 	std::vector<Pair> P = (*db)[first].getP();
-	graphP(out_str, db, first, P, draw, reduce, 1/(*db)[first].getMFPT(), drawn);
+	graphP(out_str, db, first, P, draw, reduce, 1/(*db)[first].getMFPT(), drawn, flux);
 
 	//search the database for N+ bonded states and repeat
 	for (int bond_num = N; bond_num < N*N; bond_num++) {
-		bool stop = downGraph(out_str, db, bond_num, draw, reduce, drawn);
+		bool stop = downGraph(out_str, db, bond_num, draw, reduce, drawn, flux);
 		if (!stop) {
 			break;
 		}
