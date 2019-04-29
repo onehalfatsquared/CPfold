@@ -14,27 +14,33 @@ double morseP(double r, double rho, double E);
 double morseEval(double* particles, int rho, double* E, int N, int* P);
 //evaluate gradient of morse potential
 void morseGrad(double* particles, int rho, double* E, int N, int* P, double* g);
+//evlauate lj potential
+double ljP(double r, double rho, double E);
+//evaluate total potential energy of system of particles
+double ljEval(double* particles, int rho, double* E, int N, int* P);
+//evaluate gradient of morse potential
+void ljGrad(double* particles, int rho, double* E, int N, int* P, double* g);
 //evaluate the sticky parameter for morse potential
-void stickyF(double E, double rho, double k0, double& f, double& fprime);
+void stickyF(double E, double rho, double beta, double k0, double& f, double& fprime);
 //use newtons method to find E from kappa
-double stickyNewton(double E, double rho, double k0);
+double stickyNewton(double E, double rho, double k0, double beta);
 
 
 //time integration stuff
 //use em scheme to solve sde
 void EM(double* X0, int N, int Nt, double k, 
-					int rho, double* E, int* P, double beta);
+					int rho, double* E, int* P, double beta, int pot);
 //solve sde system
 void solveSDE(double* X0, int N, double T, int rho, double beta,
-							double* E, int* P, int method);
+							double* E, int* P, int method, int pot);
 
 //sampling stuff
 void estimateMFPT(int N, int state, Database* db);
 void estimatePartitionFn(int N, int state, Database* db);
 void setupSimMFPT(int N, double Eh, int*& P, double*& E);
-void equilibrate(double* X, Database* DB, int state, int eq, int N, double DT,
+void equilibrate(double* X, int pot, Database* DB, int state, int eq, int N, double DT,
 													int rho, double* E, double beta, int* P, int method);
-void runTrajectoryMFPT(double* X, Database* DB, int state, int samples, int N, 
+void runTrajectoryMFPT(double* X, int pot, Database* DB, int state, int samples, int N, 
 	double DT, int rho, double* E, double beta, int* P, int method, int& Num, 
 																									int& Den, std::vector<Pair>& PM );
 void updatePM(int new_state, std::vector<Pair>& PM); 

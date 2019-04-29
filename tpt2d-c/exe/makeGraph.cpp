@@ -33,6 +33,9 @@ int main(int argc, char* argv[]) {
 	//make graphviz code
 	bd::makeGraphViz(db, draw, reduce, flux);
 
+	//report that the graph is made
+	printf("Code succesfully constructed.\n");
+
 	//free memory - delete database
 	delete db;
 

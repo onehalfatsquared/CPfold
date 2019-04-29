@@ -35,15 +35,19 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+	//set potential type
+	int pot = 0; //0 morse, 1 lj
 
-	bd::solveSDE(X0, N, T, rho, beta, E, P, method);
+	//run bd
+	bd::solveSDE(X0, N, T, rho, beta, E, P, method, pot);
 
+	//output the final state
 	for (int i = 0; i < 2*N; i++) printf("%f\n",X0[i]);
 
+	//free memory
+	delete []P; delete []E; delete []X0;
 
-	delete []P;
-	delete []E;
-	delete []X0;
-	return 1;
+	//exit
+	return 0;
 
 }

@@ -8,7 +8,7 @@ namespace bd{
 
 
 void EM(double* X0, int N, int Nt, double k, 
-					int rho, double* E, int* P, double beta) {
+					int rho, double* E, int* P, double beta, int pot) {
 	//apply the EM method to solve the SDE
 	//initialize particle and gradient storage
 	double* g = new double[2*N];
@@ -22,7 +22,12 @@ void EM(double* X0, int N, int Nt, double k,
 	//apply the EM scheme
 	for (int i = 0; i < Nt; i++) {
 		c2p(X0, particles, N);
-		morseGrad(particles, rho, E, N, P, g);
+		if (pot == 0) {//use morse potential
+			morseGrad(particles, rho, E, N, P, g);
+		}
+		else if (pot == 1) {//use lennard jones potential
+			ljGrad(particles, rho, E, N, P, g);
+		}
 		for (int j = 0; j < 2*N; j++) {
 			X0[j] += -g[j]*k + sqrt(2.0*k/beta)*distribution(generator);
 		}
@@ -38,12 +43,12 @@ void EM(double* X0, int N, int Nt, double k,
 
 
 void solveSDE(double* X0, int N, double T, int rho, double beta,
-												 double* E, int* P, int method) {
+												 double* E, int* P, int method, int pot) {
 	if (method == 1) {
 		//set time step
 		double k = 5e-6; int Nt = T/k; 
 		//solve the sde
-		EM(X0,  N, Nt, k, rho, E, P, beta);
+		EM(X0,  N, Nt, k, rho, E, P, beta, pot);
 	}
 }
 

@@ -1,6 +1,7 @@
 set(SOURCES
 	integrators.cpp
 	morse.cpp
+	lennardJones.cpp
 	sampling.cpp
 	stickyFn.cpp)
 

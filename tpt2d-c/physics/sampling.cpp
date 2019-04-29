@@ -178,7 +178,7 @@ void updatePM(int new_state, std::vector<Pair>& PM) {
 }
 
 
-void runTrajectoryMFPT(double* X, Database* db, int state, int samples, int N, 
+void runTrajectoryMFPT(double* X, int pot, Database* db, int state, int samples, int N, 
 	double DT, int rho, double* E, double beta, int* P, int method, int& Num, 
 																											int& Den, std::vector<Pair>& PM ) {
 	//run the trajectory, update mfpt estimates
@@ -192,7 +192,7 @@ void runTrajectoryMFPT(double* X, Database* db, int state, int samples, int N,
 	for (int i = 0; i < max_it; i++) {
 		reset = 0; reflect = 0;
 		//solve SDE
-		solveSDE(X, N, DT, rho, beta, E, P, method);
+		solveSDE(X, N, DT, rho, beta, E, P, method, pot);
 		//check if state changed
 		checkState(X, N, state, new_state, db, timer, reset, reflect);
 		if (reflect == 0 && reset == 0) {//no hit, proceed
@@ -218,7 +218,7 @@ void runTrajectoryMFPT(double* X, Database* db, int state, int samples, int N,
 }
 
 
-void equilibrate(double* X, Database* db, int state, int eq, int N, double DT, 
+void equilibrate(double* X, int pot, Database* db, int state, int eq, int N, double DT, 
 													int rho, double* E, double beta, int* P, int method) {
 	//perform eq steps to equilibrate the trajectory. do not record data
 
@@ -230,7 +230,7 @@ void equilibrate(double* X, Database* db, int state, int eq, int N, double DT,
 	for (int i = 0; i < eq; i++) {
 		reset = 0; reflect = 0;
 		//solve the sde
-		solveSDE(X, N, DT, rho, beta, E, P, method);
+		solveSDE(X, N, DT, rho, beta, E, P, method, pot);
 		//check if state changed
 		checkState(X, N, state, new_state, db, timer, reset, reflect);
 		//if state changed, reflect back. otherwise continue
@@ -261,6 +261,7 @@ void estimateMFPT(int N, int state, Database* db) {
 
 	//set parameters
 	int rho = 40; double beta = 1; double DT = 0.01; int Kh = 1850;
+	int pot = 1;  //set potential. 0 = morse, 1 = LJ
 	int method = 1; //solve SDEs with EM
 	int samples = 2000; //number of hits per walker for estimator
 	int eq = 200; //number of steps to equilibrate for
@@ -281,7 +282,7 @@ void estimateMFPT(int N, int state, Database* db) {
 	printf("Beginning MFPT Estimator for state %d out of %d.\n", state, num_states);
 
 	//setup simulation
-	double Eh = stickyNewton(8, rho, Kh); //get energy corresponding to kappa
+	double Eh = stickyNewton(8, rho, Kh, beta); //get energy corresponding to kappa
 	//initialize interaction matrices
 	int* P = new int[N*N]; double* E = new double[N*N];
 	setupSimMFPT(N, Eh, P, E);
@@ -308,10 +309,10 @@ void estimateMFPT(int N, int state, Database* db) {
 	c.makeArray2d(X, N);
 
 	//equilibrate the trajectories
-	equilibrate(X, db, state, eq, N, DT, rho, E, beta, P, method);
+	equilibrate(X, pot, db, state, eq, N, DT, rho, E, beta, P, method);
 
 	//run BD
-	runTrajectoryMFPT(X, db, state, samples, N, DT, rho, E, beta, P, method, NUM, DEN, PM );
+	runTrajectoryMFPT(X, pot, db, state, samples, N, DT, rho, E, beta, P, method, NUM, DEN, PM );
 
 	//store samples
 	if (DEN != 0) {

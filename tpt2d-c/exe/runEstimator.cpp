@@ -19,6 +19,7 @@ int main(int argc, char* argv[]) {
 	//get the database here
 	bd::Database* db = bd::readData(infile);
 
+	//set database variables
 	int N = db->getN(); int num_states = db->getNumStates();
 
 	//tell user information
