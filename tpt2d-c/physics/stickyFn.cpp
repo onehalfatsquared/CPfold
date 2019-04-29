@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stdlib.h>
 namespace bd{
 
 void stickyF(double E, double rho, double beta, double k0, double& f, double& fprime) {
