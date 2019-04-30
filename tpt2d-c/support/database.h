@@ -116,12 +116,14 @@ class Database {
 Database* readData(std::string& filename);
 std::ostream& operator<<(std::ostream&, const Database&);
 
+//functions to remove unphysical states from the database
 bool checkPhysicalState(int N, int state, Database* db);
 void makeNM(int N, int state, int b, Database* db, Eigen::VectorXd , Eigen::MatrixXd& , 
 																							     Eigen::VectorXd& , Eigen::VectorXd);
-
 void getPurgeStates(Database* db, std::vector<int>& toPurge);
 void purgeUnphysical(Database* db);
+
+//functions to lump permutations together in the database
 void combinePairs(std::vector<Pair>& p1, std::vector<Pair> p2);
 void lumpEntries(Database* db, int state, std::vector<int> perms);
 void lumpPerms(Database* db);

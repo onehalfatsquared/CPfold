@@ -1,5 +1,5 @@
 #include "database.h"
-#include "graph.h"
+#include "graphviz.h"
 #include "pair.h"
 #include <vector>
 #include <cstdlib>
@@ -37,6 +37,13 @@ void sameRank(std::ofstream& out_str, std::vector<int> states) {
 		out_str << "\"" + std::to_string(states[i]) + "\";";
 	}
 	out_str << "}\n";
+}
+
+void makeEdgeClean(std::ofstream& out_str, int source, int target, double edgeWidth) {
+	//draw an edge from source to target - no labels
+
+	out_str << "\"" + std::to_string(source) + "\" -- \"" + 
+	std::to_string(target) + "\" [penwidth = " + std::to_string(edgeWidth) + "]\n";
 }
 
 void makeEdge(std::ofstream& out_str, int source, int target, double edgeWidth, double rate) {
@@ -77,16 +84,20 @@ void graphP(std::ofstream& out_str, Database* db, int state, std::vector<Pair> P
 		}
 	}
 
-	double tol = 0.06; //tolerance for printing an edge. 
+	double fluxtol = 0.06; //tolerance for printing an edge when reducing over fluxes
+	double tol = 1e-3; //tolerance for printing an edge always - for anomalies
 	//print the node and edge to file
 	for (int i = 0; i < P.size(); i++) {
-		if (reduce == 0 || P[i].value/S > tol) {
+		if ((reduce == 0 && P[i].value/S > tol) || P[i].value/S > fluxtol) {
 			index = P[i].index;
 			printCluster(out_str, index, draw);
-			if (flux == 1) {
+			if (flux == 1) {//use probabilities as edge labels
 				makeEdge(out_str, state, index, edgeWidth[i], P[i].value/S);
 			}
-			else {
+			else if (flux == -1) {//use no edge labels
+				makeEdgeClean(out_str, state, index, edgeWidth[i]);
+			}
+			else { //use rates as edge labels
 				makeEdge(out_str, state, index, edgeWidth[i], rates[i]);
 			}
 			drawn.push_back(index);

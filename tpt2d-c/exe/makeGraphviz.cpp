@@ -1,12 +1,17 @@
 // example to run dot with:  dot -Tpng N6graphviz.txt -O
 
+/* If draw = 1, the nodes will look for images of clusters
+	 If reduce = 1, nodes with less than 5-6 % of flux will be removed
+	 If flux = 1, probabilities will be displayed instead of rates
+	 If flux = -1, no labels will be placed on the edges.
+*/
 
 #include <cstdlib>
 #include <stdio.h>
 #include <iostream>
 #include <fstream>
 #include "database.h"
-#include "graph.h"
+#include "graphviz.h"
 
 
 
