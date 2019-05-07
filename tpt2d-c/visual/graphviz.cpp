@@ -57,7 +57,7 @@ void makeEdge(std::ofstream& out_str, int source, int target, double edgeWidth, 
 	", label = " + s + "]\n";
 }
 
-void graphP(std::ofstream& out_str, Database* db, int state, std::vector<Pair> P, int draw, int reduce, double normalizer, std::vector<int>& drawn, int flux) {
+void graphP(std::ofstream& out_str, Database* db, int state, std::vector<Pair> P, double* row_prob,  int draw, int reduce, double normalizer, std::vector<int>& drawn, int flux) {
 	//use the data in P for state to make nodes and edges
 
 	//declare variables
@@ -72,9 +72,13 @@ void graphP(std::ofstream& out_str, Database* db, int state, std::vector<Pair> P
 	S = (*db)[state].sumP();
 	for (int i = 0; i < P.size(); i++) {
 		index = P[i].index; value = P[i].value/S; //index and probability to go to i. 
+		row_prob[index] = row_prob[index] + row_prob[state]*value;
 		rates.push_back( (1/mfpt) * value);
 		if (draw == 0) {
 			edgeWidth.push_back(rates[i]/normalizer*30);
+		}
+		if (draw == 1 && flux == -1) {
+			edgeWidth.push_back(50*row_prob[state]*value);
 		}
 		else if (draw == 1 && reduce == 0) {
 			edgeWidth.push_back(rates[i]/normalizer*50);
@@ -107,7 +111,7 @@ void graphP(std::ofstream& out_str, Database* db, int state, std::vector<Pair> P
 	sameRank(out_str, rankVec);
 }
 
-bool downGraph(std::ofstream& out_str, Database* db, int bonds, int draw, int reduce, std::vector<int>& drawn, int flux) {
+bool downGraph(std::ofstream& out_str, Database* db, int bonds, double* row_prob, int draw, int reduce, std::vector<int>& drawn, int flux) {
 	//search for states with given bonds and construct graph
 
 	//search for states first and get the normalizing constant for rates
@@ -128,7 +132,7 @@ bool downGraph(std::ofstream& out_str, Database* db, int bonds, int draw, int re
 				//check if state has been drawn before edge making
 				if (reduce == 0 || std::find(drawn.begin(), drawn.end(), i) !=drawn.end()) {
  					std::vector<Pair> P = (*db)[i].getP();
-					graphP(out_str, db, i, P, draw, reduce, normalizer, drawn, flux);
+					graphP(out_str, db, i, P, row_prob, draw, reduce, normalizer, drawn, flux);
 				}
 			}
 		}
@@ -165,6 +169,9 @@ void makeGraphViz(Database* db, int draw, int reduce, int flux) {
 	//set the minimum number of bonds - N-1
 	int min_bond = N-1; int first = 0;
 
+	//crate array for probability distribution conditional on bond num
+	double* row_prob = new double[ns]; for (int i = 0; i < ns; i++) row_prob[i] = 0;
+
 	//search the database for the worm state and create the node
 	for (int i = 0; i < ns; i++) {
 		if ((*db)[i].getBonds() == min_bond) {
@@ -172,6 +179,7 @@ void makeGraphViz(Database* db, int draw, int reduce, int flux) {
 			break;
 		}
 	}
+	row_prob[first] = 1;
 	printCluster(out_str, first, draw);
 
 	//make a same rank statement for vertical alignment
@@ -181,11 +189,11 @@ void makeGraphViz(Database* db, int draw, int reduce, int flux) {
 
 	//get the transition data and make new nodes and edges
 	std::vector<Pair> P = (*db)[first].getP();
-	graphP(out_str, db, first, P, draw, reduce, 1/(*db)[first].getMFPT(), drawn, flux);
+	graphP(out_str, db, first, P, row_prob, draw, reduce, 1/(*db)[first].getMFPT(), drawn, flux);
 
 	//search the database for N+ bonded states and repeat
 	for (int bond_num = N; bond_num < N*N; bond_num++) {
-		bool stop = downGraph(out_str, db, bond_num, draw, reduce, drawn, flux);
+		bool stop = downGraph(out_str, db, bond_num, row_prob, draw, reduce, drawn, flux);
 		if (!stop) {
 			break;
 		}
@@ -194,6 +202,8 @@ void makeGraphViz(Database* db, int draw, int reduce, int flux) {
 	//end reached - put a curly to end
 	out_str << "}";	
 	
+	//free memory
+	delete []row_prob;
 
 }
 

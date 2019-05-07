@@ -11,8 +11,8 @@ void makeEdge(std::ofstream& out_str, int source, int target, double edgeWidth, 
 void makeEdgeClean(std::ofstream& out_str, int source, int target, double edgeWidth);
 void printCluster(std::ofstream& out_str, int index, int draw);
 void graphP(std::ofstream& out_str, Database* db, int state, 
-							std::vector<Pair> P, int draw, int reduce, double normalizer, std::vector<int>&, int flux);
-bool downGraph(std::ofstream& out_str, Database* db, int bonds, int draw,int reduce, std::vector<int>&, int flux);
+							std::vector<Pair> P, double* ,int draw, int reduce, double normalizer, std::vector<int>&, int flux);
+bool downGraph(std::ofstream& out_str, Database* db, int bonds, double* , int draw,int reduce, std::vector<int>&, int flux);
 
 
 

@@ -11,12 +11,12 @@ int main(int argc, char* argv[]) {
 
 	//handle input
 	if (argc != 3) {
-		fprintf(stderr, "Usage: <Input File> <path>%s\n", argv[0]);
+		fprintf(stderr, "Usage: <Input File> <target> %s\n", argv[0]);
 		return 1;
 	}
 	std::string infile (argv[1]);
 
-	int path = atoi(argv[2]);
+	int target = atoi(argv[2]);
 
 	//get the database here
 	bd::Database* db = bd::readData(infile);
@@ -32,8 +32,25 @@ int main(int argc, char* argv[]) {
 	//print out most probable path
 	MPP(g, 1);
 
+	//print out path with fastest rate
+	if (target == -1) {
+		QP(g, 1);
+	}
+	else {
+		QP(g, 1, target);
+	}
+
+	//construct the subgraph that ends at target
+	bd::Graph* sub = bd::targetSubgraph(g, 1, target);
+
+	//print most probable path
+	MPP(sub,1);
+
+	//print the graph
+	bd::printGraph(sub, 1, 1, 0);
+
 	//free memory - delete database
-	delete db; delete g;
+	delete db; delete g; delete sub;
 
 	return 0;
 }
