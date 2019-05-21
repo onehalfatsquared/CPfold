@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <map>
 #include <ios>
 
 /* Graph class to traverse and compute paths.
@@ -40,6 +41,11 @@ class Vertex {
 		friend Graph* makeGraph(Database* db);
 		friend void updateGraph(int node, Database* db, Graph* g, bool* present, int& count);
 		friend Graph* targetSubgraph(Graph* g, int source, int target);
+		friend Graph* sourceSubgraph(Graph* g, int source);
+		friend void findConditionalEnd(Graph* g, int source);
+
+		//end state distributions
+		std::vector<double> endDistr;
 
 		//acessor functions
 		int getIndex() const {return index;}
@@ -75,12 +81,15 @@ class Graph {
 		Vertex& operator[](int index) {return vertices[index];}
 		const Vertex& operator[](int index) const {return vertices[index];}
 		friend void updateGraph(int node, Database* db, Graph* g, bool* present, int& count);
+		friend Graph* makeGraph(Database* db);
 
 		//accessor functions
 		int getN() const {return N;}
+		int getNumEndStates() const {return end;}
 
 	private:
-		int N; Vertex* vertices;
+		int N; int end;
+		Vertex* vertices;
 
 
 	//copy constructors - restricts compiling when user tries to copy a graph
@@ -96,6 +105,8 @@ class Graph {
 Graph* makeGraph(Database* db);
 //make a subgraph of all states that can reach target
 Graph* targetSubgraph(Graph* g, int source, int target);
+//make a subgraph of all states after source
+Graph* sourceSubgraph(Graph* g, int source);
 //get the probability distribution of end states
 void endDistribution(Graph* g);
 //find the most probable path
@@ -114,11 +125,16 @@ void tOrder(Graph* g, int* T, int source);
 //given a path, fill in the rates for each step of the path
 void fillRates(Graph* g, std::vector<int> path, std::vector<double>& rates);
 
-void printGraph(Graph* g, int source, int draw, int clean) ;
+void printGraph(Graph* g, int source, int draw, int clean, int reduce) ;
 void makeEdge(std::ofstream& out_str, int source, int target, double edgeWidth, double rate) ;
 void makeEdgeClean(std::ofstream& out_str, int source, int target, double edgeWidth);
 void sameRank(std::ofstream& out_str, std::vector<int> states);
 void printCluster(std::ofstream& out_str, int index, int draw);
+
+void getEndDistribution(Graph* g, int source, double* probs, int possible, std::map<int,int> toIndex, int* indices);
+void findConditionalEnd(Graph* g, int source);
+void printCluster(std::ofstream& out_str, int index, std::vector<double> end);
+void printGraphEndDistribution(Graph* g, int source, int reduce);
 
 
 

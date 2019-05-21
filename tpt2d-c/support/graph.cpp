@@ -1,6 +1,7 @@
 #include "database.h"
 #include "graph.h"
 #include "pair.h"
+#include <map>
 #include <vector>
 #include <deque>
 #include <cstdlib>
@@ -9,6 +10,8 @@
 #include <fstream>
 #include <algorithm>
 #include <sstream>
+
+#define Ptol 0.10
 
 namespace bd {
 
@@ -22,7 +25,8 @@ Vertex::~Vertex() {}
 
 //graph constructor
 Graph::Graph(int N_) {
-	N = N_;
+	N = N_; 
+	end = 0;
 	vertices = new Vertex[N]; 
 }
 
@@ -40,26 +44,30 @@ void updateGraph(int node, Database* db, Graph* g, bool* present, int& count) {
 	std::vector<Pair> P = (*db)[node].getP();
 	double S = (*db)[node].sumP();
 	double mfpt = (*db)[node].getMFPT();
+	double tol = 0.005;
 
 	//loop over P - make edges, add nodes
 	for (int i = 0; i < P.size(); i++) {
 		//make edge
 		int target = P[i].index; double prob = P[i].value/S;
-		(*g)[node].edges.push_back(Edge(target, 1/mfpt*prob, prob));
-		(*g)[target].back_edges.push_back(node);
+		if (1/mfpt*prob > tol) {
+			(*g)[node].edges.push_back(Edge(target, 1/mfpt*prob, prob));
+			(*g)[target].back_edges.push_back(node);
 
-		//add/update nodes
-		if (!present[target]) {//node does not exist, add
-			present[target] = 1; //update present arrays
-			Vertex& v = (*g)[target]; //set reference v 
-			v.index = target;
-			v.prob = v.prob + (*g)[node].prob * prob;
-			count++;
-		}
-		else {//node already exists, just update
-			(*g)[target].prob = (*g)[target].prob + (*g)[node].prob * prob;
+			//add/update nodes
+			if (!present[target]) {//node does not exist, add
+				present[target] = 1; //update present arrays
+				Vertex& v = (*g)[target]; //set reference v 
+				v.index = target;
+				v.prob = v.prob + (*g)[node].prob * prob;
+				count++;
+			}
+			else {//node already exists, just update
+				(*g)[target].prob = (*g)[target].prob + (*g)[node].prob * prob;
+			}
 		}
 	}
+
 }
 
 
@@ -76,7 +84,10 @@ Graph* makeGraph(Database* db) {
 	Graph* graph = new Graph(N);
 
 	//set the minimum number of bonds - particles-1
-	int min_bond = particles-1; int first = 0;
+	int min_bond = particles-1; int first = 0; 
+
+	//set counters for number of end states
+  int countUpdates = 1;
 
 	//search the database for the worm state and create the vertex
 	for (int i = 0; i < N; i++) {
@@ -98,10 +109,15 @@ Graph* makeGraph(Database* db) {
 		for (int i = 0; i < N; i++) {
 			if ((*db)[i].getBonds() == bond_num) {
 				updateGraph(i, db, graph, present, count);
+				countUpdates += 1;
 			}
 		}
 		bond_num++;
 	}
+
+	//set number of end states
+	graph->end = N - countUpdates;
+	printf("End states: %d.\n", graph->end);
 
 	//free memory
 	delete []present; 
@@ -122,10 +138,10 @@ Graph* targetSubgraph(Graph* g, int source, int target) {
 		int node = toVisit[0];
 		int E = (*g)[node].getNumBackEdges();
 		for (int edge = 0; edge < E; edge++) {
-			int source = (*g)[node].getEdgeSource(edge);
-			if (inSub[source] == 0) {
-				inSub[source] = 1;
-				toVisit.push_back(source);
+			int s = (*g)[node].getEdgeSource(edge);
+			if (inSub[s] == 0) {
+				inSub[s] = 1;
+				toVisit.push_back(s);
 			}
 		}
 		toVisit.pop_front();
@@ -167,7 +183,7 @@ Graph* targetSubgraph(Graph* g, int source, int target) {
 				toVisit.push_back(T);
 				Vertex& v = (*graph)[T]; //set reference v 
 				v.index = T;
-				v.prob = v.prob + (*g)[source].prob * prob;
+				v.prob = v.prob + (*graph)[source].prob * prob;
 				}
 			else {//node already exists, just update
 				(*graph)[T].prob = (*graph)[T].prob + (*graph)[source].prob * prob;
@@ -199,7 +215,7 @@ Graph* targetSubgraph(Graph* g, int source, int target) {
 					toVisit.push_back(T);
 					Vertex& v = (*graph)[T]; //set reference v 
 					v.index = T;
-					v.prob = v.prob + (*g)[node].prob * prob;
+					v.prob = v.prob + (*graph)[node].prob * prob;
 					}
 				else {//node already exists, just update
 					(*graph)[T].prob = (*graph)[T].prob + (*graph)[node].prob * prob;
@@ -212,6 +228,86 @@ Graph* targetSubgraph(Graph* g, int source, int target) {
 
 	//graph is made. free memory and return graph.
 	delete []inSub; delete []present;
+	return graph;
+}
+
+Graph* sourceSubgraph(Graph* g, int source) {
+	//construct the subgraph of g that starts at node source
+
+	//create new graph structure
+	int ns = g->getN();
+	Graph* graph = new Graph(ns);
+	
+	//present array to check if a state has been added yet
+	bool* present = new bool[ns]; for (int i = 0; i < ns; i++) present[i] = 0;
+
+	//make the source node
+	Vertex& v = (*graph)[source];
+	v.index = source;
+	v.prob = 1;
+	present[source] = 1;
+
+	std::deque<int> toVisit; 
+
+	//loop over source edges. get new normalizer, make edges. add new nodes.
+	int E = (*g)[source].getNumEdges();
+	double norm = 0;
+	for (int i = 0; i < E; i++) {
+		int T = (*g)[source].getEdgeTarget(i);
+		norm += (*g)[source].getEdgeRate(i);
+	}
+	for (int i = 0; i < E; i++) {
+		int T = (*g)[source].getEdgeTarget(i);
+		double rate = (*g)[source].getEdgeRate(i);
+		double prob = rate / norm;
+		(*graph)[source].edges.push_back(Edge(T, rate, prob));
+		(*graph)[T].back_edges.push_back(source);
+
+		if (!present[T]) {//node does not exist, add
+			present[T] = 1; //update present arrays
+			toVisit.push_back(T);
+			Vertex& v = (*graph)[T]; //set reference v 
+			v.index = T;
+			v.prob = v.prob + (*graph)[source].prob * prob;
+			}
+		else {//node already exists, just update
+			(*graph)[T].prob = (*graph)[T].prob + (*graph)[source].prob * prob;
+		}
+	}
+
+	//loop over vertices, top down in toVisit, check if should be present, perform update
+	while(!toVisit.empty()) {
+		int node = toVisit[0];
+		int E = (*g)[node].getNumEdges();
+		double norm = 0;
+		for (int i = 0; i < E; i++) {
+			int T = (*g)[node].getEdgeTarget(i);
+			norm += (*g)[node].getEdgeRate(i);
+		}
+		for (int i = 0; i < E; i++) {
+			int T = (*g)[node].getEdgeTarget(i);
+			double rate = (*g)[node].getEdgeRate(i);
+			double prob = rate / norm;
+			(*graph)[node].edges.push_back(Edge(T, rate, prob));
+			(*graph)[T].back_edges.push_back(node);
+
+			if (!present[T]) {//node does not exist, add
+				present[T] = 1; //update present arrays
+				toVisit.push_back(T);
+				Vertex& v = (*graph)[T]; //set reference v 
+				v.index = T;
+				v.prob = v.prob + (*graph)[node].prob * prob;
+				}
+			else {//node already exists, just update
+				(*graph)[T].prob = (*graph)[T].prob + (*graph)[node].prob * prob;
+			}
+		}
+		toVisit.pop_front();
+	}
+
+
+	//graph is made. free memory and return graph.
+	delete []present;
 	return graph;
 }
 
@@ -256,7 +352,7 @@ void makeEdge(std::ofstream& out_str, int source, int target, double edgeWidth, 
 	", label = " + s + "]\n";
 }
 
-void printGraph(Graph* g, int source, int draw, int clean) {
+void printGraph(Graph* g, int source, int draw, int clean, int reduce) {
 	//construct a graphviz file to print the graph
 
 	//keep track of drawn nodes and ranks
@@ -286,18 +382,20 @@ void printGraph(Graph* g, int source, int draw, int clean) {
 		int T = (*g)[source].getEdgeTarget(edge);
 		double rate = (*g)[source].getEdgeRate(edge);
 		double prob = (*g)[source].getEdgeProb(edge);
-		if (!drawn[T]) {
-			printCluster(out_str, T, draw);
-			drawn[T] = 1; rankVec.push_back(T);
+		if (reduce == 0 || prob > Ptol) {
+			if (!drawn[T]) {
+				printCluster(out_str, T, draw);
+				drawn[T] = 1; rankVec.push_back(T);
+			}
+			double edgeWidth = 40*node_prob*prob;
+			if (clean == 0) {
+				makeEdge(out_str, source, T, edgeWidth, rate);
+			}
+			else if (clean == 1) {
+				makeEdgeClean(out_str, source, T, edgeWidth);
+			}
+			toVisit.push_back(T);
 		}
-		double edgeWidth = 40*node_prob*prob;
-		if (clean == 0) {
-			makeEdge(out_str, source, T, edgeWidth, rate);
-		}
-		else if (clean == 1) {
-			makeEdgeClean(out_str, source, T, edgeWidth);
-		}
-		toVisit.push_back(T);
 	}
 	sameRank(out_str, rankVec); int rankNum = rankVec.size();
 	rankVec.clear();
@@ -313,7 +411,7 @@ void printGraph(Graph* g, int source, int draw, int clean) {
 			int T = (*g)[node].getEdgeTarget(edge);
 			double rate = (*g)[node].getEdgeRate(edge);
 			double prob = (*g)[node].getEdgeProb(edge);
-			if (rate > 0.01) {
+			if (rate > 0.01 && (reduce == 0 || prob > Ptol)) {
 				if (!drawn[T]) {
 					printCluster(out_str, T, draw);
 					drawn[T] = 1; rankVec.push_back(T);
@@ -335,18 +433,6 @@ void printGraph(Graph* g, int source, int draw, int clean) {
 		}
 	}
 
-
-
-
-
-
-
-
-
-
-
-
-
 	//end reached - put a curly to end
 	out_str << "}";	
 }
@@ -359,7 +445,8 @@ void endDistribution(Graph* g) {
 	//loop over nodes. CHeck if num edges = 0 -> final state
 	for (int i = 0; i < g->getN(); i++) {
 		int E = (*g)[i].getNumEdges();
-		if (E == 0) {
+		int B = (*g)[i].getNumBackEdges();
+		if (E == 0 && B != 0) {
 			printf("State %d, Probability %f\n", i, (*g)[i].getProb());
 		}
 	}
@@ -599,6 +686,192 @@ void QP(Graph* g, int source, int target) {
 	delete []T; delete []M;
 }
 
+void getEndDistribution(Graph* g, int source, double* probs, int possible, std::map<int,int> toIndex, int* indices) {
+	//get the probability of each end state for given graph g
+
+	for (int i = 0; i < g->getN(); i++) {
+		int E = (*g)[i].getNumEdges();
+		int B = (*g)[i].getNumBackEdges();
+		if (E == 0 && B != 0) {
+			int inArray = toIndex.find(i)->second;
+			probs[inArray] = (*g)[i].getProb();
+		}
+	}
+
+	//if the node is an end node, this wont work. check seperately
+	for (int i = 0; i < possible; i++) {
+		if (indices[i] == source) {
+			probs[i] = 1;
+		}
+	}
+
+}
+
+void findConditionalEnd(Graph* g, int source) {
+	//for every node in g, find probability to end in each possible state
+	//probabilities will be ordered in a vector, smallest to largest index
+
+	//make arrays for storing info
+	int possible = g->getNumEndStates();
+	int* indices = new int[possible];
+	double* probs = new double[possible];
+	std::map<int, int> toIndex;
+	std::vector<double> endDistr; 
+
+	//do the worm state, standard graph. fill indices with end states.
+	int count = 0;
+	for (int i = 0; i < g->getN(); i++) {
+		int E = (*g)[i].getNumEdges();
+		int B = (*g)[i].getNumBackEdges();
+		if (E == 0 && B != 0) {
+			indices[count] = i; probs[count] = (*g)[i].getProb();
+			toIndex.insert(std::make_pair(i, count));
+			count++;
+		}
+	}
+	for (int i = 0; i < possible; i++) {
+		endDistr.push_back(probs[i]);
+		probs[i] = 0;
+	}
+	(*g)[source].endDistr = endDistr;
+	endDistr.clear();
+
+	//make every subgraph, compute the new end distribution, fill it in. 
+	for (int i = 0; i < g->getN(); i++) {
+		if (i != source) {
+			Graph* s = sourceSubgraph(g, i); 
+			getEndDistribution(s, i, probs, possible, toIndex, indices);
+			for (int j = 0; j < possible; j++) {
+				endDistr.push_back(probs[j]);
+				probs[j] = 0;
+			}
+			(*g)[i].endDistr = endDistr;
+			endDistr.clear();
+			delete s;
+		}
+	}
+
+	//free memory
+	delete []indices; delete []probs;
+}
+
+void printCluster(std::ofstream& out_str, int index, std::vector<double> end) {
+	//print a node creation in graphviz. Include probability for each end state.
+
+	//convert the vector of probs into a string
+	std::string P = "(";
+	for (int i = 0; i < end.size()-1; i++) {
+		double val = end[i];
+		std::string s = std::to_string(val);
+		s.erase(s.end()-4,s.end());
+		P = P + s + ",";
+	}
+	double val = end[end.size()-1];
+	std::string s = std::to_string(val);
+	s.erase(s.end()-4,s.end());
+	P = P + s + ")";
+
+	//output the node creation command
+	//out_str << "\"" + std::to_string(index) + "\" [xlabel=\"" + P +" \", shape=circle, width = 1, regular = 1," +
+	//" style = filled, fillcolor=white," + "image=\"c" +std::to_string(index) + ".png\"]; \n";
+
+	//out_str << "\"" + std::to_string(index) + "\" [label=\"|" + P +" \", shape=record, width = 1, regular = 1," +
+	//" style = filled, fillcolor=white," + "image=\"c" +std::to_string(index) + ".png\"]; \n";
+
+	out_str << "\"" + std::to_string(index) + "\" [label=\"\n\n\n\n\n\n" + P +" \", shape=circle, width = 1, regular = 1," +
+	" fontsize=50, style = filled, fillcolor=white," + "image=\"c" +std::to_string(index) + ".png\"]; \n";
+} 
+
+void printGraphEndDistribution(Graph* g, int source, int reduce) {
+	//construct a graphviz file to print the graph - include probability for each end state
+	//always draw, always clean, sometimes reduce
+
+	//set usual input variables
+	int clean = 1;
+
+	//keep track of drawn nodes and ranks
+	std::vector<int> rankVec; std::deque<int> toVisit;
+	int ns = g->getN();
+	bool* drawn = new bool[ns]; for (int i = 0; i < ns; i++) drawn[i] = 0; 
+
+	//declare a file to write output to
+	std::string out;
+	out = "graphvizEND.txt";
+	std::ofstream out_str(out);
+
+	//probability tolerance for reduced graphs
+
+	//write the graphviz header
+	out_str << "graph bd {\n nodesep = 1.5; ranksep = 4; \n";
+	out_str << "edge [ fontcolor=red, fontsize=48];\n";
+
+	//print the source node
+	printCluster(out_str, source, (*g)[source].endDistr);
+	rankVec.push_back(source);
+	sameRank(out_str, rankVec);
+	rankVec.clear(); drawn[source] = 1;
+
+	//loop over edges of source
+	int E = (*g)[source].getNumEdges();
+	double node_prob = (*g)[source].getProb();
+	for (int edge = 0; edge < E; edge++) {
+		int T = (*g)[source].getEdgeTarget(edge);
+		double rate = (*g)[source].getEdgeRate(edge);
+		double prob = (*g)[source].getEdgeProb(edge);
+		if (reduce == 0 || prob > Ptol) {
+			if (!drawn[T]) {
+				printCluster(out_str, T, (*g)[T].endDistr);
+				drawn[T] = 1; rankVec.push_back(T);
+			}
+			double edgeWidth = 40*node_prob*prob;
+			if (clean == 0) {
+				makeEdge(out_str, source, T, edgeWidth, rate);
+			}
+			else if (clean == 1) {
+				makeEdgeClean(out_str, source, T, edgeWidth);
+			}
+			toVisit.push_back(T);
+		}
+	}
+	sameRank(out_str, rankVec); int rankNum = rankVec.size();
+	rankVec.clear();
+
+	//loop over the rest of the nodes
+	int count = 0;
+	while (!toVisit.empty()) {
+		int node = toVisit[0];
+		count++;
+		int E = (*g)[node].getNumEdges();
+		double node_prob = (*g)[node].getProb();
+		for (int edge = 0; edge < E; edge++) {
+			int T = (*g)[node].getEdgeTarget(edge);
+			double rate = (*g)[node].getEdgeRate(edge);
+			double prob = (*g)[node].getEdgeProb(edge);
+			if (rate > 0.01 && (reduce == 0 || prob > Ptol)) {
+				if (!drawn[T]) {
+					printCluster(out_str, T, (*g)[T].endDistr);
+					drawn[T] = 1; rankVec.push_back(T);
+					toVisit.push_back(T);
+				}
+				double edgeWidth = 40*node_prob*prob;
+				if (clean == 0) {
+					makeEdge(out_str, node, T, edgeWidth, rate);
+				}
+				else if (clean == 1) {
+					makeEdgeClean(out_str, node, T, edgeWidth);
+				}
+			}
+		}
+		toVisit.pop_front();
+		if (count == rankNum) {
+			count = 0; rankNum = rankVec.size();
+			sameRank(out_str, rankVec); rankVec.clear();
+		}
+	}
+
+	//end reached - put a curly to end
+	out_str << "}";	
+}
 
 
 
