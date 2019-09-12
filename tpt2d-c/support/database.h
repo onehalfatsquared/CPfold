@@ -130,4 +130,11 @@ void lumpPerms(Database* db);
 void getMinIndex(int N, int ns, std::vector<Pair> P, Database* db, 
 									std::vector<int>& iso, std::vector<Pair>& isoPair );
 
+//map outside structures to my structures
+void structureMap(std::string& filename, Database* db, int* M2A, int& NC);
+void findIsomorphic(int N, int num_states, int* AM, Database* db, std::vector<int>& iso);
+void buildNautyGraph(int N, int M, int* AM, graph* g);
+void printTM(Database* db, int* M2A, int NC) ;
+void printTM(Database* db) ;
+
 }

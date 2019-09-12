@@ -36,13 +36,18 @@ void solveSDE(double* X0, int N, double T, int rho, double beta,
 
 //sampling stuff
 void estimateMFPT(int N, int state, Database* db);
+void estimateChain(int N, int state, Database* db);
 void estimatePartitionFn(int N, int state, Database* db);
 void setupSimMFPT(int N, double Eh, int*& P, double*& E);
+void setupChain(double* X, int N);
 void equilibrate(double* X, int pot, Database* DB, int state, int eq, int N, double DT,
 													int rho, double* E, double beta, int* P, int method);
 void runTrajectoryMFPT(double* X, int pot, Database* DB, int state, int samples, int N, 
 	double DT, int rho, double* E, double beta, int* P, int method, int& Num, 
 																									int& Den, std::vector<Pair>& PM );
+void runTrajectoryChain(double* X, int pot, Database* db, int state, int samples, int N, 
+	double DT, int rho, double* E, double beta, int* P, int method, int& Num, 
+																											int& Den, std::vector<Pair>& PM ); 
 void updatePM(int new_state, std::vector<Pair>& PM); 
 void checkState(double* X, int N, int state, int& new_state, Database* db, int& timer,
 							 int& reset, int& reflect);

@@ -3,6 +3,7 @@ set(SOURCES
 	euDist.cpp
 	database.cpp
 	adjMat.cpp
+	import.cpp
 	graph.cpp)
 
 add_library(support ${SOURCES})

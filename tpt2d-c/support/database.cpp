@@ -137,7 +137,7 @@ Database* readData(std::string& filename) {
 		}
 
 		//next state
-		index++;
+		index++; 
 	}
 	in_str.close();
 	return database;

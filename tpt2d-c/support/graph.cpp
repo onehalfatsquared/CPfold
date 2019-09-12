@@ -11,7 +11,7 @@
 #include <algorithm>
 #include <sstream>
 
-#define Ptol 0.10
+#define Ptol 0.07
 
 namespace bd {
 
@@ -44,7 +44,7 @@ void updateGraph(int node, Database* db, Graph* g, bool* present, int& count) {
 	std::vector<Pair> P = (*db)[node].getP();
 	double S = (*db)[node].sumP();
 	double mfpt = (*db)[node].getMFPT();
-	double tol = 0.005;
+	double tol = 1e-5;
 
 	//loop over P - make edges, add nodes
 	for (int i = 0; i < P.size(); i++) {
@@ -110,9 +110,10 @@ Graph* makeGraph(Database* db) {
 			if ((*db)[i].getBonds() == bond_num) {
 				updateGraph(i, db, graph, present, count);
 				countUpdates += 1;
+				//printf("%d done, count = %d\n", i, count);
 			}
 		}
-		bond_num++;
+		bond_num++; 
 	}
 
 	//set number of end states
@@ -761,14 +762,14 @@ void printCluster(std::ofstream& out_str, int index, std::vector<double> end) {
 	//convert the vector of probs into a string
 	std::string P = "(";
 	for (int i = 0; i < end.size()-1; i++) {
-		double val = end[i];
+		int val = end[i]*100;
 		std::string s = std::to_string(val);
-		s.erase(s.end()-4,s.end());
+		//s.erase(s.end()-4,s.end());
 		P = P + s + ",";
 	}
-	double val = end[end.size()-1];
+	int val = end[end.size()-1]*100;
 	std::string s = std::to_string(val);
-	s.erase(s.end()-4,s.end());
+	//s.erase(s.end()-4,s.end());
 	P = P + s + ")";
 
 	//output the node creation command

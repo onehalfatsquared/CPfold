@@ -177,6 +177,46 @@ void updatePM(int new_state, std::vector<Pair>& PM) {
 
 }
 
+void runTrajectoryChain(double* X, int pot, Database* db, int state, int samples, int N, 
+	double DT, int rho, double* E, double beta, int* P, int method, int& Num, 
+																											int& Den, std::vector<Pair>& PM ) {
+	//run the trajectory, update mfpt estimates
+
+	//intiailize temp storage and set parameters
+	double* temp = new double[2*N]; memcpy(temp, X, 2*N*sizeof(double));
+	int reset; int reflect; int new_state = state; int hit = 0; int max_it = 100;
+	int timer = 0; pot = 0;
+
+	//solve sde and update
+	for (int i = 0; i < max_it; i++) {
+		reset = 0; reflect = 0;
+		//solve SDE
+		solveSDE(X, N, DT, rho, beta, E, P, method, pot);
+		//check if state changed
+		checkState(X, N, state, new_state, db, timer, reset, reflect);
+		if (reflect == 0 && reset == 0) {//no hit, proceed
+			memcpy(temp, X, 2*N*sizeof(double)); // copy x to temp
+		}
+		else if (reflect == 1) {//hit new state, update estimates
+			Den += timer; Num += timer*(timer+1)/2.0; 
+			//PM[new_state] += 1;
+			updatePM(new_state, PM);
+			memcpy(X, temp, 2*N*sizeof(double));//copy temp to x -> reset step
+			timer = 0; hit +=1;
+			//printf("New state %d", new_state);
+		}
+		else {//chain broke, reset previous config
+			memcpy(X, temp, 2*N*sizeof(double));//copy temp to x -> reset step
+		}
+		//if we reach desired number of samples, break
+		if (hit == samples) {
+			break;
+		}
+	}
+	//free the temp memory
+	delete []temp;
+}
+
 
 void runTrajectoryMFPT(double* X, int pot, Database* db, int state, int samples, int N, 
 	double DT, int rho, double* E, double beta, int* P, int method, int& Num, 
@@ -250,6 +290,18 @@ void setupSimMFPT(int N, double Eh, int*& P, double*& E) {
 	//initialize the interaction matrices - all interacting, strong bonds
 	for (int i = 0; i < N*N; i++) {
 		P[i] = 1; E[i] = Eh;
+	}
+}
+
+void setupChain(double* X, int N) {
+	//construct a linear chain of particle positions
+	for (int i = 0; i < 2*N; i++) {
+		if (i % 2 == 0) {
+			X[i] = i/2+1;
+		}
+		else{
+			X[i] = 0;
+		}
 	}
 }
 
@@ -378,6 +430,138 @@ void estimateMFPT(int N, int state, Database* db) {
 	for (int i = 0; i < num_threads; i++) printf("MFPT estimate %d = %f\n", i, mfptSamples[i]);
 	*/
 
+
+	//free memory
+	delete []E; delete []P; delete []mfptSamples;
+	//delete []PM; delete []pm; 
+}
+
+void estimateChain(int N, int state, Database* db) {
+	/*estimate mean first passage time starting in 
+	chain state (must be given in state)*/
+
+
+	//set parameters
+	int rho = 40; double beta = 1; double DT = 0.01; int Kh = 1850;
+	int pot = 1;  //set potential. 0 = morse, 1 = LJ
+	int method = 1; //solve SDEs with EM
+	int samples = 16667; //number of hits per walker for estimator
+
+	//quantities to update - old estimates
+	int num_states = db->getNumStates();
+	int num = (*db)[state].getNumerator(); 
+	int den = (*db)[state].getDenominator(); 
+	std::vector<Pair> pm = (*db)[state].getP();
+
+	//quantities to update - new estimates
+	int NUM = 0; int DEN = 0;
+	std::vector<Pair> PM; std::vector<Pair> PMshare;
+	double mfpt = 0;
+	double sigma = 0;
+
+	//output start message
+	printf("Beginning MFPT Estimator for linear chain.\n");
+
+	//setup simulation
+	double Eh = stickyNewton(8, rho, Kh, beta); //get energy corresponding to kappa
+	//initialize interaction matrices
+	int* P = new int[N*N]; double* E = new double[N*N];
+	setupSimMFPT(N, Eh, P, E);
+	printf("E = %f\n", Eh);
+	
+
+	//store mfpt estimates on each thread to get standard deviation
+	double* mfptSamples; int num_threads;
+
+	for (int i = 0; i < PM.size(); i++) printf("0 thread has:\n %d, %f\n", PM[i].index, PM[i].value);
+
+	//open parallel region
+	//#pragma omp parallel reduction(+:NUM, DEN, PM[:num_states])
+	#pragma omp parallel private(PM) shared(PMshare) reduction(+:NUM, DEN)
+	{
+
+	//initialize samples
+	num_threads = omp_get_num_threads();
+	mfptSamples = new double[num_threads];
+
+	double* X = new double[2*N];
+	int mult = 1; int progress = 2000;
+
+
+
+	//run BD
+	for (int times = 0; times < samples; times++) {
+		setupChain(X,N); 
+		runTrajectoryChain(X, pot, db, state, 1, N, DT, rho, E, beta, P, method, NUM, DEN, PM );
+		if (times % progress == 0) {
+			printf("Thread %d generated sample %d.\n", omp_get_thread_num(), progress*mult);
+			mult++;
+		}
+	}
+
+	//store samples
+	if (DEN != 0) {
+		mfptSamples[omp_get_thread_num()] = DT * DEN / samples;
+	}
+	else {
+		mfptSamples[omp_get_thread_num()] = 0;
+	}
+
+	if (omp_get_thread_num() == 0) {
+		PMshare = PM;
+	}
+	//do update on PM vectors - need barrier
+	#pragma omp barrier
+	#pragma omp critical
+	{
+		if (omp_get_thread_num() != 0) {
+			combinePairs(PMshare, PM);
+		}
+	}
+
+	//free cluster memory
+	delete []X;
+
+	//end parallel region
+	}
+
+	//combine estimates - if any samples were found (11->12 state)
+	if (DEN != 0) {
+		//combine estimates
+		num += NUM; den += DEN;
+		combinePairs(PMshare, pm); //PMshare has the updated info
+		mfpt = DT * den / (num_threads*samples);
+		sigma = sampleSTD(mfptSamples, num_threads);
+
+		//make a Z vector with same num of elements as P
+		std::vector<Pair> Z; 
+		for (int i = 0; i < PMshare.size(); i++) {
+			Z.push_back(Pair(PMshare[i].index, 0));
+		}
+
+		//update database
+		(*db)[state].mfpt = mfpt;
+		(*db)[state].num = num;
+		(*db)[state].denom = den;
+		(*db)[state].num_neighbors = PMshare.size();
+		(*db)[state].P = PMshare;
+		(*db)[state].Z = Z;
+		(*db)[state].Zerr = Z;
+		(*db)[state].sigma = sigma;
+	}
+
+	//print out final estimates - debug
+	/*
+	printf("%Numerator = %d, Denominator = %d, \n", num, den);
+	double sum = 0;
+	for (int i = 0; i < PMshare.size(); i++) {
+		printf("State = %d, visits = %f\n", PMshare[i].index, PMshare[i].value);
+		sum +=PMshare[i].value;
+	}
+	printf("sum of hits = %f\n", sum);
+	printf("Total Estimate = %f +- %f\n", mfpt, sigma);
+	for (int i = 0; i < num_threads; i++) printf("MFPT estimate %d = %f\n", i, mfptSamples[i]);
+	*/
 
 	//free memory
 	delete []E; delete []P; delete []mfptSamples;

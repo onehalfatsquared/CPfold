@@ -56,6 +56,7 @@ int main(int argc, char* argv[]) {
 
 	//construct the subgraph that ends at target
 	bd::Graph* sub = bd::targetSubgraph(g, source, target);
+	bd::printGraph(sub, source, draw, clean, reduce);
 
 	//print most probable path ending at target
 	MPP(sub,source);
