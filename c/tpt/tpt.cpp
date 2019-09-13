@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <vector>
-#include <../Eigen/Dense>
+#include <eigen3/Eigen/Dense>
 #include "point.h"
 #include "database.h"
 #include "bDynamics.h"

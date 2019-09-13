@@ -3,7 +3,7 @@
 #include "pair.h"
 #include "adjacency.h"
 #include "nauty.h"
-#include <../Eigen/Dense>
+#include <eigen3/Eigen/Dense>
 #include <vector>
 #include <string>
 

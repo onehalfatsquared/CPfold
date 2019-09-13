@@ -1,6 +1,6 @@
 #pragma once
 #include "point.h"
-#include <../Eigen/Dense>
+#include <eigen3/Eigen/Dense>
 #include "nauty.h"
 #include "database.h"
 #include <string>

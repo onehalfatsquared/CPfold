@@ -1,7 +1,7 @@
 #include "database.h"
 #include "nauty.h"
 #include <algorithm>
-#include <../Eigen/Dense>
+#include <eigen3/Eigen/Dense>
 #include <vector>
 #include <fstream>
 #include <cstdlib>
