@@ -557,21 +557,6 @@ void estimateChain(int N, int state, Database* db) {
 }
 
 
-void estimatePartitionFn(int N, int state, Database* db) {
-	/*estimate mean first passage time starting in state and going to state with
-	one additional bond. Uses parallel implementations of a single walker with
-	long trajectory.*/
-
-	//set parameters
-	int rho = 40; double beta = 1; double DT = 0.01; int Kh = 1850;
-	int method = 1; //solve SDEs with EM
-	int samples = 1000; //number of hits per walker for estimator
-	int eq = 200; //number of steps to equilibrate for
-
-
-
-
-}
 
 
 

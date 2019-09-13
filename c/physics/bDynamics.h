@@ -39,7 +39,6 @@ void solveSDE(double* X0, int N, double T, int rho, double beta,
 //sampling stuff
 void estimateMFPT(int N, int state, Database* db);
 void estimateChain(int N, int state, Database* db);
-void estimatePartitionFn(int N, int state, Database* db);
 void setupSimMFPT(int N, double Eh, int*& P, double*& E);
 void equilibrate(double* X, int pot, Database* DB, int state, int eq, int N, double DT,
 													int rho, double* E, double beta, int* P, int method);

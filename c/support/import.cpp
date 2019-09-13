@@ -2,7 +2,6 @@
 #include "nauty.h"
 #include "adjacency.h"
 #include <algorithm>
-//#include <../Eigen/Dense>
 #include <vector>
 #include <iostream>
 #include <fstream>
