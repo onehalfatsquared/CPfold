@@ -4,6 +4,7 @@
 #include <fstream>
 #include "database.h"
 #include "graph.h"
+#include "graphviz.h"
 
 /* Input Description:
 	 Input File - location of file containing mfpt data. Likely NxLump.txt
@@ -38,33 +39,33 @@ int main(int argc, char* argv[]) {
 	printf("Database has been stored as a graph.\n");
 
 	//print out the ending distribution
-	endDistribution(g);
+	bd::endDistribution(g);
 
 	//print out most probable path
-	MPP(g, source);
+	bd::MPP(g, source);
 
 	//print the graph
 	bd::printGraph(g, source, draw, clean, reduce);
 
 	//print out path with fastest rate
 	if (target == -1) {
-		QP(g, source);
+		bd::QP(g, source);
 	}
 	else {
-		QP(g, source, target);
+		bd::QP(g, source, target);
 	}
 
 	//construct the subgraph that ends at target
 	bd::Graph* sub = bd::targetSubgraph(g, source, target);
-	bd::printGraph(sub, source, draw, clean, reduce);
+	printGraph(sub, source, draw, clean, reduce);
 
 	//print most probable path ending at target
-	MPP(sub,source);
+	bd::MPP(sub,source);
 
 	//construct subgraph that starts at some node
 	bd::Graph* sub2 = bd::sourceSubgraph(g, 17);
 	//bd::printGraph(sub2, 17, draw, clean, reduce);
-	endDistribution(sub2);
+	bd::endDistribution(sub2);
 
 	//check end distr calc
 	bd::findConditionalEnd(g, source);

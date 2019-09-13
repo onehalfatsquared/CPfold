@@ -3,19 +3,23 @@
 #include <ios>
 namespace bd { 
 class Database; 
+class Graph;
 
 
-void makeGraphViz(Database* db, int draw, int reduce, int flux);
-void sameRank(std::ofstream& out_str, std::vector<int> states);
-void makeEdge(std::ofstream& out_str, int source, int target, double edgeWidth, double rate);
+void printGraph(Graph* g, int source, int draw, int clean, int reduce) ;
+void makeEdge(std::ofstream& out_str, int source, int target, double edgeWidth, double rate) ;
 void makeEdgeClean(std::ofstream& out_str, int source, int target, double edgeWidth);
+void sameRank(std::ofstream& out_str, std::vector<int> states);
 void printCluster(std::ofstream& out_str, int index, int draw);
-void graphP(std::ofstream& out_str, Database* db, int state, 
-							std::vector<Pair> P, double* ,int draw, int reduce, double normalizer, std::vector<int>&, int flux);
-bool downGraph(std::ofstream& out_str, Database* db, int bonds, double* , int draw,int reduce, std::vector<int>&, int flux);
 
-
-
-
-
+void printCluster(std::ofstream& out_str, int index, std::vector<double> end);
+void printGraphEndDistribution(Graph* g, int source, int reduce);
+//make a graphviz file with the given path
+void printPath(std::vector<int> path, std::vector<double> val, std::string s);
+//print the most probable path
+void MPP(Graph* g, int source);
+//print the quickest folding path
+void QP(Graph* g, int source);
+//print the quickest folding path ending at target
+void QP(Graph* g, int source, int target);
 }

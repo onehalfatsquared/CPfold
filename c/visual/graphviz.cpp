@@ -1,20 +1,19 @@
 #include "database.h"
 #include "graphviz.h"
+#include "graph.h"
 #include "pair.h"
 #include <vector>
+#include <deque>
 #include <cstdlib>
 #include <stdio.h>
 #include <iostream>
 #include <fstream>
 #include <algorithm>
 #include <sstream>
+#include "../defines.h"
 
 
 namespace bd{
-
-
-
-
 
 void printCluster(std::ofstream& out_str, int index, int draw) {
 	//print a node creation in graphviz
@@ -57,154 +56,391 @@ void makeEdge(std::ofstream& out_str, int source, int target, double edgeWidth, 
 	", label = " + s + "]\n";
 }
 
-void graphP(std::ofstream& out_str, Database* db, int state, std::vector<Pair> P, double* row_prob,  int draw, int reduce, double normalizer, std::vector<int>& drawn, int flux) {
-	//use the data in P for state to make nodes and edges
+void printGraph(Graph* g, int source, int draw, int clean, int reduce) {
+	//construct a graphviz file to print the graph
 
-	//declare variables
-	std::vector<int> rankVec; rankVec.clear();
-	int index; double value;
-	double mfpt; double S;
-	std::vector<double> rates; rates.clear();
-	std::vector<double> edgeWidth; edgeWidth.clear();
-
-	//compute the rates for each state in the row
-	mfpt = (*db)[state].getMFPT();
-	S = (*db)[state].sumP();
-	for (int i = 0; i < P.size(); i++) {
-		index = P[i].index; value = P[i].value/S; //index and probability to go to i. 
-		row_prob[index] = row_prob[index] + row_prob[state]*value;
-		rates.push_back( (1/mfpt) * value);
-		if (draw == 0) {
-			edgeWidth.push_back(rates[i]/normalizer*30);
-		}
-		if (draw == 1 && flux == -1) {
-			edgeWidth.push_back(50*row_prob[state]*value);
-		}
-		else if (draw == 1 && reduce == 0) {
-			edgeWidth.push_back(rates[i]/normalizer*50);
-		}
-		else if (draw == 1 && reduce == 1) {
-			edgeWidth.push_back(P[i].value/S*25);
-		}
-	}
-
-	double fluxtol = 0.06; //tolerance for printing an edge when reducing over fluxes
-	double tol = 1e-3; //tolerance for printing an edge always - for anomalies
-	//print the node and edge to file
-	for (int i = 0; i < P.size(); i++) {
-		if ((reduce == 0 && P[i].value/S > tol) || P[i].value/S > fluxtol) {
-			index = P[i].index;
-			printCluster(out_str, index, draw);
-			if (flux == 1) {//use probabilities as edge labels
-				makeEdge(out_str, state, index, edgeWidth[i], P[i].value/S);
-			}
-			else if (flux == -1) {//use no edge labels
-				makeEdgeClean(out_str, state, index, edgeWidth[i]);
-			}
-			else { //use rates as edge labels
-				makeEdge(out_str, state, index, edgeWidth[i], rates[i]);
-			}
-			drawn.push_back(index);
-			rankVec.push_back(index); 
-		}
-	}
-	sameRank(out_str, rankVec);
-}
-
-bool downGraph(std::ofstream& out_str, Database* db, int bonds, double* row_prob, int draw, int reduce, std::vector<int>& drawn, int flux) {
-	//search for states with given bonds and construct graph
-
-	//search for states first and get the normalizing constant for rates
-	bool flag = false; double normalizer = 0;
-	for (int i = 0; i < db->getNumStates(); i++) {
-		int B = (*db)[i].getBonds();
-		if (B == bonds) { //state with B bonds found
-			normalizer += 1 / (*db)[i].getMFPT();
-			flag = true;
-		}
-	}
-
-	//if there was a state at the next level, go through and graph them
-	if (flag) {
-		for (int i = 0; i < db->getNumStates(); i++) {
-			int B = (*db)[i].getBonds();
-			if (B == bonds) {
-				//check if state has been drawn before edge making
-				if (reduce == 0 || std::find(drawn.begin(), drawn.end(), i) !=drawn.end()) {
- 					std::vector<Pair> P = (*db)[i].getP();
-					graphP(out_str, db, i, P, row_prob, draw, reduce, normalizer, drawn, flux);
-				}
-			}
-		}
-	}
-	return flag; //if flag is false, there are no states with B bonds, stop
-}
-
-
-
-
-
-
-
-void makeGraphViz(Database* db, int draw, int reduce, int flux) {
-	//create a graphviz graph using mfpt data
-
-	//get problem data
-	int N = db->getN(); int ns = db->getNumStates();
-
-	//declare variables
-	int index; double value; 
-	std::vector<int> rankVec;
-	std::vector<int> drawn; 
+	//keep track of drawn nodes and ranks
+	std::vector<int> rankVec; std::deque<int> toVisit;
+	int ns = g->getN();
+	bool* drawn = new bool[ns]; for (int i = 0; i < ns; i++) drawn[i] = 0; 
 
 	//declare a file to write output to
 	std::string out;
-	out = "N" + std::to_string(N) + "graphviz.txt";
+	out = "graphviz.txt";
 	std::ofstream out_str(out);
 
 	//write the graphviz header
-	out_str << "graph mfptN" + std::to_string(N) + " {\n nodesep = 1.5; ranksep = 4; \n";
+	out_str << "graph bd {\n nodesep = 1.5; ranksep = 4; \n";
 	out_str << "edge [ fontcolor=red, fontsize=48];\n";
 
-	//set the minimum number of bonds - N-1
-	int min_bond = N-1; int first = 0;
+	//print the source node
+	printCluster(out_str, source, draw);
+	rankVec.push_back(source);
+	sameRank(out_str, rankVec);
+	rankVec.clear(); drawn[source] = 1;
 
-	//crate array for probability distribution conditional on bond num
-	double* row_prob = new double[ns]; for (int i = 0; i < ns; i++) row_prob[i] = 0;
-
-	//search the database for the worm state and create the node
-	for (int i = 0; i < ns; i++) {
-		if ((*db)[i].getBonds() == min_bond) {
-			first = i; 
-			break;
+	//loop over edges of source
+	int E = (*g)[source].getNumEdges();
+	double node_prob = (*g)[source].getProb();
+	for (int edge = 0; edge < E; edge++) {
+		int T = (*g)[source].getEdgeTarget(edge);
+		double rate = (*g)[source].getEdgeRate(edge);
+		double prob = (*g)[source].getEdgeProb(edge);
+		if (reduce == 0 || prob > PTOL) {
+			if (!drawn[T]) {
+				printCluster(out_str, T, draw);
+				drawn[T] = 1; rankVec.push_back(T);
+			}
+			double edgeWidth = 40*node_prob*prob;
+			if (clean == 0) {
+				makeEdge(out_str, source, T, edgeWidth, rate);
+			}
+			else if (clean == 1) {
+				makeEdgeClean(out_str, source, T, edgeWidth);
+			}
+			toVisit.push_back(T);
 		}
 	}
-	row_prob[first] = 1;
-	printCluster(out_str, first, draw);
+	sameRank(out_str, rankVec); int rankNum = rankVec.size();
+	rankVec.clear();
 
-	//make a same rank statement for vertical alignment
-	rankVec.push_back(first);
-	sameRank(out_str, rankVec);
-	rankVec.clear(); drawn.clear();
-
-	//get the transition data and make new nodes and edges
-	std::vector<Pair> P = (*db)[first].getP();
-	graphP(out_str, db, first, P, row_prob, draw, reduce, 1/(*db)[first].getMFPT(), drawn, flux);
-
-	//search the database for N+ bonded states and repeat
-	for (int bond_num = N; bond_num < N*N; bond_num++) {
-		bool stop = downGraph(out_str, db, bond_num, row_prob, draw, reduce, drawn, flux);
-		if (!stop) {
-			break;
+	//loop over the rest of the nodes
+	int count = 0;
+	while (!toVisit.empty()) {
+		int node = toVisit[0];
+		count++;
+		int E = (*g)[node].getNumEdges();
+		double node_prob = (*g)[node].getProb();
+		for (int edge = 0; edge < E; edge++) {
+			int T = (*g)[node].getEdgeTarget(edge);
+			double rate = (*g)[node].getEdgeRate(edge);
+			double prob = (*g)[node].getEdgeProb(edge);
+			if (rate > 0.01 && (reduce == 0 || prob > PTOL)) {
+				if (!drawn[T]) {
+					printCluster(out_str, T, draw);
+					drawn[T] = 1; rankVec.push_back(T);
+					toVisit.push_back(T);
+				}
+				double edgeWidth = 40*node_prob*prob;
+				if (clean == 0) {
+					makeEdge(out_str, node, T, edgeWidth, rate);
+				}
+				else if (clean == 1) {
+					makeEdgeClean(out_str, node, T, edgeWidth);
+				}
+			}
+		}
+		toVisit.pop_front();
+		if (count == rankNum) {
+			count = 0; rankNum = rankVec.size();
+			sameRank(out_str, rankVec); rankVec.clear();
 		}
 	}
 
 	//end reached - put a curly to end
 	out_str << "}";	
+}
+
+void printCluster(std::ofstream& out_str, int index, std::vector<double> end) {
+	//print a node creation in graphviz. Include probability for each end state.
+
+	//convert the vector of probs into a string
+	std::string P = "(";
+	for (int i = 0; i < end.size()-1; i++) {
+		int val = end[i]*100;
+		std::string s = std::to_string(val);
+		//s.erase(s.end()-4,s.end());
+		P = P + s + ",";
+	}
+	int val = end[end.size()-1]*100;
+	std::string s = std::to_string(val);
+	//s.erase(s.end()-4,s.end());
+	P = P + s + ")";
+
+	//output the node creation command
+	//out_str << "\"" + std::to_string(index) + "\" [xlabel=\"" + P +" \", shape=circle, width = 1, regular = 1," +
+	//" style = filled, fillcolor=white," + "image=\"c" +std::to_string(index) + ".png\"]; \n";
+
+	//out_str << "\"" + std::to_string(index) + "\" [label=\"|" + P +" \", shape=record, width = 1, regular = 1," +
+	//" style = filled, fillcolor=white," + "image=\"c" +std::to_string(index) + ".png\"]; \n";
+
+	out_str << "\"" + std::to_string(index) + "\" [label=\"\n\n\n\n\n\n" + P +" \", shape=circle, width = 1, regular = 1," +
+	" fontsize=50, style = filled, fillcolor=white," + "image=\"c" +std::to_string(index) + ".png\"]; \n";
+} 
+
+void printGraphEndDistribution(Graph* g, int source, int reduce) {
+	//construct a graphviz file to print the graph - include probability for each end state
+	//always draw, always clean, sometimes reduce
+
+	//set usual input variables
+	int clean = 1;
+
+	//keep track of drawn nodes and ranks
+	std::vector<int> rankVec; std::deque<int> toVisit;
+	int ns = g->getN();
+	bool* drawn = new bool[ns]; for (int i = 0; i < ns; i++) drawn[i] = 0; 
+
+	//declare a file to write output to
+	std::string out;
+	out = "graphvizEND.txt";
+	std::ofstream out_str(out);
+
+	//probability tolerance for reduced graphs
+
+	//write the graphviz header
+	out_str << "graph bd {\n nodesep = 1.5; ranksep = 4; \n";
+	out_str << "edge [ fontcolor=red, fontsize=48];\n";
+
+	//print the source node
+	printCluster(out_str, source, (*g)[source].endDistr);
+	rankVec.push_back(source);
+	sameRank(out_str, rankVec);
+	rankVec.clear(); drawn[source] = 1;
+
+	//loop over edges of source
+	int E = (*g)[source].getNumEdges();
+	double node_prob = (*g)[source].getProb();
+	for (int edge = 0; edge < E; edge++) {
+		int T = (*g)[source].getEdgeTarget(edge);
+		double rate = (*g)[source].getEdgeRate(edge);
+		double prob = (*g)[source].getEdgeProb(edge);
+		if (reduce == 0 || prob > PTOL) {
+			if (!drawn[T]) {
+				printCluster(out_str, T, (*g)[T].endDistr);
+				drawn[T] = 1; rankVec.push_back(T);
+			}
+			double edgeWidth = 40*node_prob*prob;
+			if (clean == 0) {
+				makeEdge(out_str, source, T, edgeWidth, rate);
+			}
+			else if (clean == 1) {
+				makeEdgeClean(out_str, source, T, edgeWidth);
+			}
+			toVisit.push_back(T);
+		}
+	}
+	sameRank(out_str, rankVec); int rankNum = rankVec.size();
+	rankVec.clear();
+
+	//loop over the rest of the nodes
+	int count = 0;
+	while (!toVisit.empty()) {
+		int node = toVisit[0];
+		count++;
+		int E = (*g)[node].getNumEdges();
+		double node_prob = (*g)[node].getProb();
+		for (int edge = 0; edge < E; edge++) {
+			int T = (*g)[node].getEdgeTarget(edge);
+			double rate = (*g)[node].getEdgeRate(edge);
+			double prob = (*g)[node].getEdgeProb(edge);
+			if (rate > 0.01 && (reduce == 0 || prob > PTOL)) {
+				if (!drawn[T]) {
+					printCluster(out_str, T, (*g)[T].endDistr);
+					drawn[T] = 1; rankVec.push_back(T);
+					toVisit.push_back(T);
+				}
+				double edgeWidth = 40*node_prob*prob;
+				if (clean == 0) {
+					makeEdge(out_str, node, T, edgeWidth, rate);
+				}
+				else if (clean == 1) {
+					makeEdgeClean(out_str, node, T, edgeWidth);
+				}
+			}
+		}
+		toVisit.pop_front();
+		if (count == rankNum) {
+			count = 0; rankNum = rankVec.size();
+			sameRank(out_str, rankVec); rankVec.clear();
+		}
+	}
+
+	//end reached - put a curly to end
+	out_str << "}";	
+}
+
+void printPath(std::vector<int> path, std::vector<double> val, std::string s) {
+	//makes a graphviz file that prints the given path - with images, thats the point
+
+	//declare a file to write output to
+	std::string out;
+	out = s + "graphviz.txt";
+	std::ofstream out_str(out);
+
+	//write the graphviz header
+	out_str << "graph " + s + " {\n nodesep = 1.5; ranksep = 4; \n";
+	out_str << "edge [ fontcolor=red, fontsize=48];\n";
+
+	//draw all the nodes
+	for (int i = 0; i < path.size(); i++) {
+		int index = path[i];
+		out_str << "\"" + std::to_string(index) + "\" [label=\"\", shape=circle, width = 1, regular = 1," +
+			" style = filled, fillcolor=white," + "image=\"c" +std::to_string(index) + ".png\"]; \n";
+	}
+
+	//draw all the edges
+	for (int i = 0; i < path.size()-1; i++) {
+		int source = path[i]; int target = path[i+1];
+		std::string s = std::to_string(val[i]);
+		s.erase(s.end()-3,s.end());
+		int edgeWidth = 5;
+		out_str << "\"" + std::to_string(source) + "\" -- \"" + 
+			std::to_string(target) + "\" [penwidth = " + std::to_string(edgeWidth) + 
+			", label = " + s + "]\n";
+	}
+
+	//make all nodes have the same rank
+	out_str << "{rank = same; ";
+	for (int i = 0; i < path.size(); i++) {
+		out_str << "\"" + std::to_string(path[i]) + "\";";
+	}
+	out_str << "}\n";
+
+	//print ending curly
+	out_str << "}";
+}
+
+void QP(Graph* g, int source) {
+	//determine the quickest folding path (largest rate)
+
+	//get number of nodes
+	int ns = g->getN();
+
+	//make arrays that will store max sums and paths
+	double* M = new double[ns];
+	std::vector<std::vector<int>> paths(ns);
+	for (int i = 0; i < ns; i++) M[i] = 0;
+	M[source] = 0; paths[source].push_back(source);
+
+	//compute a topological ordering of the graph
+	int* T = new int[ns];
+	tOrder(g, T, source);
+
+	//loop over nodes, go down edges, check for largest path
+	for (int i = 0; i < ns; i++) {
+		int node = T[i]; 
+		int E = (*g)[node].getNumEdges();
+		for (int edge = 0; edge < E; edge++) {
+			int target = (*g)[node].getEdgeTarget(edge);
+			double rate = (*g)[node].getEdgeRate(edge);
+			double pathTotal = M[node] + rate;
+			if (pathTotal > M[target]) {
+				M[target] = pathTotal;
+				std::vector<int> prevPath = paths[node];
+				prevPath.push_back(target);
+				paths[target] = prevPath;
+			}
+		}
+	}
 	
+	//find the max of the array M, get corresponding path
+	int ind; double maxVal = 0;
+	for (int i = 0; i < ns; i++) {
+		if (M[i] > maxVal) {
+			maxVal = M[i];
+			ind = i;
+		}
+	}
+	std::vector<int> maxPath = paths[ind];
+
+	//print to user
+	printf("Quickest Path: ");
+	for (int i = 0; i < maxPath.size()-1; i++) {
+		printf("%d, ", maxPath[i]);
+	}
+	printf("%d. ", maxPath[maxPath.size()-1]);
+	printf("Total Rate = %f\n", M[ind]);
+
+	//fill the rates on the path
+	std::vector<double> rates;
+	fillRates(g, maxPath, rates);
+
+	//get graphviz code to show path
+	printPath(maxPath, rates, "QP");
+
 	//free memory
-	delete []row_prob;
+	delete []T; delete []M;
+}
+
+void QP(Graph* g, int source, int target) {
+	//determine the quickest folding path (largest rate) from source to target
+
+	//get number of nodes
+	int ns = g->getN();
+
+	//make arrays that will store max sums and paths
+	double* M = new double[ns];
+	std::vector<std::vector<int>> paths(ns);
+	for (int i = 0; i < ns; i++) M[i] = 0;
+	M[source] = 0; paths[source].push_back(source);
+
+	//compute a topological ordering of the graph
+	int* T = new int[ns];
+	tOrder(g, T, source);
+
+	//loop over nodes, go down edges, check for largest path
+	for (int i = 0; i < ns; i++) {
+		int node = T[i]; 
+		int E = (*g)[node].getNumEdges();
+		for (int edge = 0; edge < E; edge++) {
+			int target = (*g)[node].getEdgeTarget(edge);
+			double rate = (*g)[node].getEdgeRate(edge);
+			double pathTotal = M[node] + rate;
+			if (pathTotal > M[target]) {
+				M[target] = pathTotal;
+				std::vector<int> prevPath = paths[node];
+				prevPath.push_back(target);
+				paths[target] = prevPath;
+			}
+		}
+	}
+	
+	//Get the desired target max
+	int ind = target; double maxVal = M[target];
+	std::vector<int> maxPath = paths[ind];
+
+	//print to user
+	printf("Quickest Path ending at %d: ", target);
+	for (int i = 0; i < maxPath.size()-1; i++) {
+		printf("%d, ", maxPath[i]);
+	}
+	printf("%d. ", maxPath[maxPath.size()-1]);
+	printf("Total Rate = %f\n", M[ind]);
+
+	//fill the rates on the path
+	std::vector<double> rates;
+	fillRates(g, maxPath, rates);
+
+	//get graphviz code to show path
+	printPath(maxPath, rates, "QP");
+
+	//free memory
+	delete []T; delete []M;
+}
+
+void MPP(Graph* g, int source) {
+	//determine the most probable path down the graph from given source
+
+	//find the path by traveling from top to bottom
+	std::vector<int> path; std::vector<double> prob;
+	path.push_back(source);
+	int E = (*g)[source].getNumEdges();
+	while (E > 0) {
+		findMaxProb(g, source, E, path, prob);
+		E = (*g)[source].getNumEdges();
+	}
+
+	//print to user
+	printf("Most Probable Path: ");
+	for (int i = 0; i < path.size()-1; i++) {
+		printf("%d, ", path[i]);
+	}
+	printf("%d\n", path[path.size()-1]);
+
+	//make a graphviz file that shows the path
+	printPath(path, prob, "MPP");
 
 }
+
 
 }

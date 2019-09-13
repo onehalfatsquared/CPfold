@@ -109,33 +109,16 @@ Graph* targetSubgraph(Graph* g, int source, int target);
 Graph* sourceSubgraph(Graph* g, int source);
 //get the probability distribution of end states
 void endDistribution(Graph* g);
-//find the most probable path
-void MPP(Graph* g, int source);
 //find the outgoing edge with the largest value
 void findMaxProb(Graph* g, int& source, int E, std::vector<int>& path, 
 																					std::vector<double>& prob);
-//make a graphviz file with the given path
-void printPath(std::vector<int> path, std::vector<double> val, std::string s);
-//find the quickest folding path
-void QP(Graph* g, int source);
-//find the quikcest folding path ending at target
-void QP(Graph* g, int source, int target);
 //construct a topological ordering of the graph
 void tOrder(Graph* g, int* T, int source);
 //given a path, fill in the rates for each step of the path
 void fillRates(Graph* g, std::vector<int> path, std::vector<double>& rates);
 
-void printGraph(Graph* g, int source, int draw, int clean, int reduce) ;
-void makeEdge(std::ofstream& out_str, int source, int target, double edgeWidth, double rate) ;
-void makeEdgeClean(std::ofstream& out_str, int source, int target, double edgeWidth);
-void sameRank(std::ofstream& out_str, std::vector<int> states);
-void printCluster(std::ofstream& out_str, int index, int draw);
-
 void getEndDistribution(Graph* g, int source, double* probs, int possible, std::map<int,int> toIndex, int* indices);
 void findConditionalEnd(Graph* g, int source);
-void printCluster(std::ofstream& out_str, int index, std::vector<double> end);
-void printGraphEndDistribution(Graph* g, int source, int reduce);
-
 
 
 
