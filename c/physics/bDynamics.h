@@ -27,6 +27,8 @@ double stickyNewton(double E, double rho, double k0, double beta);
 
 
 //time integration stuff
+//init the chain
+void setupChain(double* X, int N);
 //use em scheme to solve sde
 void EM(double* X0, int N, int Nt, double k, 
 					int rho, double* E, int* P, double beta, int pot);
@@ -39,7 +41,6 @@ void estimateMFPT(int N, int state, Database* db);
 void estimateChain(int N, int state, Database* db);
 void estimatePartitionFn(int N, int state, Database* db);
 void setupSimMFPT(int N, double Eh, int*& P, double*& E);
-void setupChain(double* X, int N);
 void equilibrate(double* X, int pot, Database* DB, int state, int eq, int N, double DT,
 													int rho, double* E, double beta, int* P, int method);
 void runTrajectoryMFPT(double* X, int pot, Database* DB, int state, int samples, int N, 

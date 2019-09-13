@@ -1,19 +1,20 @@
 #include <cstdlib>
 #include <stdio.h>
 #include "bDynamics.h"
+#include "../defines.h"
 
 int main(int argc, char* argv[]) {
 
 	//handle input
-	if (argc != 3) {
-		fprintf(stderr, "Usage: %s <N> <T>", argv[0]);
+	if (argc != 2) {
+		fprintf(stderr, "Usage: %s <Final Time>", argv[0]);
 		return 1;
 	}
-	int N = atoi(argv[1]);
-	double T = atof(argv[2]);
+	double T = atof(argv[1]);
+	int N = PARTICLES;
 
 	//set parameters
-	int rho = 40;
+	int rho = RANGE;
 	double beta = 1;
 	int method = 1;
 
@@ -25,24 +26,17 @@ int main(int argc, char* argv[]) {
 	}
 
 	//set the initial and final state storage
-	double* X0 = new double[2*N];
-	for (int i = 0; i < 2*N; i++) {
-		if (i % 2 == 0) {
-			X0[i] = i/2+1;
-		}
-		else{
-			X0[i] = 0;
-		}
-	}
+	double* X0 = new double[DIMENSION*N];
+	bd::setupChain(X0, N);
 
 	//set potential type
-	int pot = 0; //0 morse, 1 lj
+	int pot = POTENTIAL; //0 morse, 1 lj
 
 	//run bd
 	bd::solveSDE(X0, N, T, rho, beta, E, P, method, pot);
 
 	//output the final state
-	for (int i = 0; i < 2*N; i++) printf("%f\n",X0[i]);
+	for (int i = 0; i < DIMENSION*N; i++) printf("%f\n",X0[i]);
 
 	//free memory
 	delete []P; delete []E; delete []X0;

@@ -293,18 +293,6 @@ void setupSimMFPT(int N, double Eh, int*& P, double*& E) {
 	}
 }
 
-void setupChain(double* X, int N) {
-	//construct a linear chain of particle positions
-	for (int i = 0; i < 2*N; i++) {
-		if (i % 2 == 0) {
-			X[i] = i/2+1;
-		}
-		else{
-			X[i] = 0;
-		}
-	}
-}
-
 
 void estimateMFPT(int N, int state, Database* db) {
 	/*estimate mean first passage time starting in state and going to state with
