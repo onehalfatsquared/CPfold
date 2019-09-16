@@ -3,6 +3,7 @@
 #include <string.h>
 #include <iostream>
 #include "bDynamics.h"
+#include "sampling.h"
 #include "database.h"
 #include <omp.h>
 namespace bd{

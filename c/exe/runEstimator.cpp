@@ -4,6 +4,7 @@
 #include <fstream>
 #include "bDynamics.h"
 #include "database.h"
+#include "sampling.h"
 
 //MAKE SURE TO RUN THIS ON A PURGED DATA SET EX input/N7Purge.txt
 // Run Type: 0 for full run

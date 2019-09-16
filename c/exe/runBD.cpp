@@ -7,11 +7,11 @@ int main(int argc, char* argv[]) {
 
 	//handle input
 	if (argc != 2) {
-		fprintf(stderr, "Usage: %s <Final Time>", argv[0]);
+		fprintf(stderr, "Usage: %s <Num Particles> <Final Time>", argv[0]);
 		return 1;
 	}
-	double T = atof(argv[1]);
-	int N = PARTICLES;
+	int N = atof(argv[1]);
+	double T = atof(argv[2]);
 
 	//set parameters
 	int rho = RANGE;
@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
 	bd::solveSDE(X0, N, T, rho, beta, E, P, method, pot);
 
 	//output the final state
-	for (int i = 0; i < DIMENSION*N; i++) printf("%f\n",X0[i]);
+	bd::printCluster(X0, N);
 
 	//free memory
 	delete []P; delete []E; delete []X0;

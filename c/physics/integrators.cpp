@@ -6,8 +6,6 @@
 namespace bd{
 
 
-
-
 void EM(double* X0, int N, int Nt, double k, 
 					int rho, double* E, int* P, double beta, int pot) {
 	//apply the EM method to solve the SDE
@@ -38,11 +36,6 @@ void EM(double* X0, int N, int Nt, double k,
 	delete []g; delete []particles;
 }
 
-
-
-
-
-
 void solveSDE(double* X0, int N, double T, int rho, double beta,
 												 double* E, int* P, int method, int pot) {
 	if (method == 1) {
@@ -64,5 +57,11 @@ void setupChain(double* X, int N) {
 		}
 	}
 }
+
+void printCluster(double* X, int N) {
+	//print the cluster in X
+	for (int i = 0; i < DIMENSION*N; i++) printf("%f\n",X[i]);
+}
+
 
 }
