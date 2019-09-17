@@ -21,7 +21,7 @@ int main(int argc, char* argv[]) {
 	int* M = new int[N*N];
 	for (int i = 0; i < N*N; i++) M[i] = 0;
 	M[1] = 1; M[3] = 1; M[5] = 1; M[7] = 1;
-	mcm::setup(N,X0,M);
+	mcm::runSampler(N,X0,M);
 
 	//output the final state
 	bd::printCluster(X0, N);

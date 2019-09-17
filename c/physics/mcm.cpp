@@ -156,6 +156,34 @@ void makeJ(int N, int* M, Eigen::MatrixXd& J, Eigen::VectorXd x) {
 
 }
 
+bool checkInequality(int N, int* M, Eigen::VectorXd y) {
+	//check if the sample y violates any of the inequality constraints
+
+	double XD, YD;
+	double ZD = 0;
+
+	//loop over and construct system
+	for (int i = 0; i <N; i ++) {
+		for (int j = i+1; j < N; j++) {
+			if (M[bd::toIndex(i,j,N)] == 0) {
+				//compute distances
+				XD = y(DIMENSION*i) - y(DIMENSION*j);
+				YD = y(DIMENSION*i+1) - y(DIMENSION*j+1);
+#if (DIMENSION == 3) 
+				ZD = y(DIMENSION*i+2) - y(DIMENSION*j+2);
+#endif 
+
+				//check if distance is less than 1
+				if (XD*XD + YD*YD + ZD*ZD < 1) {
+					return false;
+				}
+			}
+		}
+	}
+
+	return true;
+}
+
 void evalConstraint(int N, int* M, Eigen::VectorXd& q, Eigen::VectorXd x) {
 	//evaluate the lhs constraint function
 
@@ -194,22 +222,11 @@ int getNumBonds(int N, int* M) {
 	return b;
 }
 
-void setup(int N, double* X, int* M) {
-	//do stuff //todo
+void getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x) {
+	//use the MCM algorithm to generate a new sample in x
 
-	//get the number of bonds in the configuration, get DoF
-	int df = DIMENSION*N;           //num degrees of freedom in ambient system
-	int b = getNumBonds(N,M);      //num bonds
-	int d = df-b;                  //effective dimension of system
-
-	//setup the matrices/vectors with eigen
-	Eigen::MatrixXd Qx(b,df); 
-	Eigen::VectorXd x(df); 
-
-	//initialize x with values in X. fill Qx with zeros. 
-	for (int i = 0; i < df; i++) {
-		x(i) = X[i];
-	}
+	//init the gradient of the constraint matrix
+	Eigen::MatrixXd Qx(b,df);
 	Qx.fill(0.0);
 
 	//fill Qx (Note: Qx is df by b after returning)
@@ -227,9 +244,42 @@ void setup(int N, double* X, int* M) {
 	Eigen::VectorXd a(b); a.fill(0.0);
 	Eigen::VectorXd y(df); y.fill(0.0);
 	bool success = project(N, M, b, x+v, Qx, a);
-	if (success) {
-		y = x+v+Qx*a;
+	//if the projection fails, return with X_(n+1) = X_n
+	if (!success) {
+		return;
 	}
+	//if success, y is the proposed sample
+	y = x+v+Qx*a;
+
+	//check for inequality violations. if success = false, return.
+	success = checkInequality(N, M, y);
+	if (!success) {
+		return;
+	}
+
+	//next, we check the reverse step
+}
+
+void runSampler(int N, double* X, int* M) {
+	//run the sampling algo
+
+	//get the number of bonds in the configuration, get DoF
+	int df = DIMENSION*N;           //num degrees of freedom in ambient system
+	int b = getNumBonds(N,M);      //num bonds
+	int d = df-b;                  //effective dimension of system
+
+	//setup the vector with eigen 
+	Eigen::VectorXd x(df); 
+
+	//initialize x with values in X. 
+	for (int i = 0; i < df; i++) {
+		x(i) = X[i];
+	}
+
+	//get a new sample
+	getSample(N, M, df, b, d, x);
+
+	
 }
 
 
