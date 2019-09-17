@@ -37,7 +37,13 @@ namespace mcm {
 
 //monte carlo on manifolds sampling stuff
 
-
+void project();
+void QRortho(Eigen::MatrixXd& Qx, Eigen::MatrixXd& Q, int d);
+int getNumBonds(int N, int* M);
+void setup(int N, double* X, int* M);
+double evalDensity(Eigen::VectorXd v, int d);
+void proposeTan(Eigen::MatrixXd Q, Eigen::VectorXd& v);
+void evalConstraint(int N, int* M, Eigen::VectorXd& q, Eigen::VectorXd x);
 
 
 
