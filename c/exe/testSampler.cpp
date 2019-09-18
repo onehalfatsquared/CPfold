@@ -10,7 +10,7 @@ int main(int argc, char* argv[]) {
 
 	//set parameters
 	int N = 3;
-	int num_samples = 1000;
+	int num_samples = 100000;
 	int kappa = 1.5;
 
 	//set the initial and final state storage
@@ -21,7 +21,7 @@ int main(int argc, char* argv[]) {
 	int* M = new int[N*N];
 	for (int i = 0; i < N*N; i++) M[i] = 0;
 	M[1] = 1; M[3] = 1; M[5] = 1; M[7] = 1;
-	mcm::runSampler(N,X0,M);
+	mcm::runTest(N,X0,M,num_samples);
 
 	//output the final state
 	bd::printCluster(X0, N);

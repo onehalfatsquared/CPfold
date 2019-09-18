@@ -37,7 +37,7 @@ namespace mcm {
 
 //monte carlo on manifolds sampling stuff
 
-void runSampler(int N, double* X, int* M);
+void runTest(int N, double* X, int* M, int num_samples);
 
 bool project(int N, int* M, int b, Eigen::VectorXd z, Eigen::MatrixXd Qz, Eigen::VectorXd& a);
 bool checkInequality(int N, int* M, Eigen::VectorXd y);
@@ -51,6 +51,7 @@ void makeJ(int N, int* M, Eigen::MatrixXd& J, Eigen::VectorXd x);
 void makeQx(int N, int* M, Eigen::MatrixXd& Qx, Eigen::VectorXd x);
 double getMH(Eigen::VectorXd x, Eigen::VectorXd y, Eigen::VectorXd v, Eigen::VectorXd vr, int d, int b);
 double fEval(int b);
+double getBondAngle(Eigen::VectorXd x);
 
 
 }

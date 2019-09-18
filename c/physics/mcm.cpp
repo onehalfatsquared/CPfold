@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <iostream>
+#include <fstream>
 #include <chrono>
 #include "bDynamics.h"
 #include "database.h"
@@ -14,6 +15,25 @@
 #include <omp.h>
 namespace mcm {
 
+double getBondAngle(Eigen::VectorXd x) {
+	//get the bond angle for a trimer
+
+	//init the storage for vectors between particles (1,2) and (2,3)
+	Eigen::VectorXd v1(DIMENSION); v1.fill(0.0);
+	Eigen::VectorXd v2(DIMENSION); v2.fill(0.0);
+
+	//fill the displacement vectors
+	for (int i = 0; i < DIMENSION; i++) {
+		v1(i) = x(DIMENSION+i)-x(i);
+		v2(i) = x(2*DIMENSION+i)-x(DIMENSION+i);
+	}
+
+	//compute the scaled dot product
+	double sdp = (v1.dot(v2))/(v1.norm()*v2.norm());
+
+	//return the inverse cosine of sdp to get angle
+	return acos(sdp);
+}
 double getResidual(int N, int* M, int b, Eigen::VectorXd p) {
 	//get the residual of the constraint eqs in 2 norm at point p
 
@@ -324,7 +344,7 @@ void getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x) {
 
 }
 
-void runSampler(int N, double* X, int* M) {
+void runTest(int N, double* X, int* M, int num_samples) {
 	//run the sampling algo
 
 	//get the number of bonds in the configuration, get DoF
@@ -333,15 +353,32 @@ void runSampler(int N, double* X, int* M) {
 	int d = df-b;                  //effective dimension of system
 
 	//setup the vector with eigen 
-	Eigen::VectorXd x(df); 
+	Eigen::VectorXd x(df);        //store the current sample
+	Eigen::VectorXd prev(df);     //stores the previous sample 
 
 	//initialize x with values in X. 
 	for (int i = 0; i < df; i++) {
 		x(i) = X[i];
 	}
 
+	//init a counter
+	int ctr = 0;
+	int burnIn = 1000;
+
+	//output file
+	std::ofstream ofile;
+	ofile.open("ba.txt");
+
 	//get a new sample
-	getSample(N, M, df, b, d, x);
+	while (ctr < num_samples+burnIn) {
+		prev = x;
+		getSample(N, M, df, b, d, x);
+		if (ctr>burnIn)
+			ofile << getBondAngle(x) << "\n";
+		ctr++;
+	}
+	ofile.close();
+
 
 	
 }
