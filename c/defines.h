@@ -14,6 +14,7 @@
 
 //mcmc parameters
 #define SIG       0.5      //std for isotropic gaussian proposal
+#define KAP       1.5      //sticky parameter for particles
 
 
 //visual parameters

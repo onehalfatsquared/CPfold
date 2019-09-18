@@ -49,7 +49,8 @@ void proposeTan(Eigen::MatrixXd Q, Eigen::VectorXd& v);
 void evalConstraint(int N, int* M, Eigen::VectorXd& q, Eigen::VectorXd x);
 void makeJ(int N, int* M, Eigen::MatrixXd& J, Eigen::VectorXd x);
 void makeQx(int N, int* M, Eigen::MatrixXd& Qx, Eigen::VectorXd x);
-
+double getMH(Eigen::VectorXd x, Eigen::VectorXd y, Eigen::VectorXd v, Eigen::VectorXd vr, int d, int b);
+double fEval(int b);
 
 
 }

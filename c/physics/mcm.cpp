@@ -22,6 +22,30 @@ double getResidual(int N, int* M, int b, Eigen::VectorXd p) {
 	return q.norm();
 }
 
+double getMH(Eigen::VectorXd x, Eigen::VectorXd y, Eigen::VectorXd v, Eigen::VectorXd vr, int d, int b) {
+	//compute the Metropolis-Hastings acceptance probability for the move
+
+	double N = fEval(b)*evalDensity(vr,d);
+	double D = fEval(b)*evalDensity(v,d);
+	double p = N/D;
+
+	if (p > 1) 
+		return 1.0;
+	else
+		return p;
+}
+
+double fEval(int b) {
+	//evaluate the function to be sampled //todo different types of bonds + partition fn
+
+	double f = 1.0;
+	for (int i = 0; i < b; i++) {
+		f *= KAP;
+	}
+
+	return f;
+}
+
 bool project(int N, int* M, int b, Eigen::VectorXd z, Eigen::MatrixXd Qz, Eigen::VectorXd& a) {
 	//project the point onto the manifold using newtons method
 
@@ -257,7 +281,47 @@ void getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x) {
 		return;
 	}
 
-	//next, we check the reverse step
+	//next, we check the reverse step.
+	// Get the matrix Qy
+	Eigen::MatrixXd Qy(b,df);
+	Qy.fill(0.0);
+	makeQx(N, M, Qy, y);
+
+	//get the orthogonal complement of Qy via the last d cols of Q (QR decomp of Qx)
+	Q.fill(0.0);
+	QRortho(Qy, Q, d); 
+
+	//project x-y onto the space spanned by cols of Q
+	Eigen::VectorXd vr(df); vr.fill(0.0);
+	Eigen::MatrixXd P = Q.transpose()*Q;
+	Eigen::VectorXd p = P.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(Q.transpose()*(x-y));
+	vr = Q*p;  
+	
+	//compute the acceptance prob 
+	double prob = getMH(x,y,v,vr,d,b);
+
+	//accept or reject
+	std::default_random_engine generator;
+	std::uniform_real_distribution<double> distribution(0.0,1.0);
+	double U = distribution(generator);
+	if (U > prob) {
+		return;
+	}
+
+	//if we reach here, y is accepted. Just need to check reverse projection
+	success = project(N, M, b, y+vr, Qy, a);
+	if (!success) {
+		return;
+	}
+
+	//projection successful, check if result gives back x
+	Eigen::VectorXd xDiff(df); xDiff.fill(0.0);
+	Eigen::VectorXd xr(df); xr.fill(0.0);
+	xr = y+vr+Qy*a; xDiff = x-xr;
+	if (xDiff.norm() < N_TOL) {
+		x=y;
+	}
+
 }
 
 void runSampler(int N, double* X, int* M) {
