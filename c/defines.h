@@ -9,11 +9,11 @@
 #define RK_TS    1e-6       // time step for RK integrator
 
 //Newton's Method Parameters
-#define N_ITER     30      // Max iterations for NM
-#define N_TOL    1e-6      // tolerance for norm(dx)
+#define N_ITER     10      // Max iterations for NM
+#define N_TOL    1e-7      // tolerance for norm(dx)
 
 //mcmc parameters
-#define SIG       0.5      //std for isotropic gaussian proposal
+#define SIG       0.25      //std for isotropic gaussian proposal
 #define KAP       1.5      //sticky parameter for particles
 
 
