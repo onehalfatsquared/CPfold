@@ -34,6 +34,7 @@ double getBondAngle(Eigen::VectorXd x) {
 	//return the inverse cosine of sdp to get angle
 	return acos(sdp);
 }
+
 double getResidual(int N, int* M, int b, Eigen::VectorXd p) {
 	//get the residual of the constraint eqs in 2 norm at point p
 
@@ -50,7 +51,6 @@ double getMH(Eigen::MatrixXd Qx, Eigen::MatrixXd Qy, Eigen::VectorXd x,
 	double D = fEval(b, Qx)*evalDensity(v,d);
 	double p = N/D;
 
-	//std::cout << p << "\n";
 	if (p > 1) 
 		return 1.0;
 	else
@@ -67,20 +67,18 @@ double getJacobian(Eigen::MatrixXd Q) {
       pdet *= abs(s(i));
     }
   }
-  //std::cout << pdet << "\n";
   return 1.0/pdet;
 
 }
 
 double fEval(int b, Eigen::MatrixXd Q) {
-	//evaluate the function to be sampled //todo different types of bonds + partition fn
+	//evaluate the function to be sampled 
 
 	double f = 1.0;
 	for (int i = 0; i < b; i++) {
 		f *= KAP;
 	}
 
-	//std::cout << f*getJacobian(Q) << "\n";
 	return f*getJacobian(Q);
 }
 
@@ -97,6 +95,7 @@ bool project(int N, int* M, int b, Eigen::VectorXd z, Eigen::MatrixXd Qz, Eigen:
 	Eigen::VectorXd F(b); F.fill(0.0);
 	Eigen::VectorXd da(a.size()); da.fill(0.0);
 
+	//perform iterations of NM
 	while (residual > N_TOL) {
 
 		//construct the system
@@ -127,50 +126,40 @@ bool project(int N, int* M, int b, Eigen::VectorXd z, Eigen::MatrixXd Qz, Eigen:
 
 double evalDensity(Eigen::VectorXd v, int d) {
 	//evaluate the gaussian d dimensional probability desnity at v
+
 	double V = v.squaredNorm();  //get the squared 2 norm of v
 	double Z = 1;               //compute normalizing const with for loop
+
+	/* //Normalization not needed for MCMC
 	for (int i = 0; i < d; i++) {
 		Z /= (sqrt(2*M_PI)*SIG);
 	}
+	*/
+
 	return Z*exp(-V/(2*SIG*SIG));
 }
 
-void proposeTan(Eigen::MatrixXd Q, Eigen::VectorXd& v, int d) {
+void proposeTan(Eigen::MatrixXd Q, Eigen::VectorXd& v, int d, RandomNo* rngee) {
 	//generate a proposal move tangent to M - isotropic gaussian
 
-	//initialize the random number generator - Normal(0,1) //fix seed
-	//unsigned seed = 12345; //for debug
-	//std::default_random_engine generator;
-	unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-	std::default_random_engine generator(seed);
-	std::normal_distribution<double> distribution(0.0,1.0);
+	//store the weights of each vector
 	Eigen::VectorXd r(d);
 
+	//compute weights, standard dev, SIG, times N(0,1)
 	for (int i = 0; i < d; i++) {
-		r(i) = SIG*distribution(generator); //weights of each basis vector
+		r(i) = SIG*rngee->getG(); 
 	}
 
 	//get proposal move
 	v = Q*r;
-
 }
 
 void QRortho(Eigen::MatrixXd& Qx, Eigen::MatrixXd& Q, int d) {
 	//get the last d cols of Q matrix from a QR decomp of Qx
 
-	int which = 2;
+	Eigen::MatrixXd Qfull = Qx.colPivHouseholderQr().matrixQ();
+	Q = Qfull.rightCols(d);
 
-	if (which == 1) {
-		Eigen::MatrixXd Qfull = Qx.colPivHouseholderQr().matrixQ();
-		Q = Qfull.rightCols(d);
-	}
-
-
-	if (which == 2) {
-		Eigen::ColPivHouseholderQR<Eigen::MatrixXd> qr(Qx);
-	  Eigen::MatrixXd wholeQ = qr.householderQ();
-	  Q = wholeQ.block(0,2,6,d);
-	}
 }
 
 void makeQx(int N, int* M, Eigen::MatrixXd& Qx, Eigen::VectorXd x) {
@@ -206,7 +195,7 @@ void makeQx(int N, int* M, Eigen::MatrixXd& Qx, Eigen::VectorXd x) {
 }
 
 void makeJ(int N, int* M, Eigen::MatrixXd& J, Eigen::VectorXd x) {
-	//construct the (transpose of the) jacobian of the constraint matrix
+	//construct the jacobian matrix for use in newtons method
 
 	double XD, YD, ZD;
 	int count = 0;
@@ -283,7 +272,6 @@ void evalConstraint(int N, int* M, Eigen::VectorXd& q, Eigen::VectorXd x) {
 
 				//evaluate the distance constraint
 				q(count) = XD*XD + YD*YD + ZD*ZD -1;
-
 				count +=1;
 			}
 		}
@@ -301,7 +289,7 @@ int getNumBonds(int N, int* M) {
 	return b;
 }
 
-void getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x) {
+void getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x, RandomNo* rngee) {
 	//use the MCM algorithm to generate a new sample in x
 
 	//init the gradient of the constraint matrix
@@ -311,28 +299,13 @@ void getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x) {
 	//fill Qx (Note: Qx is df by b after returning)
 	makeQx(N, M, Qx, x);
 
-	/*
-	std::cout << Qx << "\n";
-	abort();
-	*/
-
 	//get the orthogonal complement of Qx via the last d cols of Q (QR decomp of Qx)
 	Eigen::MatrixXd Q(df,d); Q.fill(0.0);
 	QRortho(Qx, Q, d); 
 
-	/*
-	std::cout << Q << "\n";
-	abort();
-	*/
-
 	//generate a proposal move, v, in the tangent space using Q
 	Eigen::VectorXd v(df); v.fill(0.0);
-	proposeTan(Q, v, d);
-
-	/*
-	std::cout << v << "\n";
-	abort();
-	*/
+	proposeTan(Q, v, d, rngee);
 
 	//project the point to M, by adding w=Qx*a, to get sample, y
 	Eigen::VectorXd a(b); a.fill(0.0);
@@ -344,11 +317,6 @@ void getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x) {
 	}
 	//if success, y is the proposed sample
 	y = x+v+Qx*a;
-
-	/*
-	std::cout << y << "\n";
-	abort();
-	*/
 
 	//check for inequality violations. if success = false, return.
 	success = checkInequality(N, M, y);
@@ -366,25 +334,18 @@ void getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x) {
 	Q.fill(0.0);
 	QRortho(Qy, Q, d); 
 
-	//project x-y onto the space spanned by cols of Q
+	//project x-y onto the space spanned by cols of Q to get reverse step, vr
 	Eigen::VectorXd vr(df); vr.fill(0.0);
 	for (int i = 0; i < d; i++ ) {
 		Eigen::VectorXd u = Q.col(i);
 		vr += u.dot(x-y)*u;
 	}
-
-	/*
-	std::cout << vr << "\n";
-	abort();
-	*/
 	
 	//compute the acceptance prob 
 	double prob = getMH(Qx,Qy,x,y,v,vr,d,b);
 
 	//accept or reject
-	std::default_random_engine generator;
-	std::uniform_real_distribution<double> distribution(0.0,1.0);
-	double U = distribution(generator);
+	double U = rngee->getU();
 	if (U > prob) {
 		return;
 	}
@@ -399,11 +360,11 @@ void getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x) {
 	Eigen::VectorXd xDiff(df); xDiff.fill(0.0);
 	Eigen::VectorXd xr(df); xr.fill(0.0);
 	xr = y+vr+Qy*a; xDiff = x-xr;
-	if (xDiff.norm() < N_TOL) {
+	if (xDiff.norm() < 100*N_TOL) {
 		x=y;
 	}
-
 }
+
 
 void runTest(int N, double* X, int* M, int num_samples) {
 	//run the sampling algo
@@ -422,39 +383,31 @@ void runTest(int N, double* X, int* M, int num_samples) {
 		x(i) = X[i];
 	}
 
-	//x << 1,0,2,0,2,1;
-	std::cout << getBondAngle(x) << "\n";
+	//construct an rng class
+	RandomNo* rngee = new RandomNo();
 
 	//init a counter
-	int ctr = 0;
-	int burnIn = 5000;
+	int ctr = 0; int burnIn = 1000;
 
 	//output file
 	std::ofstream ofile;
 	ofile.open("ba.txt");
 
-	//get a new sample
+	//get some samples
 	while (ctr < num_samples+burnIn) {
 		prev = x;
-		getSample(N, M, df, b, d, x);
+		getSample(N, M, df, b, d, x, rngee);
 		if (ctr>burnIn)
 			ofile << getBondAngle(x) << "\n";
 		ctr++;
 	}
+
+	//close the file
 	ofile.close();
 
-
-	
+	//free the memory
+	delete rngee;
 }
-
-
-
-
-
-
-
-
-
 
 
 

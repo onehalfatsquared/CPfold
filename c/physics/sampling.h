@@ -3,7 +3,29 @@
 #include "adjacency.h"
 #include "pair.h"
 #include <vector>
+#include <random>
+#include <chrono>
 #include <eigen3/Eigen/Dense>
+
+class RandomNo{
+	std::mt19937 generator; 
+	std::uniform_real_distribution<double> uDist;
+	std::normal_distribution<double> gDist;
+
+	public:
+		RandomNo(unsigned int seed = std::random_device{}())
+        : generator{seed},uDist{0,1},gDist{0,1} {}
+
+    double getU() {
+    	return uDist(generator);
+    }
+    double getG() {
+    	return gDist(generator);
+    }
+
+
+};
+
 namespace bd { 
 class Database;
 
@@ -38,6 +60,7 @@ namespace mcm {
 //monte carlo on manifolds sampling stuff
 
 void runTest(int N, double* X, int* M, int num_samples);
+void getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x, RandomNo* rng);
 
 bool project(int N, int* M, int b, Eigen::VectorXd z, Eigen::MatrixXd Qz, Eigen::VectorXd& a);
 bool checkInequality(int N, int* M, Eigen::VectorXd y);
@@ -45,7 +68,7 @@ double getResidual(int N, int* M, int b, Eigen::VectorXd p);
 void QRortho(Eigen::MatrixXd& Qx, Eigen::MatrixXd& Q, int d);
 int getNumBonds(int N, int* M);
 double evalDensity(Eigen::VectorXd v, int d);
-void proposeTan(Eigen::MatrixXd Q, Eigen::VectorXd& v);
+void proposeTan(Eigen::MatrixXd Q, Eigen::VectorXd& v, int d, RandomNo* rngee);
 void evalConstraint(int N, int* M, Eigen::VectorXd& q, Eigen::VectorXd x);
 void makeJ(int N, int* M, Eigen::MatrixXd& J, Eigen::VectorXd x);
 void makeQx(int N, int* M, Eigen::MatrixXd& Qx, Eigen::VectorXd x);
@@ -57,4 +80,5 @@ double getBondAngle(Eigen::VectorXd x);
 
 
 }
+
 
