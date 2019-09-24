@@ -9,6 +9,7 @@
 #define RK_TS    1e-6       // time step for RK integrator
 #define SAMPLES  2000       // number of samples to obtain (per prcoessor)
 #define EQ        200       //number of samples to equilibrate for (change to time?) 
+#define MAX_TRY  1000       //if this many MCMC samples dont transition, ignore
 
 //Newton's Method Parameters
 #define N_ITER     10      // Max iterations for NM

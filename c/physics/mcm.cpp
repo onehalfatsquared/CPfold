@@ -105,6 +105,7 @@ double getMH(Eigen::MatrixXd Qx, Eigen::MatrixXd Qy, Eigen::VectorXd x,
 						 Eigen::VectorXd y, Eigen::VectorXd v, Eigen::VectorXd vr, int d, int b) {
 	//compute the Metropolis-Hastings acceptance probability for the move
 
+	//todo - make adjacency matrix to get bond numbers for feval?
 	double N = fEval(b, Qy)*evalDensity(vr,d);
 	double D = fEval(b, Qx)*evalDensity(v,d);
 	double p = N/D;
@@ -470,16 +471,67 @@ void minVarEstimate(int sampleSize, double* means, double* variances, double& M,
 }
 
 void equilibrate() {
+	//equilibrate the starting point before getting samples
 
 }
 
-void getSampleMFPT() {
+double getTime() {
+	//given two samples from langevin eq, estimate the time between the move
 
+	return 0;
+}
+
+void checkState() {
+	//check if a new state has been reached
+
+	return;
+}
+
+double getSampleMFPT(double* X, bd::Database* db, int state, int N, int* M,
+	std::vector<bd::Pair>& PM, RandomNo* rngee) {
+	//get a sample of the mean first passage time, record the state that gets visited
+
+	//parameters for the estimator and bond checking
+	int max_it = MAX_TRY;             //cut off if no bond after max_it samples
+	int new_state;                    //state with added bond id
+	bool accepted;                    //flag to check if MCMC accepted proposal
+	bool hit;                         //flag to check if new state has been hit
+	int df = DIMENSION*N;             //num dimensions of the system
+	int b = (*db)[state].getBonds();  //num bonds in starting cluster
+	int d = df - b;                  //effective degrees of freedom
+	double timer = 0;                //init the timer for the mfpt
+
+	//change cluster from array to Eigen vector
+	Eigen::VectorXd x(df); Eigen::VectorXd x_prev(df);
+	for (int i = 0; i < df; i++) x[i] = X[i];
+	x_prev = x;
+
+	//generate samples using MCMC until a boundary is hit
+	for (int i = 0; i < max_it; i++) {
+		//get the sample
+		accepted = getSample(N, M, df, b, d, x, rngee);
+
+		//if the position has changed, update timer and check for bond formation
+		if (accepted) {
+
+			//get the time for the move (todo) update timer and x_prev
+			double dt = getTime();
+			timer += dt;
+			x_prev = x;
+
+			//check if state changed - todo make new checkstate
+			checkState();
+			if (hit == 1) {//hit new state, update estimates
+				updatePM(new_state, PM);
+				return timer;
+			}
+		}
+	}
 }
 
 
 
-void estimateMFPT(int N, int state, bd::Database* db) {
+void estimateMFPT(int N, int state, bd::Database* db, RandomNo* rngee) {
 	/*estimate mean first passage time starting in state and going to state with
 	one additional bond. Uses parallel implementations of a single walker with
 	long trajectory.*/
@@ -488,6 +540,10 @@ void estimateMFPT(int N, int state, bd::Database* db) {
 	int samples = SAMPLES; //number of hits per walker for estimator
 	int eq = EQ; //number of steps to equilibrate for
 	int num_states = db->getNumStates(); //total number of states
+
+	//construct the adjacency matrix of the state
+	int* M = new int[N*N];
+	bd::extractAM(N, state, M, db);
 
 	//quantities to update - new estimates
 	std::vector<bd::Pair> PM; std::vector<bd::Pair> PMshare;
@@ -536,7 +592,7 @@ void estimateMFPT(int N, int state, bd::Database* db) {
 			equilibrate();
 
 			//get a sample - has to update PM
-			getSampleMFPT();
+			getSampleMFPT(X, db, state, N, M, PM, rngee);
 
 			//add sample to mfptVec
 
@@ -603,7 +659,7 @@ void estimateMFPT(int N, int state, bd::Database* db) {
 
 
 	//free memory
-	delete []mfptSamples; delete []mfptVar;
+	delete []mfptSamples; delete []mfptVar; delete []M;
 }
 
 

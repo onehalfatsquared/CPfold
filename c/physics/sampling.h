@@ -84,7 +84,7 @@ double getJacobian(Eigen::MatrixXd Q);
 //chain mfpt estimator functions
 void sampleStats(std::vector<double> X, double& M, double& V);
 void equilibrate();
-void getSampleMFPT();
+double getSampleMFPT();
 void minVarEstimate(int sampleSize, double* means, double* variances, double& M, double& V);
 void estimateMFPT(int N, int state, bd::Database* db);
 
