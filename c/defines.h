@@ -7,6 +7,8 @@
 #define RANGE      40				// range paremeter for potentials
 #define EULER_TS 5e-6       // time step for EM integrator
 #define RK_TS    1e-6       // time step for RK integrator
+#define SAMPLES  2000       // number of samples to obtain (per prcoessor)
+#define EQ        200       //number of samples to equilibrate for (change to time?) 
 
 //Newton's Method Parameters
 #define N_ITER     10      // Max iterations for NM
@@ -15,7 +17,6 @@
 //mcmc parameters
 #define SIG       0.25      //std for isotropic gaussian proposal
 #define KAP       1.5      //sticky parameter for particles
-
 
 //visual parameters
 #define PTOL 0.07          // exclude nodes from plot with less than this probability

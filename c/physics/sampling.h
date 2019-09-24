@@ -29,7 +29,7 @@ class RandomNo{
 namespace bd { 
 class Database;
 
-//brownian dynamics sampling stuff
+//brownian dynamics sampling section
 void estimateMFPT(int N, int state, Database* db);
 void estimateChain(int N, int state, Database* db);
 void setupSimMFPT(int N, double Eh, int*& P, double*& E);
@@ -56,12 +56,16 @@ bool findMatrix(int* M, int* old, int old_bonds, int N, Database* db, int& timer
 }
 
 namespace mcm {
+class Database;
 
-//monte carlo on manifolds sampling stuff
+//monte carlo on manifolds sampling section
 
-void runTest(int N, double* X, int* M, int num_samples);
-void getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x, RandomNo* rng);
+//trimer test functions
+void runTestTrimer(int N, double* X, int* M, int num_samples);
+double getBondAngle(Eigen::VectorXd x);
 
+//mcmc algorithm functions
+bool getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x, RandomNo* rng);
 bool project(int N, int* M, int b, Eigen::VectorXd z, Eigen::MatrixXd Qz, Eigen::VectorXd& a);
 bool checkInequality(int N, int* M, Eigen::VectorXd y);
 double getResidual(int N, int* M, int b, Eigen::VectorXd p);
@@ -76,7 +80,13 @@ double getMH(Eigen::MatrixXd Qx, Eigen::MatrixXd Qy,Eigen::VectorXd x,
 						 Eigen::VectorXd y, Eigen::VectorXd v, Eigen::VectorXd vr, int d, int b);
 double fEval(int b, Eigen::MatrixXd Q);
 double getJacobian(Eigen::MatrixXd Q);
-double getBondAngle(Eigen::VectorXd x);
+
+//chain mfpt estimator functions
+void sampleStats(std::vector<double> X, double& M, double& V);
+void equilibrate();
+void getSampleMFPT();
+void minVarEstimate(int sampleSize, double* means, double* variances);
+void estimateMFPT(int N, int state, bd::Database* db);
 
 
 }

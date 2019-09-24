@@ -15,6 +15,11 @@
 #include <omp.h>
 namespace mcm {
 
+/****************************************************/
+/*********** Code for Trimer Test *******************/
+/****************************************************/
+
+
 double getBondAngle(Eigen::VectorXd x) {
 	//get the bond angle for a trimer
 
@@ -34,6 +39,59 @@ double getBondAngle(Eigen::VectorXd x) {
 	//return the inverse cosine of sdp to get angle
 	return acos(sdp);
 }
+
+void runTestTrimer(int N, double* X, int* M, int num_samples) {
+	//run the sampling algo on a trimer test problem
+
+	//get the number of bonds in the configuration, get DoF
+	int df = DIMENSION*N;           //num degrees of freedom in ambient system
+	int b = getNumBonds(N,M);      //num bonds
+	int d = df-b;                  //effective dimension of system
+
+	//setup the vector with eigen 
+	Eigen::VectorXd x(df);        //store the current sample
+	Eigen::VectorXd prev(df);     //stores the previous sample 
+
+	//initialize x with values in X. 
+	for (int i = 0; i < df; i++) {
+		x(i) = X[i];
+	}
+
+	//construct an rng class
+	RandomNo* rngee = new RandomNo();
+
+	//init a counter
+	int ctr = 0; int burnIn = 1000;
+
+	//output file
+	std::ofstream ofile;
+	ofile.open("ba.txt");
+
+	//get some samples
+	while (ctr < num_samples+burnIn) {
+		prev = x;
+		getSample(N, M, df, b, d, x, rngee);
+		if (ctr>burnIn)
+			ofile << getBondAngle(x) << "\n";
+		ctr++;
+	}
+
+	//close the file
+	ofile.close();
+
+	//free the memory
+	delete rngee;
+}
+
+/****************************************************/
+/*********** End code for trimer test ***************/
+/****************************************************/
+
+
+/****************************************************/
+/*********** MCMC Internal Functions ****************/
+/****************************************************/
+
 
 double getResidual(int N, int* M, int b, Eigen::VectorXd p) {
 	//get the residual of the constraint eqs in 2 norm at point p
@@ -67,8 +125,8 @@ double getJacobian(Eigen::MatrixXd Q) {
       pdet *= abs(s(i));
     }
   }
-  return 1.0/pdet;
 
+  return 1.0/pdet;
 }
 
 double fEval(int b, Eigen::MatrixXd Q) {
@@ -121,7 +179,6 @@ bool project(int N, int* M, int b, Eigen::VectorXd z, Eigen::MatrixXd Qz, Eigen:
 	}
 
 	return true;
-
 }
 
 double evalDensity(Eigen::VectorXd v, int d) {
@@ -159,7 +216,6 @@ void QRortho(Eigen::MatrixXd& Qx, Eigen::MatrixXd& Q, int d) {
 
 	Eigen::MatrixXd Qfull = Qx.colPivHouseholderQr().matrixQ();
 	Q = Qfull.rightCols(d);
-
 }
 
 void makeQx(int N, int* M, Eigen::MatrixXd& Qx, Eigen::VectorXd x) {
@@ -221,7 +277,6 @@ void makeJ(int N, int* M, Eigen::MatrixXd& J, Eigen::VectorXd x) {
 			}
 		}
 	}
-
 }
 
 bool checkInequality(int N, int* M, Eigen::VectorXd y) {
@@ -289,7 +344,7 @@ int getNumBonds(int N, int* M) {
 	return b;
 }
 
-void getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x, RandomNo* rngee) {
+bool getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x, RandomNo* rngee) {
 	//use the MCM algorithm to generate a new sample in x
 
 	//init the gradient of the constraint matrix
@@ -313,7 +368,7 @@ void getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x, RandomNo
 	bool success = project(N, M, b, x+v, Qx, a);
 	//if the projection fails, return with X_(n+1) = X_n
 	if (!success) {
-		return;
+		return false;
 	}
 	//if success, y is the proposed sample
 	y = x+v+Qx*a;
@@ -321,7 +376,7 @@ void getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x, RandomNo
 	//check for inequality violations. if success = false, return.
 	success = checkInequality(N, M, y);
 	if (!success) {
-		return;
+		return false;
 	}
 
 	//next, we check the reverse step.
@@ -347,13 +402,13 @@ void getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x, RandomNo
 	//accept or reject
 	double U = rngee->getU();
 	if (U > prob) {
-		return;
+		return false;
 	}
 
 	//if we reach here, y is accepted. Just need to check reverse projection
 	success = project(N, M, b, y+vr, Qy, a);
 	if (!success) {
-		return;
+		return false;
 	}
 
 	//projection successful, check if result gives back x
@@ -362,52 +417,179 @@ void getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x, RandomNo
 	xr = y+vr+Qy*a; xDiff = x-xr;
 	if (xDiff.norm() < 100*N_TOL) {
 		x=y;
+		return true;
 	}
+
+	return false;
+}
+
+/****************************************************/
+/*********** End MCMC Internal Functions ************/
+/****************************************************/
+
+/****************************************************/
+/*********** MFPT Estimator Functions ***************/
+/****************************************************/
+
+void sampleStats(std::vector<double> X, double& M, double& V) {
+	//return the sample mean of the vector X
+
+	//init the mean and variance at 0, get sample size
+	M = 0; V = 0;
+	int N = X.size();
+
+	//compute the mean
+	for (int i = 0; i < N; i++) M += X[i];
+	M /= float(N);
+
+	//compute the variance 
+	for (int i = 0; i < N; i++) V += (X[i]-M) * (X[i]-M);
+	V /= (N-1);
+}
+
+void minVarEstimate(int sampleSize, double* means, double* variances) {
+	//combine the estimated means in a linear combination to minimize variance
+
+
+}
+
+void equilibrate() {
+
+}
+
+void getSampleMFPT() {
+	
 }
 
 
-void runTest(int N, double* X, int* M, int num_samples) {
-	//run the sampling algo
 
-	//get the number of bonds in the configuration, get DoF
-	int df = DIMENSION*N;           //num degrees of freedom in ambient system
-	int b = getNumBonds(N,M);      //num bonds
-	int d = df-b;                  //effective dimension of system
+void estimateMFPT(int N, int state, bd::Database* db) {
+	/*estimate mean first passage time starting in state and going to state with
+	one additional bond. Uses parallel implementations of a single walker with
+	long trajectory.*/
 
-	//setup the vector with eigen 
-	Eigen::VectorXd x(df);        //store the current sample
-	Eigen::VectorXd prev(df);     //stores the previous sample 
+	//set parameters
+	int samples = SAMPLES; //number of hits per walker for estimator
+	int eq = EQ; //number of steps to equilibrate for
+	int num_states = db->getNumStates(); //total number of states
 
-	//initialize x with values in X. 
-	for (int i = 0; i < df; i++) {
-		x(i) = X[i];
+	//quantities to update - new estimates
+	std::vector<bd::Pair> PM; std::vector<bd::Pair> PMshare;
+	double mfpt = 0;
+	double sigma = 0;
+
+	//output start message for this state
+	printf("Beginning MFPT Estimator for state %d out of %d.\n", state, num_states);
+
+	//store mfpt estimates on each thread to get standard deviation
+	double* mfptSamples; double* mfptVar; int num_threads;
+
+	//debug line
+	for (int i = 0; i < PM.size(); i++) printf("0 thread has:\n %d, %f\n", PM[i].index, PM[i].value);
+
+	//open parallel region
+	#pragma omp parallel private(PM) shared(PMshare) 
+	{
+		//initialize final samples storage - only on one processor - then barrier
+		num_threads = omp_get_num_threads();
+		#pragma omp single
+		{
+			mfptSamples = new double[num_threads];
+			mfptVar     = new double[num_threads];
+			for (int i = 0; i < num_threads; i++) {
+				mfptSamples[i] = 0; mfptVar[i] = 0;
+			}
+		}
+		#pragma omp barrier
+
+		//init the private mfpt sample storage
+		std::vector<double> mfptVec;
+
+		//get starting coordinates randomly from the database
+		const bd::Cluster& c = (*db)[state].getRandomIC();
+
+		//cluster structs to arrays
+		double* X = new double[DIMENSION*N];
+		if (DIMENSION == 2)
+			c.makeArray2d(X, N);
+		else if (DIMENSION == 3) 
+			c.makeArray3d(X, N);
+
+		for (int step = 0; step < samples; step++) {
+			//equilibrate the trajectories
+			equilibrate();
+
+			//get a sample - has to update PM
+			getSampleMFPT();
+
+			//add sample to mfptVec
+
+			//revert to original coordinates
+
+		}
+
+		//get sample means and variances
+		double M; double V;
+		sampleStats(mfptVec, M, V);
+		mfptSamples[omp_get_thread_num()] = M;
+		mfptVar[omp_get_thread_num()] = V;
+
+		//do update on PM vectors - need barrier - one at a time
+		if (omp_get_thread_num() == 0) {
+			PMshare = PM;
+		}
+		#pragma omp barrier
+		#pragma omp critical
+		{
+			if (omp_get_thread_num() != 0) {
+				combinePairs(PMshare, PM);
+			}
+		}
+
+		//free cluster memory
+		delete []X;
+
+		//end parallel region
 	}
 
-	//construct an rng class
-	RandomNo* rngee = new RandomNo();
+	//update estimates
+	//combine the mfptSamples entries to get min variance estimator
+		
 
-	//init a counter
-	int ctr = 0; int burnIn = 1000;
-
-	//output file
-	std::ofstream ofile;
-	ofile.open("ba.txt");
-
-	//get some samples
-	while (ctr < num_samples+burnIn) {
-		prev = x;
-		getSample(N, M, df, b, d, x, rngee);
-		if (ctr>burnIn)
-			ofile << getBondAngle(x) << "\n";
-		ctr++;
+	//make a Z vector with same num of elements as P
+	std::vector<bd::Pair> Z; 
+	for (int i = 0; i < PMshare.size(); i++) {
+		Z.push_back(bd::Pair(PMshare[i].index, 0));
 	}
 
-	//close the file
-	ofile.close();
+	//update database
+	(*db)[state].mfpt = mfpt;
+	(*db)[state].num = 0;
+	(*db)[state].denom = 0;
+	(*db)[state].num_neighbors = PMshare.size();
+	(*db)[state].P = PMshare;
+	(*db)[state].Z = Z;
+	(*db)[state].Zerr = Z;
+	(*db)[state].sigma = sigma;
 
-	//free the memory
-	delete rngee;
+	//print out final estimates - debug
+	/*
+	printf("%Numerator = %d, Denominator = %d, \n", num, den);
+	double sum = 0;
+	for (int i = 0; i < PMshare.size(); i++) {
+		printf("State = %d, visits = %f\n", PMshare[i].index, PMshare[i].value);
+		sum +=PMshare[i].value;
+	}
+	printf("sum of hits = %f\n", sum);
+	printf("Total Estimate = %f +- %f\n", mfpt, sigma);
+	for (int i = 0; i < num_threads; i++) printf("MFPT estimate %d = %f\n", i, mfptSamples[i]);
+	*/
+
+
+	//free memory
+	delete []mfptSamples; delete []mfptVar;
 }
+
 
 
 
