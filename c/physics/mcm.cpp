@@ -447,10 +447,26 @@ void sampleStats(std::vector<double> X, double& M, double& V) {
 	V /= (N-1);
 }
 
-void minVarEstimate(int sampleSize, double* means, double* variances) {
+void minVarEstimate(int sampleSize, double* means, double* variances, double& M, double& V) {
 	//combine the estimated means in a linear combination to minimize variance
+	//formula: M = 1/S sum(V_jm_j), S = 1/(sum(1/V_j))
 
+	//init the output mean and variance, and normalizer
+	M = 0; V = 0;
+	double S = 0;
 
+	//compute the normalizing term, S
+	for (int i = 0; i < sampleSize; i++) {
+		S += 1.0/variances[i];
+	}
+
+	//compute the minimizing variance and the corresponding mean
+	for (int i = 0; i < sampleSize; i++) {
+		M += means[i]/variances[i];
+		V += 1.0/variances[i];
+	}
+	M /= S;
+	V /= S*S;
 }
 
 void equilibrate() {
@@ -458,7 +474,7 @@ void equilibrate() {
 }
 
 void getSampleMFPT() {
-	
+
 }
 
 
