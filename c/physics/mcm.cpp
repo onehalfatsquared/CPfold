@@ -470,15 +470,28 @@ void minVarEstimate(int sampleSize, double* means, double* variances, double& M,
 	V /= S*S;
 }
 
-void equilibrate() {
-	//equilibrate the starting point before getting samples
-
-}
-
-double getTime() {
+double getTime(int N, Eigen::VectorXd x, Eigen::VectorXd x0) {
 	//given two samples from langevin eq, estimate the time between the move
 
-	return 0;
+	//init the mean square dispalcement
+	double msd = 0;
+
+	//resize the position vectors to particle based array
+	x.resize(N, DIMENSION); x0.resize(N, DIMENSION);
+	Eigen::VectorXd displacements = x-x0;
+
+	//loop over particle displcements, increment msd
+	for (int i = 0; i < N; i++) {
+		msd += displacements.row(i).squaredNorm();
+	}
+
+	//divide by number of particles for mean
+	msd /= N;
+
+	//divide by dimension of system?
+	msd /= (2*DIMENSION);
+
+	return msd;
 }
 
 bool findMatrix(int* M, int* old, int old_bonds, int N, bd::Database* db, 
@@ -543,6 +556,56 @@ void checkState(int N, Eigen::VectorXd x, int state, bd::Database* db,
 	}
 }
 
+void equilibrate(double* X, bd::Database* db, int state, int N, int* M,
+								 RandomNo* rngee) {
+	//equilibrate the starting point before getting samples
+
+	//parameters for the estimator and bond checking
+	int max_it = EQ;                  //cut off if no bond after max_it samples
+	int new_state = state;            //new state id
+	bool accepted;                    //flag to check if MCMC accepted proposal
+	int df = DIMENSION*N;             //num dimensions of the system
+	int b = (*db)[state].getBonds();  //num bonds in starting cluster
+	int d = df - b;                  //effective degrees of freedom
+	double timer = 0;                //init the timer for the mfpt
+	bool reset = false;              //if this becomes true, reset with no sample
+
+	//change cluster from array to Eigen vector
+	Eigen::VectorXd x(df); Eigen::VectorXd x_prev(df);
+	for (int i = 0; i < df; i++) x(i) = X[i];
+	x_prev = x;
+
+	//generate samples using MCMC until EQ steps
+	for (int i = 0; i < max_it; i++) {
+		//get the sample
+		accepted = getSample(N, M, df, b, d, x, rngee);
+
+		//if the position has changed, update timer and check for bond formation
+		if (accepted) {
+
+			//get the time for the move (todo) update timer and x_prev
+			double dt = getTime(N, x, x_prev);
+			timer += dt;
+
+			//check if state changed
+			checkState(N, x, state, db, reset, new_state);
+
+			// if reset is true or new state is hit, revert to previous sample
+			if (reset || state != new_state) { 
+				x = x_prev;
+			}
+			else { //if state is same, update x_prev
+				x_prev = x;
+			}
+
+		}
+	}
+
+	//update the array X with vector x values
+	for (int i = 0; i < df; i++) X[i] = x(i);
+
+}
+
 double getSampleMFPT(double* X, bd::Database* db, int state, int N, int* M,
 	std::vector<bd::Pair>& PM, RandomNo* rngee) {
 	//get a sample of the mean first passage time, record the state that gets visited
@@ -551,7 +614,6 @@ double getSampleMFPT(double* X, bd::Database* db, int state, int N, int* M,
 	int max_it = MAX_TRY;             //cut off if no bond after max_it samples
 	int new_state = state;            //new state id
 	bool accepted;                    //flag to check if MCMC accepted proposal
-	bool hit;                         //flag to check if new state has been hit
 	int df = DIMENSION*N;             //num dimensions of the system
 	int b = (*db)[state].getBonds();  //num bonds in starting cluster
 	int d = df - b;                  //effective degrees of freedom
@@ -572,7 +634,7 @@ double getSampleMFPT(double* X, bd::Database* db, int state, int N, int* M,
 		if (accepted) {
 
 			//get the time for the move (todo) update timer and x_prev
-			double dt = getTime();
+			double dt = getTime(N, x, x_prev);
 			timer += dt;
 			x_prev = x;
 
@@ -615,7 +677,7 @@ void estimateMFPT(int N, int state, bd::Database* db, RandomNo* rngee) {
 	//quantities to update - new estimates
 	std::vector<bd::Pair> PM; std::vector<bd::Pair> PMshare;
 	double mfpt = 0;
-	double sigma = 0;
+	double sigma2 = 0;
 
 	//output start message for this state
 	printf("Beginning MFPT Estimator for state %d out of %d.\n", state, num_states);
@@ -657,7 +719,7 @@ void estimateMFPT(int N, int state, bd::Database* db, RandomNo* rngee) {
 
 		for (int step = 0; step < samples; step++) {
 			//equilibrate the trajectories
-			equilibrate();
+			equilibrate(X, db, state, N, M, rngee);
 
 			//get a sample - has to update PM
 			double sample_t = getSampleMFPT(X, db, state, N, M, PM, rngee);
@@ -694,8 +756,9 @@ void estimateMFPT(int N, int state, bd::Database* db, RandomNo* rngee) {
 
 	//update estimates
 	//combine the mfptSamples entries to get min variance estimator
+	minVarEstimate(num_threads, mfptSamples, mfptVar, mfpt, sigma2);
+	double sigma = sqrt(sigma2);
 		
-
 	//make a Z vector with same num of elements as P
 	std::vector<bd::Pair> Z; 
 	for (int i = 0; i < PMshare.size(); i++) {
