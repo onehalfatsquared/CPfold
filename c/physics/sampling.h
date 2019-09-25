@@ -83,10 +83,18 @@ double getJacobian(Eigen::MatrixXd Q);
 
 //chain mfpt estimator functions
 void sampleStats(std::vector<double> X, double& M, double& V);
-void equilibrate();
-double getSampleMFPT();
 void minVarEstimate(int sampleSize, double* means, double* variances, double& M, double& V);
-void estimateMFPT(int N, int state, bd::Database* db);
+void estimateMFPT(int N, int state, bd::Database* db, RandomNo* rngee);
+double getTime(int N, Eigen::VectorXd x, Eigen::VectorXd x0);
+bool findMatrix(int* M, int* old, int old_bonds, int N, bd::Database* db, 
+								bool& reset, int& new_state);
+void checkState(int N, Eigen::VectorXd x, int state, bd::Database* db,
+							  bool& reset, int& new_state);
+void equilibrate(double* X, bd::Database* db, int state, int N, int* M, RandomNo* rngee);
+double getSampleMFPT(double* X, bd::Database* db, int state, int N, int* M,
+	std::vector<bd::Pair>& PM, RandomNo* rngee);
+
+
 
 
 }
