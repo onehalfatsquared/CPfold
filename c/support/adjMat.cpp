@@ -3,6 +3,7 @@
 #include "nauty.h"
 #include "database.h"
 #include "adjacency.h"
+#include "../defines.h"
 #include <vector>
 #include <eigen3/Eigen/Dense>
 namespace bd{
@@ -46,14 +47,15 @@ int checkSame(int* M1, int* M2, int N) {
 
 void getAdj(double* X, int N, int* M) {
 	//get the adjacnecy matrix from a cluster X
-	int i, j; double tol = 1e-5;
-	double* particles = new double[2*N]; double* Z = new double[2];
+
+	int i, j; 
+	double* particles = new double[DIMENSION*N]; double* Z = new double[DIMENSION];
 	c2p(X, particles, N);
 	for (int index = 0; index < N*N; index++) {
 		index2ij(index, N, i, j);
 		if (j > i) {
 			double d = euDist(particles, i, j, N, Z);
-			if (d < 1.1 + tol) {
+			if (d < BOND_CUTOFF) {
 				M[index] = 1; M[toIndex(j,i,N)] = 1;
 			}
 		}
