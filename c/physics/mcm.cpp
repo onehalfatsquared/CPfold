@@ -481,10 +481,66 @@ double getTime() {
 	return 0;
 }
 
-void checkState() {
+bool findMatrix(int* M, int* old, int old_bonds, int N, bd::Database* db, 
+								bool& reset, int& new_state) {
+	//find a state by transition matrix in the database
+
+	//loop over each state and compare adjacency matrix
+	for (int i = 0; i < (*db).getNumStates(); i++) {
+		bd::extractAM(N, i, old, db);
+		int S = bd::checkSame(old, M, N); 
+		if (S == 1) {//found matrix
+			int new_bonds = (*db)[i].getBonds();
+			if (new_bonds == old_bonds + 1 || (old_bonds == 10 && new_bonds == 12)) {//keep these
+				new_state = i; 
+			}
+			else {// 2 states at once transition. just delete this sample
+				reset = true; 
+			}
+			return 1; 
+		}
+	}
+	return 0;
+}
+
+void checkState(int N, Eigen::VectorXd x, int state, bd::Database* db,
+							  bool& reset, int& new_state) {
 	//check if a new state has been reached
 
-	return;
+	//declare reset false, only true if the sample is invalid
+	reset = false;
+
+	//make an array of the current config
+	double* X = new double[DIMENSION*N]; 
+	for (int i = 0; i < DIMENSION*N; i++) X[i]=x(i);
+
+	//get adjacency matrix of the current state
+	int* M = new int[N*N]; for (int i = 0; i < N*N; i++) M[i]=0;
+	bd::getAdj(X, N, M);
+
+	//compare old and new state, check if same
+	int* old = new int[N*N]; for (int i = 0; i < N*N; i++) old[i]=0;
+	int old_bonds = (*db)[state].getBonds();
+	bd::extractAM(N, state, old, db);
+	int success = bd::checkSame(old, M, N);
+
+	if (success) {//same matrix
+		delete []M; delete []old; delete []X;
+		return;
+	}
+	else {//not the same, find matrix in database
+		success = findMatrix(M, old, old_bonds, N, db,  reset,  new_state);
+		if (!success) {
+			//may output an unphysical state. refine with newton, check again
+			bd::refine(N, X, M);
+			success = findMatrix(M, old, old_bonds, N, db,  reset,  new_state);
+			if (!success) { //state still not found after refine, ignore this sample
+				reset = true; 
+				printf("State not found in database\n\n\n\n\n");
+			}
+		}
+		delete []M; delete []old; delete []X;
+	}
 }
 
 double getSampleMFPT(double* X, bd::Database* db, int state, int N, int* M,
@@ -493,13 +549,14 @@ double getSampleMFPT(double* X, bd::Database* db, int state, int N, int* M,
 
 	//parameters for the estimator and bond checking
 	int max_it = MAX_TRY;             //cut off if no bond after max_it samples
-	int new_state;                    //state with added bond id
+	int new_state = state;            //new state id
 	bool accepted;                    //flag to check if MCMC accepted proposal
 	bool hit;                         //flag to check if new state has been hit
 	int df = DIMENSION*N;             //num dimensions of the system
 	int b = (*db)[state].getBonds();  //num bonds in starting cluster
 	int d = df - b;                  //effective degrees of freedom
 	double timer = 0;                //init the timer for the mfpt
+	bool reset = false;              //if this becomes true, reset with no sample
 
 	//change cluster from array to Eigen vector
 	Eigen::VectorXd x(df); Eigen::VectorXd x_prev(df);
@@ -519,14 +576,24 @@ double getSampleMFPT(double* X, bd::Database* db, int state, int N, int* M,
 			timer += dt;
 			x_prev = x;
 
-			//check if state changed - todo make new checkstate
-			checkState();
-			if (hit == 1) {//hit new state, update estimates
+			//check if state changed
+			checkState(N, x, state, db, reset, new_state);
+
+			// if reset is true, this sample is invalid. return -1, check for this in push back
+			if (reset) { 
+				return -1;
+			}
+
+			//if the new_state is different from state, return a sample
+			if (state != new_state) { 
 				updatePM(new_state, PM);
 				return timer;
 			}
 		}
 	}
+
+	//if no sample is obtained after max_it, return -1
+	return -1;
 }
 
 
@@ -582,6 +649,7 @@ void estimateMFPT(int N, int state, bd::Database* db, RandomNo* rngee) {
 
 		//cluster structs to arrays
 		double* X = new double[DIMENSION*N];
+		//set the initial configuration in array X
 		if (DIMENSION == 2)
 			c.makeArray2d(X, N);
 		else if (DIMENSION == 3) 
@@ -592,12 +660,12 @@ void estimateMFPT(int N, int state, bd::Database* db, RandomNo* rngee) {
 			equilibrate();
 
 			//get a sample - has to update PM
-			getSampleMFPT(X, db, state, N, M, PM, rngee);
+			double sample_t = getSampleMFPT(X, db, state, N, M, PM, rngee);
 
-			//add sample to mfptVec
-
-			//revert to original coordinates
-
+			//add sample to mfptVec (if its not -1)
+			if (sample_t >= 0) {
+				mfptVec.push_back(sample_t);
+			}
 		}
 
 		//get sample means and variances
