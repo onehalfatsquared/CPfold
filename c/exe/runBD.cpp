@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
 
 	//set parameters
 	int rho = RANGE;
-	double beta = 1;
+	double beta = BETA;
 	int method = 1;
 
 	//initialize interaction matrices

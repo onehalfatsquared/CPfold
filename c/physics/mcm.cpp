@@ -58,7 +58,7 @@ void runTestTrimer(int N, double* X, int* M, int num_samples) {
 	}
 
 	//construct an rng class
-	RandomNo* rngee = new RandomNo();
+	RandomNo* rngee = new RandomNo(2);
 
 	//init a counter
 	int ctr = 0; int burnIn = 1000;
@@ -369,6 +369,7 @@ bool getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x, RandomNo
 	bool success = project(N, M, b, x+v, Qx, a);
 	//if the projection fails, return with X_(n+1) = X_n
 	if (!success) {
+		//printf("Projection 1 fail\n");
 		return false;
 	}
 	//if success, y is the proposed sample
@@ -377,6 +378,7 @@ bool getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x, RandomNo
 	//check for inequality violations. if success = false, return.
 	success = checkInequality(N, M, y);
 	if (!success) {
+		//printf("Ineq fail\n");
 		return false;
 	}
 
@@ -403,12 +405,14 @@ bool getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x, RandomNo
 	//accept or reject
 	double U = rngee->getU();
 	if (U > prob) {
+		//printf("MH rejection\n");
 		return false;
 	}
 
 	//if we reach here, y is accepted. Just need to check reverse projection
 	success = project(N, M, b, y+vr, Qy, a);
 	if (!success) {
+		//printf("2nd project fail\n");
 		return false;
 	}
 
@@ -416,10 +420,12 @@ bool getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x, RandomNo
 	Eigen::VectorXd xDiff(df); xDiff.fill(0.0);
 	Eigen::VectorXd xr(df); xr.fill(0.0);
 	xr = y+vr+Qy*a; xDiff = x-xr;
-	if (xDiff.norm() < 100*N_TOL) {
+	if (xDiff.norm() < 1) {
 		x=y;
 		return true;
 	}
+
+	//printf("End fail, %f \n", xDiff.norm());
 
 	return false;
 }
@@ -429,7 +435,7 @@ bool getSample(int N, int* M, int df, int b, int d, Eigen::VectorXd& x, RandomNo
 /****************************************************/
 
 /****************************************************/
-/*********** MFPT Estimator Functions ***************/
+/******* MFPT Estimator Functions - Naive  **********/
 /****************************************************/
 
 void sampleStats(std::vector<double> X, double& M, double& V) {
@@ -438,6 +444,21 @@ void sampleStats(std::vector<double> X, double& M, double& V) {
 	//init the mean and variance at 0, get sample size
 	M = 0; V = 0;
 	int N = X.size();
+
+	//compute the mean
+	for (int i = 0; i < N; i++) M += X[i];
+	M /= float(N);
+
+	//compute the variance 
+	for (int i = 0; i < N; i++) V += (X[i]-M) * (X[i]-M);
+	V /= (N-1);
+}
+
+void sampleStats(double* X, int N, double& M, double& V) {
+	//return the sample mean of the array X with N elements
+
+	//init the mean and variance at 0, get sample size
+	M = 0; V = 0;
 
 	//compute the mean
 	for (int i = 0; i < N; i++) M += X[i];
@@ -476,6 +497,7 @@ double getTime(int N, Eigen::VectorXd x, Eigen::VectorXd x0) {
 	//init the mean square dispalcement
 	double msd = 0;
 
+	/*
 	//resize the position vectors to particle based array
 	x.resize(N, DIMENSION); x0.resize(N, DIMENSION);
 	Eigen::VectorXd displacements = x-x0;
@@ -490,8 +512,9 @@ double getTime(int N, Eigen::VectorXd x, Eigen::VectorXd x0) {
 
 	//divide by dimension of system?
 	msd /= (2*DIMENSION);
+	*/
 
-	return msd;
+	return SIG*SIG/2;
 }
 
 bool findMatrix(int* M, int* old, int old_bonds, int N, bd::Database* db, 
@@ -635,6 +658,7 @@ double getSampleMFPT(double* X, bd::Database* db, int state, int N, int* M,
 
 			//get the time for the move (todo) update timer and x_prev
 			double dt = getTime(N, x, x_prev);
+			//printf("dt = %f\n", dt);
 			timer += dt;
 			x_prev = x;
 
@@ -660,7 +684,7 @@ double getSampleMFPT(double* X, bd::Database* db, int state, int N, int* M,
 
 
 
-void estimateMFPT(int N, int state, bd::Database* db, RandomNo* rngee) {
+void estimateMFPTreset(int N, int state, bd::Database* db, RandomNo* rngee) {
 	/*estimate mean first passage time starting in state and going to state with
 	one additional bond. Uses parallel implementations of a single walker with
 	long trajectory.*/
@@ -726,6 +750,7 @@ void estimateMFPT(int N, int state, bd::Database* db, RandomNo* rngee) {
 
 			//add sample to mfptVec (if its not -1)
 			if (sample_t >= 0) {
+				//printf("time %f\n", sample_t);
 				mfptVec.push_back(sample_t);
 			}
 		}
@@ -756,7 +781,7 @@ void estimateMFPT(int N, int state, bd::Database* db, RandomNo* rngee) {
 
 	//update estimates
 	//combine the mfptSamples entries to get min variance estimator
-	minVarEstimate(num_threads, mfptSamples, mfptVar, mfpt, sigma2);
+	sampleStats(mfptSamples, num_threads,  mfpt, sigma2);
 	double sigma = sqrt(sigma2);
 		
 	//make a Z vector with same num of elements as P
@@ -776,8 +801,7 @@ void estimateMFPT(int N, int state, bd::Database* db, RandomNo* rngee) {
 	(*db)[state].sigma = sigma;
 
 	//print out final estimates - debug
-	/*
-	printf("%Numerator = %d, Denominator = %d, \n", num, den);
+	///*
 	double sum = 0;
 	for (int i = 0; i < PMshare.size(); i++) {
 		printf("State = %d, visits = %f\n", PMshare[i].index, PMshare[i].value);
@@ -785,17 +809,231 @@ void estimateMFPT(int N, int state, bd::Database* db, RandomNo* rngee) {
 	}
 	printf("sum of hits = %f\n", sum);
 	printf("Total Estimate = %f +- %f\n", mfpt, sigma);
-	for (int i = 0; i < num_threads; i++) printf("MFPT estimate %d = %f\n", i, mfptSamples[i]);
-	*/
+	for (int i = 0; i < num_threads; i++) printf("MFPT estimate %d = %f +- %f\n", i, mfptSamples[i], sqrt(mfptVar[i]));
+	//*/
 
 
 	//free memory
 	delete []mfptSamples; delete []mfptVar; delete []M;
 }
 
+/****************************************************/
+/***** End MFPT Estimator Functions - Naive *********/
+/****************************************************/
+
+/****************************************************/
+/**** MFPT Estimator Functions - Reflect Method  ****/
+/****************************************************/
 
 
 
 
+
+
+
+
+
+
+
+
+
+void getSamplesMFPT(double* X, bd::Database* db, int state, int N, int* M,
+	std::vector<bd::Pair>& PM, std::vector<double>& mfptVec, RandomNo* rngee) {
+	//get a sample of the mean first passage time, record the state that gets visited
+
+	//parameters for the estimator and bond checking
+	int max_it = MAX_ITS;             //cut off if not done after max_it samples
+	int new_state = state;            //new state id
+	bool accepted;                    //flag to check if MCMC accepted proposal
+	int df = DIMENSION*N;             //num dimensions of the system
+	int b = (*db)[state].getBonds();  //num bonds in starting cluster
+	int d = df - b;                  //effective degrees of freedom
+	double timer = 0;                //init the timer for the mfpt
+	bool reset = false;              //if this becomes true, reset with no sample
+	int hits = 0;
+
+	//output file
+	//std::ofstream ofile;
+	//ofile.open("x.txt");
+
+	//change cluster from array to Eigen vector
+	Eigen::VectorXd x(df); Eigen::VectorXd x_prev(df);
+	for (int i = 0; i < df; i++) x[i] = X[i];
+	x_prev = x;
+
+	//time per step is constant, set it
+	double dt = getTime(0,x,x);
+
+	//generate samples using MCMC until max_its or num samples is reached
+	for (int i = 0; i < max_it; i++) {
+		//get the sample
+		accepted = getSample(N, M, df, b, d, x, rngee);
+
+		//if the position has changed, update timer and check for bond formation
+		if (accepted) {
+			//ofile << x << "\n";
+
+			//increment the timer
+			timer += 1;
+
+			//check if state changed
+			checkState(N, x, state, db, reset, new_state);
+
+			// if reset is true, this sample is invalid. reset clock and config
+			if (reset) { 
+				timer = 0; x = x_prev;
+			}
+
+			//if the new_state is different from state update estimates
+			if (state != new_state) { 
+				//record which state is hit
+				updatePM(new_state, PM); hits++;
+
+				//get an mfpt estimate, add to vector
+				double tau = (timer+1.0)/2.0;
+				mfptVec.push_back(tau*dt);
+				//printf("%f\n", tau*dt);
+
+				//reset timer and reflect the state
+				timer = 0; x = x_prev; new_state = state;
+			}
+
+			//check if num_samples has been reached
+			if (hits == SAMPLES) {
+				break;
+			}
+
+			//update the previous config
+			x_prev = x;
+		}
+	}
+	//ofile.close();
+}
+
+
+
+
+void estimateMFPTreflect(int N, int state, bd::Database* db, RandomNo* rngee) {
+	/*estimate mean first passage time starting in state and going to state with
+	one additional bond. Uses parallel implementations of a single walker with
+	long trajectory.*/
+
+	//set parameters
+	int num_states = db->getNumStates(); //total number of states
+
+	//construct the adjacency matrix of the state
+	int* M = new int[N*N];
+	bd::extractAM(N, state, M, db);
+
+	//quantities to estimate
+	std::vector<bd::Pair> PM; std::vector<bd::Pair> PMshare;
+	double mfpt = 0;
+	double sigma2 = 0;
+
+	//output start message for this state
+	printf("Beginning MFPT Estimator for state %d out of %d.\n", state, num_states);
+
+	//store mfpt estimates on each thread to get standard deviation
+	double* mfptSamples; double* mfptVar; int num_threads;
+
+	//debug line
+	for (int i = 0; i < PM.size(); i++) printf("0 thread has:\n %d, %f\n", PM[i].index, PM[i].value);
+
+	//open parallel region
+	#pragma omp parallel private(PM) shared(PMshare) 
+	{
+		//initialize final samples storage - only on one processor - then barrier
+		num_threads = omp_get_num_threads();
+		#pragma omp single
+		{
+			mfptSamples = new double[num_threads];
+			mfptVar     = new double[num_threads];
+			for (int i = 0; i < num_threads; i++) {
+				mfptSamples[i] = 0; mfptVar[i] = 0;
+			}
+		}
+		#pragma omp barrier
+
+		//init the private mfpt sample storage
+		std::vector<double> mfptVec;
+
+		//get starting coordinates randomly from the database
+		const bd::Cluster& c = (*db)[state].getRandomIC();
+
+		//cluster structs to arrays
+		double* X = new double[DIMENSION*N];
+		//set the initial configuration in array X
+		if (DIMENSION == 2)
+			c.makeArray2d(X, N);
+		else if (DIMENSION == 3) 
+			c.makeArray3d(X, N);
+
+		//equilibrate the trajectories
+		equilibrate(X, db, state, N, M, rngee);
+
+		//get a sample - has to update PM
+		getSamplesMFPT(X, db, state, N, M, PM, mfptVec, rngee);
+
+		//get sample means and variances
+		double M; double V;
+		sampleStats(mfptVec, M, V);
+		mfptSamples[omp_get_thread_num()] = M;
+		mfptVar[omp_get_thread_num()] = V;
+
+		//do update on PM vectors - need barrier - one at a time
+		if (omp_get_thread_num() == 0) {
+			PMshare = PM;
+		}
+		#pragma omp barrier
+		#pragma omp critical
+		{
+			if (omp_get_thread_num() != 0) {
+				combinePairs(PMshare, PM);
+			}
+		}
+
+		//free cluster memory
+		delete []X;
+
+		//end parallel region
+	}
+
+	//update estimates
+	//combine the mfptSamples entries to get min variance estimator
+	sampleStats(mfptSamples, num_threads,  mfpt, sigma2);
+	double sigma = sqrt(sigma2);
+		
+	//make a Z vector with same num of elements as P
+	std::vector<bd::Pair> Z; 
+	for (int i = 0; i < PMshare.size(); i++) {
+		Z.push_back(bd::Pair(PMshare[i].index, 0));
+	}
+
+	//update database
+	(*db)[state].mfpt = mfpt;
+	(*db)[state].num = 0;
+	(*db)[state].denom = 0;
+	(*db)[state].num_neighbors = PMshare.size();
+	(*db)[state].P = PMshare;
+	(*db)[state].Z = Z;
+	(*db)[state].Zerr = Z;
+	(*db)[state].sigma = sigma;
+
+	//print out final estimates - debug
+	///*
+	double sum = 0;
+	for (int i = 0; i < PMshare.size(); i++) {
+		printf("State = %d, visits = %f\n", PMshare[i].index, PMshare[i].value);
+		sum +=PMshare[i].value;
+	}
+	printf("sum of hits = %f\n", sum);
+	printf("Total Estimate = %f +- %f\n", mfpt, sigma);
+	for (int i = 0; i < num_threads; i++) printf("MFPT estimate %d = %f +- %f\n", i, mfptSamples[i], sqrt(mfptVar[i]));
+	//*/
+
+
+	//free memory
+	delete []mfptSamples; delete []mfptVar; delete []M;
+}
 
 }

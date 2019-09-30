@@ -53,7 +53,8 @@ int main(int argc, char* argv[]) {
 			}
 			else{
 				//call the estimator
-				mcm::estimateMFPT(N, i, db, rngee);
+				mcm::estimateMFPTreflect(N, i, db, rngee);
+				//mcm::estimateMFPTreset(N, i, db, rngee);
 			}
 		}
 
