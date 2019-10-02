@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
 
 		//output the mfpt results to file
 		std::string out = infile.substr(6,2);
-		out = out + "mfptMC.txt";
+		out = out + "mfptMCTEST.txt";
 		std::ofstream out_str(out);
 		out_str << *db; 
 
