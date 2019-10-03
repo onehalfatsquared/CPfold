@@ -10,7 +10,7 @@
 #define RK_TS       1e-6       // time step for RK integrator
 #define SAMPLES      1000       // number of samples to obtain (per prcoessor)
 #define EQ           200       // number of samples to equilibrate for (change to time?) 
-#define BOND_CUTOFF 1.05       // if two particles are less than this distance, bonded
+#define BOND_CUTOFF 1.01       // if two particles are less than this distance, bonded
 
 //Newton's Method Parameters
 #define N_ITER        20       // Max iterations for NM
@@ -18,7 +18,7 @@
 
 //mcmc parameters
 #define SIG          0.15       // std for isotropic gaussian proposal
-#define KAP          1.5       // sticky parameter for particles
+#define KAP          2       // sticky parameter for particles
 #define MAX_TRY     1000       // if this many MCMC samples dont transition, ignore
 #define MAX_ITS SAMPLES*300    // max number of mcmc steps before sim is cut off
 

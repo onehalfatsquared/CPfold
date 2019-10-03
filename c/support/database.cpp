@@ -534,6 +534,63 @@ void combineMFPTdata(Database* db1, Database* db2) {
 	}
 }
 
+void printRatios(Database* db1, Database* db2) {
+	//print the ratio of mfpt estimates in two databases to compare
+
+	//get database properties, assumes both have same num states
+	int N = db1->getN(); int ns = db1->getNumStates();
+
+	//loop over the states and combine estimates
+	for (int state = 0; state < ns; state++) {
+		//get mfpt estimates
+		double mfpt1 = (*db1)[state].getMFPT(); 
+		double mfpt2 = (*db2)[state].getMFPT();
+		double ratio = mfpt1/mfpt2;
+
+		printf("State %d has an mfpt ratio %f\n", state, ratio);
+	}
+}
+
+void printProbs(Database* db1, Database* db2) {
+	//print the probability distributions for each state in two dbs
+
+	//get database properties, assumes both have same num states
+	int N = db1->getN(); int ns = db1->getNumStates();
+
+	//loop over the states and combine estimates
+	for (int state = 0; state < ns; state++) {
+		//get mfpt estimates
+		int S1 = (*db1)[state].sumP();
+		int S2 = (*db2)[state].sumP();
+
+		std::vector<Pair> p1 = (*db1)[state].getP();
+		std::vector<Pair> p2 = (*db2)[state].getP();
+
+		printf("State %d transition probabilities\n", state);
+
+		for (int i = 0; i < p1.size(); i++) {
+			int index = p1[i].index; int val1 = p1[i].value;
+			int val2 = -1;
+			for (int j = 0; j < p2.size(); j++) {
+				if (p2[j].index == index) {
+					val2 = p2[j].value;
+					break;
+				}
+			}
+			double prob1 = float(val1)/float(S1);
+			double prob2 = float(val2)/float(S2);
+			double diff = abs(prob2-prob1);
+
+			printf("%d, %f, %f, Difference = %f\n", index, prob1, prob2, diff);
+		}
+	}
+
+}
+
+void updateFreq(Database* db, std::string filename) {
+	//update frequency value with eq prob from better simulation
+	
+}
 
 
 

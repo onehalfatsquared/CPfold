@@ -137,4 +137,12 @@ void buildNautyGraph(int N, int M, int* AM, graph* g);
 void printTM(Database* db, int* M2A, int NC) ;
 void printTM(Database* db) ;
 
+//compare or do operatoins on two databases
+void combineMFPTdata(Database* db1, Database* db2);
+void printRatios(Database* db1, Database* db2);
+void printProbs(Database* db1, Database* db2);
+
+//update database entries from outside data
+void updateFreq(Database* db, std::string filename);
+
 }
