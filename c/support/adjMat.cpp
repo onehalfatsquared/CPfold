@@ -21,6 +21,30 @@ void index2ij(int index, int N, int& i, int& j) {
   j = index / N;
 }
 
+void extractAM(int N, int state, int* AM, Database* db) {
+	//extracts the adjacency matrix of state from the database
+
+	//zero out the matrix from previous searches
+	for (int i = 0; i < N*N; i++) AM[i] = 0;
+
+	//fill the matrix with db data
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++) {
+			AM[i*N+j] = (*db)[state].isInteracting(i,j,N);
+		}
+	}
+}
+
+void printAM(int N, int* AM) {
+	//print out the adj matrix 
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++) {
+			printf("%d ", AM[toIndex(N,i,j)]);
+		}
+		printf("\n");
+	}
+}
+
 int checkConnected(int* M, int N) {
 	//check if subdiagonal sums to N-1
 	int S = 0;

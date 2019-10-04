@@ -42,7 +42,7 @@ class State{
 		friend Database* readData(std::string& filename);
 
 		//accessor functions
-		int getFrequency() const {return freq;}
+		double getFrequency() const {return freq;}
 		int getBonds() const {return bond;}
 		int getNumCoords() const {return num_coords;}
 		const Cluster& getRandomIC() const;
@@ -57,9 +57,9 @@ class State{
 		std::vector<Pair> getZerr() const {return Zerr;}
 
 		//quantities to update
-		int freq, num, denom;
+		int num, denom;
 		int num_neighbors;
-		double mfpt, sigma;
+		double freq, mfpt, sigma;
 		//Pair* P; Pair* Z; Pair* Zerr;
 		std::vector<Pair> P; std::vector<Pair> Z; std::vector<Pair> Zerr;
 
@@ -144,5 +144,6 @@ void printProbs(Database* db1, Database* db2);
 
 //update database entries from outside data
 void updateFreq(Database* db, std::string filename);
+int findMatch(std::string identity, Database* db);
 
 }

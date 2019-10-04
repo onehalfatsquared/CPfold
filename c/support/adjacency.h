@@ -19,6 +19,8 @@ void getAdj(double* X, int N, int* M);
 void findIsomorphic(int N, int num_states, int state, Database* db, std::vector<int>&);
 void buildNautyGraph(int N, int M, int state, Database* db, graph* g);
 bool checkIsomorphic(int N, int M, graph* g1, graph* g2);
+void extractAM(int N, int state, int* AM, Database* db);
+void printAM(int N, int* AM);
 
 //evaluate euclidean distance 
 double euDist(double* particles, int i, int j, int N, double* Z);

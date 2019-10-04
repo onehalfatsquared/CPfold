@@ -19,16 +19,6 @@ double sampleSTD(double* X, int n) {
 	return sqrt(std);
 }
 
-
-void extractAM(int N, int state, int* AM, Database* db) {
-	//extracts the adjacency matrix of state from the database
-	for (int i = 0; i < N; i++) {
-		for (int j = 0; j < N; j++) {
-			AM[i*N+j] = (*db)[state].isInteracting(i,j,N);
-		}
-	}
-}
-
 void makeNM(int N, int* M, Eigen::VectorXd x, Eigen::MatrixXd& J, Eigen::VectorXd& F) {
 	//make the matrix and vector to solve for Newtons method
 

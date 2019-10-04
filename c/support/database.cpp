@@ -5,6 +5,7 @@
 #include <vector>
 #include <fstream>
 #include <cstdlib>
+#include <iostream>
 namespace bd {
 
 
@@ -587,9 +588,96 @@ void printProbs(Database* db1, Database* db2) {
 
 }
 
+int findMatch(std::string identity, Database* db) {
+	//map the string of bonds to an adjacency matrix in db
+	//Note: 1 in identity string -> bond
+
+	//make adjacency matrix for identity
+	int N = db->getN(); int ns = db->getNumStates(); 
+	int* AM = new int[N*N]; int* M = new int[N*N];
+	for (int i = 0; i < N*N; i++) AM[i]  = 0;
+
+	//fill AM by looping over identity
+	int particle1 = 0; int particle2 = 1;
+	for (char & c : identity) {
+    if (c == '1') {
+    	AM[toIndex(particle1, particle2, N)] = 1;
+    	AM[toIndex(particle2, particle1, N)] = 1;
+    	particle2++;
+    }
+    if (c == '2') {
+    	particle2++;
+    }
+    if (particle2 == N) {
+    	particle1++;
+    	particle2 = particle1 + 1;
+    }
+	}
+
+	//loop over the db and compare adjacency matrices
+	for (int i = 0; i < ns; i++) {
+		extractAM(N,i,M,db);
+		bool same = checkSame(AM,M,N);
+		if (same) {
+			delete []AM; delete []M;
+			return i;
+		}
+	}
+
+	//return -1 if the state could not be found
+	delete []AM; delete []M;
+	return -1;
+}
+
 void updateFreq(Database* db, std::string filename) {
 	//update frequency value with eq prob from better simulation
-	
+
+	//get the number of particles and possible bonds
+	int N = db->getN();
+	int numBond = N*(N-1)/2;
+
+	//open the file
+	std::ifstream in_str(filename);
+
+	//check if the file can be opened
+	if (!in_str) {
+		fprintf(stderr, "Cannot open file %s\n", filename.c_str());
+		return;
+	}
+
+	//declare variables to store info in file
+	std::string identity;
+	std::string id; double p; double e;
+	int counter = 0;
+
+
+	//read each line
+	while (in_str >> identity) {
+		//get the identity in a string
+		identity += " ";
+		for (int i = 0; i < numBond-1; i++) {
+			in_str >> id; identity += id + " ";
+		}
+
+		//store the probability and error
+		in_str >> p; in_str >> e;
+
+		//find which state in the db matches this state
+		int state = findMatch(identity, db);
+
+		//if found, update freq
+		if (state == -1) {
+			printf("Could not find state %d in the database\n", counter);
+			return;
+		}
+		else {
+			(*db)[state].freq = p;
+			printf("State %d in file matches state %d in database. New freq = %f\n",
+				      counter, state, p);
+			counter++;
+		}
+	}
+
 }
 
 
