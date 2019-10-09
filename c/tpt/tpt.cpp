@@ -101,16 +101,12 @@ void createMeasure(int num_states, Database* db, double* eq, double kappa) {
 	double beta = BETA;                //inverse temp
 
 	double Z = 0;                     //normalizing constant for eq
-	double z2 = 0;
 
 	//loop over states, get the equilibrium measure entry
 	for (int i = 0; i < num_states; i++) {
 		//get initial eq prob and number of bonds
 		int b = (*db)[i].getBonds();
 		double prob = (*db)[i].getFrequency();
-
-		std::cout << prob << "\n";
-		z2+=prob;
 
 		//new eq prob is prob*(ratio)^(beta*bonds)
 		double new_prob = prob*pow(stickyRatio,beta*b);
@@ -121,7 +117,6 @@ void createMeasure(int num_states, Database* db, double* eq, double kappa) {
 	}
 
 	//re-normalize
-	std::cout << z2 << "\n";
 	for (int i = 0; i < num_states; i++) eq[i] /= Z;
 }
 
@@ -157,7 +152,7 @@ void performTPT(int N, int initial, int target, Database* db, bool getIso) {
 
 	//construct the transition rate matrix 
 
-	double kappa = 4;
+	double kappa = 2000;
 
 	//step 1 - initialize the matrix
 	int num_states = db->getNumStates();
