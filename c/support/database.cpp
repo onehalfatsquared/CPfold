@@ -420,7 +420,7 @@ void lumpEntries(Database* db, int state, std::vector<int> perms) {
 	//make new P that contains min isomorphism indexes
 	std::vector<Pair> Pnew; Pnew.clear();
 
-	for (int i = 0; i < perms.size(); i++) {
+	for (int i = 1; i < perms.size(); i++) {
 
 		printf("%d, ", perms[i]);
 		//update basic quantities

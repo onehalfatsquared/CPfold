@@ -101,6 +101,7 @@ void createMeasure(int num_states, Database* db, double* eq, double kappa) {
 	double beta = BETA;                //inverse temp
 
 	double Z = 0;                     //normalizing constant for eq
+	double z2 = 0;
 
 	//loop over states, get the equilibrium measure entry
 	for (int i = 0; i < num_states; i++) {
@@ -109,6 +110,7 @@ void createMeasure(int num_states, Database* db, double* eq, double kappa) {
 		double prob = (*db)[i].getFrequency();
 
 		std::cout << prob << "\n";
+		z2+=prob;
 
 		//new eq prob is prob*(ratio)^(beta*bonds)
 		double new_prob = prob*pow(stickyRatio,beta*b);
@@ -119,6 +121,7 @@ void createMeasure(int num_states, Database* db, double* eq, double kappa) {
 	}
 
 	//re-normalize
+	std::cout << z2 << "\n";
 	for (int i = 0; i < num_states; i++) eq[i] /= Z;
 }
 
