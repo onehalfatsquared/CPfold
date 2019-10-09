@@ -418,7 +418,7 @@ void lumpEntries(Database* db, int state, std::vector<int> perms) {
 	std::vector<Pair> isoPair;
 
 	//make new P that contains min isomorphism indexes
-	std::vector<Pair> Pnew; Pnew.clear();
+	std::vector<Pair> Pnew; Pnew = P;
 
 	for (int i = 1; i < perms.size(); i++) {
 
