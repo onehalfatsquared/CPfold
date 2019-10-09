@@ -5,7 +5,7 @@
 #include "bDynamics.h"
 #include "database.h"
 
-/* Compares two database files given as input */
+/* Combines two database files given as input and returns a master file */
 
 int main(int argc, char* argv[]) {
 
@@ -22,9 +22,12 @@ int main(int argc, char* argv[]) {
 	bd::Database* db2 = bd::readData(infile2);
 
 	//compare the two 
-	bd::printRatios(db1, db2);
-	bd::printProbs(db1, db2);
+	bd::combineMFPTdata(db1, db2);
 
+	//output the new database 
+	std::string out = "master.txt";
+	std::ofstream out_str(out);
+	out_str << *db1; 
 
 	//free memory 
 	delete db1; delete db2;

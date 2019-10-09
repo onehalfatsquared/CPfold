@@ -431,8 +431,10 @@ void lumpEntries(Database* db, int state, std::vector<int> perms) {
 		double nextSQ = nextMFPT*nextMFPT;
 		double nextSigma = (*db)[perms[i]].getSigma();
 		//progogate error in mfpt reciprocals
-		mfpt = 1 / (1/mfpt + 1/nextMFPT); 
-		sigma = sqrt(sigma*sigma + nextSigma*nextSigma/(nextSQ*nextSQ));
+		if (mfpt > 0) {
+			mfpt = 1 / (1/mfpt + 1/nextMFPT); 
+			sigma = sqrt(sigma*sigma + nextSigma*nextSigma/(nextSQ*nextSQ));
+		}
 
 		//update state dependent quantities
 		//get quantities for states getting lumped
@@ -517,21 +519,27 @@ void combineMFPTdata(Database* db1, Database* db2) {
 		//get new mfpt and error bar estimate - minimize var of a linear combination
 		double mfpt1 = (*db1)[state].getMFPT(); double mfpt2 = (*db2)[state].getMFPT();
 		double sigma1 = (*db1)[state].getSigma(); double sigma2 = (*db2)[state].getSigma();
-		double v1 = sigma1*sigma1; double v2 = sigma2*sigma2;
-		double S = 1.0/v1 + 1.0/v2;
-		double mfpt = 1.0/S * (mfpt1/v1 + mfpt2/v2);
-		double sigma = 1.0/S * sqrt(1.0/v1 + 1.0/v2);
+		if (mfpt1 > 0) {
+			double v1 = sigma1*sigma1; double v2 = sigma2*sigma2;
+			double S = 1.0/v1 + 1.0/v2;
+			double mfpt = 1.0/S * (mfpt1/v1 + mfpt2/v2);
+			double sigma = 1.0/S * sqrt(1.0/v1 + 1.0/v2);
 
-		//combine the hit counts via pairs
-		std::vector<Pair> p1 = (*db1)[state].getP();
-		std::vector<Pair> p2 = (*db2)[state].getP();
-		combinePairs(p1, p2);
+			//combine the hit counts via pairs
+			std::vector<Pair> p1 = (*db1)[state].getP();
+			std::vector<Pair> p2 = (*db2)[state].getP();
+			combinePairs(p1, p2);
 
-		//add back to database 1
-		(*db1)[state].mfpt = mfpt;
-		(*db1)[state].sigma = sigma;
-		(*db1)[state].num_neighbors = p1.size();
-		(*db1)[state].P = p1;
+			//add back to database 1
+			(*db1)[state].mfpt = mfpt;
+			(*db1)[state].sigma = sigma;
+			(*db1)[state].num_neighbors = p1.size();
+			(*db1)[state].P = p1;
+
+			//print out message giving old and new errors
+			printf("Old errors: %f and %f. New Error: %f. Relative Error %f \n", 
+						sigma1, sigma2, sigma, sigma/mfpt);
+		}
 	}
 }
 
