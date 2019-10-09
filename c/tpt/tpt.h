@@ -10,8 +10,10 @@ void performTPT(int N, int initial, int target, Database* db, bool getIso);
 //transition matrix functions
 //fill in rate matrix with data from mfpt estimates
 void createTransitionMatrix(double* T, int num_states, Database* db);
+//create the invariant measure for the current problem
+void createMeasure(int num_states, Database* db, double* eq, double kappa);
 //edit rate matrix to satisfy detailed balance
-void satisfyDB(double* T, int num_states, Database* db);
+void satisfyDB(double* T, int num_states, Database* db, double* eq);
 //fill in diagonal of rate matrix
 void fillDiag(double* T, int num_states);
 

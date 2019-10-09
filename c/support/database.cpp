@@ -401,7 +401,7 @@ void lumpEntries(Database* db, int state, std::vector<int> perms) {
 	int N = db->getN(); int ns = db->getNumStates();
 
 	//basic quantities
-	int freq = (*db)[state].getFrequency();
+	double freq = (*db)[state].getFrequency();
 	int num = (*db)[state].getNumerator();
 	int denom = (*db)[state].getDenominator();
 	double mfpt = (*db)[state].getMFPT();
