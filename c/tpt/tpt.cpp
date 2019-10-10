@@ -104,6 +104,30 @@ void satisfyDB(double* T, int num_states, Database* db, double* eq) {
 	}
 }
 
+void computeFreeEnergy(int num_states, double* Z, double* F) {
+	//compute the free energy from configurational partition function
+
+	double minF = 1e10;
+
+	//compute the helmholtz free energy of each cluster from Z
+	for (int i = 0; i < num_states; i++) {
+		F[i] = -1.0/BETA * log(Z[i]);
+		if (F[i] < minF) {
+			minF = F[i];
+		}
+	}
+
+	//shift to make 0 the free energy minimum
+	for (int i = 0; i < num_states; i++) {
+		F[i] -= minF;
+	}
+}
+void computePartitionFn(int num_states, Database* db, double* Z) {
+	//compute the configurational part of the partition fn from each cluster
+
+	createMeasure(num_states, db, Z, KAP);
+}
+
 void createMeasure(int num_states, Database* db, double* eq, double kappa) {
 	//create the equilibrium distribution for this problem
 

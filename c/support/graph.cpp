@@ -18,7 +18,7 @@ Vertex::Vertex() {
 	index = 0; prob = 0; 
 }
 
-//vertex deconstructor necceary?//todo
+//vertex deconstructor
 Vertex::~Vertex() {}
 
 //graph constructor

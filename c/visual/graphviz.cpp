@@ -139,6 +139,9 @@ void printGraph(Graph* g, int source, int draw, int clean, int reduce) {
 
 	//end reached - put a curly to end
 	out_str << "}";	
+
+	//free memory
+	delete []drawn;
 }
 
 void printCluster(std::ofstream& out_str, int index, std::vector<double> end) {
@@ -257,6 +260,9 @@ void printGraphEndDistribution(Graph* g, int source, int reduce) {
 
 	//end reached - put a curly to end
 	out_str << "}";	
+
+	//free memory
+	delete []drawn;
 }
 
 void printPath(std::vector<int> path, std::vector<double> val, std::string s) {
@@ -439,7 +445,121 @@ void MPP(Graph* g, int source) {
 
 	//make a graphviz file that shows the path
 	printPath(path, prob, "MPP");
+}
 
+void printClusterRev(std::ofstream& out_str, int index, double fe) {
+	//print a node creation in graphviz. size depends on free energy
+
+	//output the node creation command
+	out_str << "\"" + std::to_string(index) + "\" [label=\"\", shape=circle, width = 1, " +
+	"penwidth = 5, regular = 1," + " style = filled, fillcolor=white," + "image=\"c" +
+	std::to_string(index) + ".png\"]; \n";
+} 
+
+void makeEdgeCleanRev(std::ofstream& out_str, int source, int target, double edgeWidth) {
+	//draw an edge from source to target - no labels
+
+	out_str << "\"" + std::to_string(source) + "\" -> \"" + 
+	std::to_string(target) + "\" [penwidth = " + std::to_string(edgeWidth) + "]\n";
+}
+
+void makeEdgeRev(std::ofstream& out_str, int source, int target, double edgeWidth, double rate) {
+	//draw an edge from source to target
+
+	std::string s = std::to_string(rate);
+	s.erase(s.end()-3,s.end());
+
+	out_str << "\"" + std::to_string(source) + "\" -> \"" + 
+	std::to_string(target) + "\" [penwidth = " + std::to_string(edgeWidth) + 
+	", label = " + s + "]\n";
+}
+
+void printGraphRev(Graph* g, int source, int draw, int clean, int reduce) {
+	//construct a graphviz file to print the graph
+
+	//keep track of drawn nodes and ranks
+	std::vector<int> rankVec; std::deque<int> toVisit;
+	int ns = g->getN();
+	bool* drawn = new bool[ns]; for (int i = 0; i < ns; i++) drawn[i] = 0; 
+
+	//declare a file to write output to
+	std::string out;
+	out = "graphviz.txt";
+	std::ofstream out_str(out);
+
+	//write the graphviz header
+	out_str << "digraph bd {\n nodesep = 1.5; ranksep = 4; \n";
+	out_str << "edge [ fontcolor=red, fontsize=48];\n";
+
+	//print the source node
+	printClusterRev(out_str, source, 1);
+	rankVec.push_back(source);
+	sameRank(out_str, rankVec);
+	rankVec.clear(); drawn[source] = 1;
+
+	//loop over edges of source
+	int E = (*g)[source].getNumEdges();
+	double node_prob = (*g)[source].getProb();
+	for (int edge = 0; edge < E; edge++) {
+		int T = (*g)[source].getEdgeTarget(edge);
+		double rate = (*g)[source].getEdgeRate(edge);
+		double prob = (*g)[source].getEdgeProb(edge);
+		if (reduce == 0 || prob > PTOL) {
+			if (!drawn[T]) {
+				printCluster(out_str, T, draw);
+				drawn[T] = 1; rankVec.push_back(T);
+			}
+			double edgeWidth = 40*node_prob*prob;
+			if (clean == 0) {
+				makeEdgeRev(out_str, source, T, edgeWidth, rate);
+			}
+			else if (clean == 1) {
+				makeEdgeCleanRev(out_str, source, T, edgeWidth);
+			}
+			toVisit.push_back(T);
+		}
+	}
+	sameRank(out_str, rankVec); int rankNum = rankVec.size();
+	rankVec.clear();
+
+	//loop over the rest of the nodes
+	int count = 0;
+	while (!toVisit.empty()) {
+		int node = toVisit[0];
+		count++;
+		int E = (*g)[node].getNumEdges();
+		double node_prob = (*g)[node].getProb();
+		for (int edge = 0; edge < E; edge++) {
+			int T = (*g)[node].getEdgeTarget(edge);
+			double rate = (*g)[node].getEdgeRate(edge);
+			double prob = (*g)[node].getEdgeProb(edge);
+			if (rate > 0.01 && (reduce == 0 || prob > PTOL)) {
+				if (!drawn[T]) {
+					printClusterRev(out_str, T, 1);
+					drawn[T] = 1; rankVec.push_back(T);
+					toVisit.push_back(T);
+				}
+				double edgeWidth = 40*node_prob*prob;
+				if (clean == 0) {
+					makeEdgeRev(out_str, node, T, edgeWidth, rate);
+				}
+				else if (clean == 1) {
+					makeEdgeCleanRev(out_str, node, T, edgeWidth);
+				}
+			}
+		}
+		toVisit.pop_front();
+		if (count == rankNum) {
+			count = 0; rankNum = rankVec.size();
+			sameRank(out_str, rankVec); rankVec.clear();
+		}
+	}
+
+	//end reached - put a curly to end
+	out_str << "}";	
+
+	//free memory 
+	delete []drawn;
 }
 
 
