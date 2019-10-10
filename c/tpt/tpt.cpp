@@ -12,7 +12,18 @@
 #include "../defines.h"
 namespace bd{
 
+void computeFlux(int num_states, double* q, double* T, double* eq, double* flux) {
+	//compute the probability flux from generator, invariant measure, and committor
 
+	int i, j;
+
+	for (int entry = 0; entry < num_states*num_states; entry++) {
+		index2ij(entry, num_states, i, j);
+		if (i != j) {
+			flux[entry] = eq[i]*T[entry]*q[j]*(1-q[i]);
+		}
+	}
+}
 
 void computeCommittor(double* q, double* T, int num_states, int initial, std::vector<int> targets) {
 	//set up and solve equation for the committor function
@@ -176,8 +187,6 @@ void performTPT(int N, int initial, int target, Database* db, bool getIso) {
 	//step 4 - fill in diagonal with negative sum of entries
 	fillDiag(T, num_states);
 
-	//for (int i = 0 ; i < num_states*num_states; i++) std::cout << T[i] << "\n";
-
 	//solve for the committor
 	//initialize committor in q
 	double* q = new double[num_states];
@@ -200,11 +209,16 @@ void performTPT(int N, int initial, int target, Database* db, bool getIso) {
 	}
 	*/
 	
-	//solve dirichlet problem for q 
+	//solve dirichlet problem for committor, q 
 	computeCommittor(q, T, num_states, initial, targets);
 
+	//init and compute the probability fluxes
+	double* flux = new double[num_states*num_states]; 
+	for (int i = 0; i < num_states*num_states; i++) flux[i] = 0;
+	computeFlux(num_states, q, T, eq, flux);
+
 	//free the memory
-	delete []T; delete []q; delete []eq;
+	delete []T; delete []q; delete []eq; delete []flux;
 
 }
 
