@@ -22,4 +22,14 @@ void MPP(Graph* g, int source);
 void QP(Graph* g, int source);
 //print the quickest folding path ending at target
 void QP(Graph* g, int source, int target);
+
+//functions for reversible process - directed graphs
+void printGraphRev(Graph* g, int source, double* F, double* flux, int draw, int clean, 
+									 int reduce);
+void makeEdgeRev(std::ofstream& out_str, int source, int target, double edgeWidth, 
+								 double rate, std::string color);
+void makeEdgeCleanRev(std::ofstream& out_str, int source, int target, double edgeWidth,
+											std::string color);
+void printClusterRev(std::ofstream& out_str, int index, double pw);
+
 }

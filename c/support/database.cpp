@@ -418,7 +418,8 @@ void lumpEntries(Database* db, int state, std::vector<int> perms) {
 	std::vector<Pair> isoPair;
 
 	//make new P that contains min isomorphism indexes
-	std::vector<Pair> Pnew; Pnew = P;
+	std::vector<Pair> Pnew; 
+	getMinIndex(N, ns, P, db, iso, Pnew);
 
 	for (int i = 1; i < perms.size(); i++) {
 
@@ -470,8 +471,8 @@ void lumpPerms(Database* db) {
 	//loop over states, lump perms, get vector of repeated states
 
 	int N = db->getN(); int ns = db->getNumStates();
-	std::vector<int> repeated;
-	std::vector<int> perms;
+	std::vector<int> repeated; repeated.clear();
+	std::vector<int> perms; perms.clear();
 	int* lumpMap = new int[ns]; 
 
 	int count = 0;

@@ -9,6 +9,8 @@
 #include "bDynamics.h"
 #include "tpt.h"
 #include "nauty.h"
+#include "graph.h"
+#include "graphviz.h"
 #include "../defines.h"
 namespace bd{
 
@@ -71,7 +73,7 @@ void computeCommittor(double* q, double* T, int num_states, int initial, std::ve
 
 	//store solution in q
 	for (int i = 0; i < x.size(); i++) {
-		q[i] = x(i);
+		q[i] = abs(x(i));
 	}
 }
 
@@ -187,7 +189,7 @@ void performTPT(int N, int initial, int target, Database* db, bool getIso) {
 
 	//construct the transition rate matrix 
 
-	double kappa = 2000;
+	double kappa = 1;
 
 	//step 1 - initialize the matrix
 	int num_states = db->getNumStates();
@@ -236,13 +238,33 @@ void performTPT(int N, int initial, int target, Database* db, bool getIso) {
 	//solve dirichlet problem for committor, q 
 	computeCommittor(q, T, num_states, initial, targets);
 
+	//for (int i = 0; i < num_states; i++) std::cout << q[i] << "\n";
+
+
 	//init and compute the probability fluxes
 	double* flux = new double[num_states*num_states]; 
 	for (int i = 0; i < num_states*num_states; i++) flux[i] = 0;
 	computeFlux(num_states, q, T, eq, flux);
 
+	//for (int i = 0; i < num_states*num_states; i++) std::cout << flux[i] << "\n";
+
+	//init and compute configurational partition function and free energy
+	double* Z = new double[num_states]; double* F = new double[num_states];
+	for (int i = 0; i < num_states; i++) Z[i] = F[i] = 0;
+	computePartitionFn(num_states, db, Z); 
+	computeFreeEnergy(num_states, Z, F);
+
+	//for (int i = 0; i < num_states; i++) std::cout << Z[i] << ' '<< F[i] << "\n";
+
+	//make a graph 
+	Graph* g = makeGraph(db);
+
+	//print out graphviz
+	printGraphRev(g, initial, F, flux, 1, 1, 0);
+
 	//free the memory
 	delete []T; delete []q; delete []eq; delete []flux;
+	delete []Z; delete []F;
 
 }
 

@@ -447,23 +447,26 @@ void MPP(Graph* g, int source) {
 	printPath(path, prob, "MPP");
 }
 
-void printClusterRev(std::ofstream& out_str, int index, double fe) {
+void printClusterRev(std::ofstream& out_str, int index, double pw) {
 	//print a node creation in graphviz. size depends on free energy
 
 	//output the node creation command
 	out_str << "\"" + std::to_string(index) + "\" [label=\"\", shape=circle, width = 1, " +
-	"penwidth = 5, regular = 1," + " style = filled, fillcolor=white," + "image=\"c" +
-	std::to_string(index) + ".png\"]; \n";
+	"penwidth = " + std::to_string(pw) + ", regular = 1," + " style = filled, fillcolor=white," 
+	+ "image=\"c" + std::to_string(index) + ".png\"]; \n";
 } 
 
-void makeEdgeCleanRev(std::ofstream& out_str, int source, int target, double edgeWidth) {
+void makeEdgeCleanRev(std::ofstream& out_str, int source, int target, double edgeWidth, 
+											std::string color) {
 	//draw an edge from source to target - no labels
 
 	out_str << "\"" + std::to_string(source) + "\" -> \"" + 
-	std::to_string(target) + "\" [penwidth = " + std::to_string(edgeWidth) + "]\n";
+	std::to_string(target) + "\" [penwidth = " + std::to_string(edgeWidth) +
+	", color= " + color + "]\n";
 }
 
-void makeEdgeRev(std::ofstream& out_str, int source, int target, double edgeWidth, double rate) {
+void makeEdgeRev(std::ofstream& out_str, int source, int target, double edgeWidth, 
+								 double rate, std::string color) {
 	//draw an edge from source to target
 
 	std::string s = std::to_string(rate);
@@ -471,11 +474,12 @@ void makeEdgeRev(std::ofstream& out_str, int source, int target, double edgeWidt
 
 	out_str << "\"" + std::to_string(source) + "\" -> \"" + 
 	std::to_string(target) + "\" [penwidth = " + std::to_string(edgeWidth) + 
-	", label = " + s + "]\n";
+	", color= " + color + ", label = " + s + "]\n";
 }
 
-void printGraphRev(Graph* g, int source, int draw, int clean, int reduce) {
-	//construct a graphviz file to print the graph
+void printGraphRev(Graph* g, int source, double* F, double* flux, int draw, int clean, 
+									 int reduce) {
+	//construct a graphviz file to print the graph - directed for reversible case
 
 	//keep track of drawn nodes and ranks
 	std::vector<int> rankVec; std::deque<int> toVisit;
@@ -484,7 +488,7 @@ void printGraphRev(Graph* g, int source, int draw, int clean, int reduce) {
 
 	//declare a file to write output to
 	std::string out;
-	out = "graphviz.txt";
+	out = "graphvizRev.txt";
 	std::ofstream out_str(out);
 
 	//write the graphviz header
@@ -492,7 +496,8 @@ void printGraphRev(Graph* g, int source, int draw, int clean, int reduce) {
 	out_str << "edge [ fontcolor=red, fontsize=48];\n";
 
 	//print the source node
-	printClusterRev(out_str, source, 1);
+	double pw = 5.0/(F[source] + 1);
+	printClusterRev(out_str, source, pw);
 	rankVec.push_back(source);
 	sameRank(out_str, rankVec);
 	rankVec.clear(); drawn[source] = 1;
@@ -502,19 +507,22 @@ void printGraphRev(Graph* g, int source, int draw, int clean, int reduce) {
 	double node_prob = (*g)[source].getProb();
 	for (int edge = 0; edge < E; edge++) {
 		int T = (*g)[source].getEdgeTarget(edge);
-		double rate = (*g)[source].getEdgeRate(edge);
 		double prob = (*g)[source].getEdgeProb(edge);
 		if (reduce == 0 || prob > PTOL) {
 			if (!drawn[T]) {
-				printCluster(out_str, T, draw);
+				double pw = 5.0/(F[source] + 1);
+				printCluster(out_str, T, pw);
 				drawn[T] = 1; rankVec.push_back(T);
 			}
-			double edgeWidth = 40*node_prob*prob;
+			double edgeWidthF = flux[toIndex(source, T, ns)]*40;
+			double edgeWidthR = flux[toIndex(T, source, ns)]*40;
 			if (clean == 0) {
-				makeEdgeRev(out_str, source, T, edgeWidth, rate);
+				makeEdgeRev(out_str, source, T, edgeWidthF, edgeWidthF/40, "green");
+				makeEdgeRev(out_str, T, source, edgeWidthR, edgeWidthR/40, "red");
 			}
 			else if (clean == 1) {
-				makeEdgeCleanRev(out_str, source, T, edgeWidth);
+				makeEdgeCleanRev(out_str, source, T, edgeWidthF, "green");
+				makeEdgeCleanRev(out_str, T, source, edgeWidthR, "red");
 			}
 			toVisit.push_back(T);
 		}
@@ -531,20 +539,23 @@ void printGraphRev(Graph* g, int source, int draw, int clean, int reduce) {
 		double node_prob = (*g)[node].getProb();
 		for (int edge = 0; edge < E; edge++) {
 			int T = (*g)[node].getEdgeTarget(edge);
-			double rate = (*g)[node].getEdgeRate(edge);
 			double prob = (*g)[node].getEdgeProb(edge);
-			if (rate > 0.01 && (reduce == 0 || prob > PTOL)) {
+			if (reduce == 0 || prob > PTOL) {
 				if (!drawn[T]) {
-					printClusterRev(out_str, T, 1);
+					double pw = 5.0/(F[node] + 1);
+					printClusterRev(out_str, T, pw);
 					drawn[T] = 1; rankVec.push_back(T);
 					toVisit.push_back(T);
 				}
-				double edgeWidth = 40*node_prob*prob;
+				double edgeWidthF = flux[toIndex(node, T, ns)]*40;
+				double edgeWidthR = flux[toIndex(T, node, ns)]*40;
 				if (clean == 0) {
-					makeEdgeRev(out_str, node, T, edgeWidth, rate);
+					makeEdgeRev(out_str, node, T, edgeWidthF, edgeWidthF/40, "green");
+					makeEdgeRev(out_str, T, node, edgeWidthR, edgeWidthR/40, "red");
 				}
 				else if (clean == 1) {
-					makeEdgeCleanRev(out_str, node, T, edgeWidth);
+					makeEdgeCleanRev(out_str, node, T, edgeWidthF, "green");
+					makeEdgeCleanRev(out_str, T, node, edgeWidthR, "red");
 				}
 			}
 		}
