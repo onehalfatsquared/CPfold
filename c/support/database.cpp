@@ -391,7 +391,6 @@ void getMinIndex(int N, int ns, std::vector<Pair> P, Database* db,
 			findIsomorphic(N, ns, P[j].index, db, iso);
 			int min_iso = *std::min_element(iso.begin(), iso.end());
 			isoPair.push_back(Pair(min_iso, P[j].value));
-			//todo - include Z and Zerr
 		}
 }
 
@@ -418,8 +417,9 @@ void lumpEntries(Database* db, int state, std::vector<int> perms) {
 	std::vector<Pair> isoPair;
 
 	//make new P that contains min isomorphism indexes
-	std::vector<Pair> Pnew; 
-	getMinIndex(N, ns, P, db, iso, Pnew);
+	std::vector<Pair> Pnew, isoPnew; 
+	getMinIndex(N, ns, P, db, iso, isoPnew);
+	combinePairs(Pnew, isoPnew);
 
 	for (int i = 1; i < perms.size(); i++) {
 
