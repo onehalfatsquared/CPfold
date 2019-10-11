@@ -12,7 +12,7 @@
 #include <sstream>
 #include "../defines.h"
 
-
+#define SCALE_REV 25
 namespace bd{
 
 void printCluster(std::ofstream& out_str, int index, int draw) {
@@ -460,21 +460,45 @@ void makeEdgeCleanRev(std::ofstream& out_str, int source, int target, double edg
 											std::string color) {
 	//draw an edge from source to target - no labels
 
-	out_str << "\"" + std::to_string(source) + "\" -> \"" + 
-	std::to_string(target) + "\" [penwidth = " + std::to_string(edgeWidth) +
-	", color= " + color + "]\n";
+	if (edgeWidth > 0.1) {
+		out_str << "\"" + std::to_string(source) + "\" -> \"" + 
+		std::to_string(target) + "\" [penwidth = " + std::to_string(edgeWidth) +
+		", color= " + color + "]\n";
+	}
 }
 
 void makeEdgeRev(std::ofstream& out_str, int source, int target, double edgeWidth, 
 								 double rate, std::string color) {
 	//draw an edge from source to target
 
-	std::string s = std::to_string(rate);
-	s.erase(s.end()-3,s.end());
+	if (edgeWidth > 0.1) {
+		std::string s = std::to_string(rate);
+		s.erase(s.end()-3,s.end());
 
-	out_str << "\"" + std::to_string(source) + "\" -> \"" + 
-	std::to_string(target) + "\" [penwidth = " + std::to_string(edgeWidth) + 
-	", color= " + color + ", label = " + s + "]\n";
+		out_str << "\"" + std::to_string(source) + "\" -> \"" + 
+		std::to_string(target) + "\" [penwidth = " + std::to_string(edgeWidth) + 
+		", color= " + color + ", label = " + s + "]\n";
+	}
+}
+
+double getPW(double f) {
+	//return pen width of node for given free energy
+
+	double pw = 15.0/(f + 1);
+	return pw; 
+}
+
+double getMax(int num_states, double* array) {
+	//get the max value of the array to scale by
+	
+	double M = 0;
+	for (int i = 0; i < num_states*num_states; i++) {
+		if (array[i] > M) {
+			M = array[i];
+		}
+	}
+
+	return M;
 }
 
 void printGraphRev(Graph* g, int source, double* F, double* flux, int draw, int clean, 
@@ -491,12 +515,16 @@ void printGraphRev(Graph* g, int source, double* F, double* flux, int draw, int 
 	out = "graphvizRev.txt";
 	std::ofstream out_str(out);
 
+	//get the scaling for edgeWidth
+	double fluxMax = getMax(ns, flux);
+	double scaling = SCALE_REV / fluxMax;
+
 	//write the graphviz header
 	out_str << "digraph bd {\n nodesep = 1.5; ranksep = 4; \n";
 	out_str << "edge [ fontcolor=red, fontsize=48];\n";
 
 	//print the source node
-	double pw = 5.0/(F[source] + 1);
+	double pw = getPW(F[source]);
 	printClusterRev(out_str, source, pw);
 	rankVec.push_back(source);
 	sameRank(out_str, rankVec);
@@ -510,15 +538,15 @@ void printGraphRev(Graph* g, int source, double* F, double* flux, int draw, int 
 		double prob = (*g)[source].getEdgeProb(edge);
 		if (reduce == 0 || prob > PTOL) {
 			if (!drawn[T]) {
-				double pw = 5.0/(F[source] + 1);
-				printCluster(out_str, T, pw);
+				double pw = getPW(F[T]);
+				printClusterRev(out_str, T, pw);
 				drawn[T] = 1; rankVec.push_back(T);
 			}
-			double edgeWidthF = flux[toIndex(source, T, ns)]*40;
-			double edgeWidthR = flux[toIndex(T, source, ns)]*40;
+			double edgeWidthF = flux[toIndex(source, T, ns)]*scaling;
+			double edgeWidthR = flux[toIndex(T, source, ns)]*scaling;
 			if (clean == 0) {
-				makeEdgeRev(out_str, source, T, edgeWidthF, edgeWidthF/40, "green");
-				makeEdgeRev(out_str, T, source, edgeWidthR, edgeWidthR/40, "red");
+				makeEdgeRev(out_str, source, T, edgeWidthF, edgeWidthF/scaling, "green");
+				makeEdgeRev(out_str, T, source, edgeWidthR, edgeWidthR/scaling, "red");
 			}
 			else if (clean == 1) {
 				makeEdgeCleanRev(out_str, source, T, edgeWidthF, "green");
@@ -542,16 +570,16 @@ void printGraphRev(Graph* g, int source, double* F, double* flux, int draw, int 
 			double prob = (*g)[node].getEdgeProb(edge);
 			if (reduce == 0 || prob > PTOL) {
 				if (!drawn[T]) {
-					double pw = 5.0/(F[node] + 1);
+					double pw = getPW(F[T]);
 					printClusterRev(out_str, T, pw);
 					drawn[T] = 1; rankVec.push_back(T);
 					toVisit.push_back(T);
 				}
-				double edgeWidthF = flux[toIndex(node, T, ns)]*40;
-				double edgeWidthR = flux[toIndex(T, node, ns)]*40;
+				double edgeWidthF = flux[toIndex(node, T, ns)]*scaling;
+				double edgeWidthR = flux[toIndex(T, node, ns)]*scaling;
 				if (clean == 0) {
-					makeEdgeRev(out_str, node, T, edgeWidthF, edgeWidthF/40, "green");
-					makeEdgeRev(out_str, T, node, edgeWidthR, edgeWidthR/40, "red");
+					makeEdgeRev(out_str, node, T, edgeWidthF, edgeWidthF/scaling, "green");
+					makeEdgeRev(out_str, T, node, edgeWidthR, edgeWidthR/scaling, "red");
 				}
 				else if (clean == 1) {
 					makeEdgeCleanRev(out_str, node, T, edgeWidthF, "green");

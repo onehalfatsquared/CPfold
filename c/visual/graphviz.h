@@ -31,5 +31,7 @@ void makeEdgeRev(std::ofstream& out_str, int source, int target, double edgeWidt
 void makeEdgeCleanRev(std::ofstream& out_str, int source, int target, double edgeWidth,
 											std::string color);
 void printClusterRev(std::ofstream& out_str, int index, double pw);
+double getPW(double f);
+double getMax(int num_states, double* array);
 
 }

@@ -187,12 +187,19 @@ void createTransitionMatrix(double* T, int num_states, Database* db) {
 void performTPT(int N, int initial, int target, Database* db, bool getIso) {
 	//perform tpt calculations from initial to target states
 
-	//construct the transition rate matrix 
-
-	double kappa = 1;
-
-	//step 1 - initialize the matrix
+	//parameters
+	double kappa = 0.500;
 	int num_states = db->getNumStates();
+
+	//init and compute configurational partition function and free energy
+	double* Z = new double[num_states]; double* F = new double[num_states];
+	for (int i = 0; i < num_states; i++) Z[i] = F[i] = 0;
+	computePartitionFn(num_states, db, Z); 
+	computeFreeEnergy(num_states, Z, F);
+
+	//for (int i = 0; i < num_states; i++) std::cout << Z[i] << ' '<< F[i] << "\n";
+
+	//step 1 - construct transition matrix
 	double* T = new double[num_states*num_states];
 	for (int i = 0; i < num_states*num_states; i++) {
 		T[i] = 0;
@@ -247,14 +254,6 @@ void performTPT(int N, int initial, int target, Database* db, bool getIso) {
 	computeFlux(num_states, q, T, eq, flux);
 
 	//for (int i = 0; i < num_states*num_states; i++) std::cout << flux[i] << "\n";
-
-	//init and compute configurational partition function and free energy
-	double* Z = new double[num_states]; double* F = new double[num_states];
-	for (int i = 0; i < num_states; i++) Z[i] = F[i] = 0;
-	computePartitionFn(num_states, db, Z); 
-	computeFreeEnergy(num_states, Z, F);
-
-	//for (int i = 0; i < num_states; i++) std::cout << Z[i] << ' '<< F[i] << "\n";
 
 	//make a graph 
 	Graph* g = makeGraph(db);
