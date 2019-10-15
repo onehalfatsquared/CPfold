@@ -77,6 +77,37 @@ void computeCommittor(double* q, double* T, int num_states, int initial, std::ve
 	}
 }
 
+void computeHittingProbability(double* P, int num_states, std::vector<int> endStates, 
+															 double* U) {
+	//compute the hitting probabilities for the states in endStates
+
+	//init and fill all the required matrices
+	Eigen::MatrixXd R(num_states,num_states); Eigen::MatrixXd Q(num_states,num_states); 
+	Eigen::MatrixXd Pm(num_states,num_states); Eigen::MatrixXd Um(num_states,num_states); 
+	for (int i = 0; i < num_states*num_states; i++) {
+		R(i) = 0; Um(i) = 0; 
+		Q(i) = P[i]; Pm(i) = P[i];
+	}
+
+
+	//let R be matrix with only columns corresponding to end states, diagonal = 1
+	//let Q be matrix with rows/cols corresponding to end state zero'd out
+	for (int i = 0; i < endStates.size(); i++) {
+		int state = endStates[i];
+		R.col(state) = Pm.col(state); R(state,state) = 1;
+		Q.row(state) = Um.row(state); Q.col(state) = Um.col(state); 
+	}
+
+	//solve for Um via (I-Q)Um = R
+	Eigen::MatrixXd D = Eigen::MatrixXd::Identity(num_states,num_states) - Q;
+	Um = D.lu().solve(R);
+
+	//store back in U array
+	for (int i = 0; i < num_states*num_states; i++) {
+		U[i] = Um(i);
+	}
+}
+
 
 void fillDiag(double* T, int num_states) {
 	//fill in diagonal elements with negative sum of entries
@@ -157,8 +188,21 @@ void createMeasure(int num_states, Database* db, double* eq, double kappa) {
 	for (int i = 0; i < num_states; i++) eq[i] /= Z;
 }
 
+void createProbabilityMatrix(double* T, int num_states, double* P) {
+	//create probability matrix from rate matrix
 
-void createTransitionMatrix(double* T, int num_states, Database* db) {
+	int i,j; 
+
+	for (int entry = 0; entry < num_states*num_states; entry++) {
+		index2ij(entry, num_states, i, j);
+		if (i != j) {
+			P[entry] = - T[entry] / T[toIndex(i,i,num_states)];
+		}
+	}
+}
+
+void createTransitionMatrix(double* T, int num_states, Database* db, 
+														std::vector<int>& endStates) {
 	//create rate matrix from data in DB - forward rates
 
 	//declare storage for each state
@@ -170,12 +214,12 @@ void createTransitionMatrix(double* T, int num_states, Database* db) {
 		mfpt = (*db)[state].getMFPT();
 		S = (*db)[state].sumP(); //get normalizing constant for this row
 
-		//loop over row. Copy data into rate matrix
-		/*
-		for (int i = 0; i < num_states; i++) {
-			T[toIndex(state, i, num_states)] = ((*db)[state].getP(i) / S) / mfpt;
+		//if S = 0, this is end state, add it to vector
+		if (S == 0) {
+			endStates.push_back(state);
 		}
-		*/
+
+		//fill in value in transition matrix
 		std::vector<Pair> P = (*db)[state].getP();
 		for (int i = 0; i < P.size(); i++) {
 			T[toIndex(state, P[i].index, num_states)] = (P[i].value / S) / mfpt;
@@ -188,8 +232,9 @@ void performTPT(int N, int initial, int target, Database* db, bool getIso) {
 	//perform tpt calculations from initial to target states
 
 	//parameters
-	double kappa = 0.500;
+	double kappa = 50.0;
 	int num_states = db->getNumStates();
+	std::vector<int> endStates;
 
 	//init and compute configurational partition function and free energy
 	double* Z = new double[num_states]; double* F = new double[num_states];
@@ -197,28 +242,32 @@ void performTPT(int N, int initial, int target, Database* db, bool getIso) {
 	computePartitionFn(num_states, db, Z); 
 	computeFreeEnergy(num_states, Z, F);
 
-	//for (int i = 0; i < num_states; i++) std::cout << Z[i] << ' '<< F[i] << "\n";
-
-	//step 1 - construct transition matrix
+	//step 1 - construct rate matrix and probability transition matrix
 	double* T = new double[num_states*num_states];
+	double* P = new double[num_states*num_states];
+	double* U = new double[num_states*num_states]; //hitting probability matrix
 	for (int i = 0; i < num_states*num_states; i++) {
-		T[i] = 0;
+		T[i] = P[i] = U[i] = 0;
 	}
 
 	//step 2 - get bonds->bonds+1 entries from mfpt estimates
-	createTransitionMatrix(T, num_states, db);
-	//for (int i = 0 ; i < num_states*num_states; i++) std::cout << T[i] << "\n";
+	createTransitionMatrix(T, num_states, db, endStates);
 
 	//step 2.5 - make array for equilibrium distribution
 	double* eq = new double[num_states];
 	createMeasure(num_states, db, eq, kappa);
-	//for (int i = 0; i < num_states; i++) std::cout << eq[i] << "\n";
 
 	//step 3 - fill in transposed entries such that T satisfies detailed balance
 	satisfyDB(T, num_states, db, eq);
 
 	//step 4 - fill in diagonal with negative sum of entries
 	fillDiag(T, num_states);
+
+	//step 5 - use the filled rate matrix to compute probability matrix
+	createProbabilityMatrix(T, num_states, P);
+	
+	//solve for hitting probabilities to endStates states
+	computeHittingProbability(P, num_states, endStates, U);
 
 	//solve for the committor
 	//initialize committor in q
@@ -263,7 +312,7 @@ void performTPT(int N, int initial, int target, Database* db, bool getIso) {
 
 	//free the memory
 	delete []T; delete []q; delete []eq; delete []flux;
-	delete []Z; delete []F;
+	delete []Z; delete []F; delete []P ; delete [] U;
 
 }
 
