@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <iostream>
+#include <fstream>
 #include <string.h>
 #include <vector>
 #include <eigen3/Eigen/Dense>
@@ -227,12 +228,111 @@ void createTransitionMatrix(double* T, int num_states, Database* db,
 	}
 }
 
+void writeHittingProbability(double* kappa, double* data, std::vector<int> endStates, int M) {
+	//output the results to a file
 
-void performTPT(int N, int initial, int target, Database* db, bool getIso) {
+	std::ofstream ofile;
+	ofile.open("hittingProb.txt");
+	ofile << "k ";
+	for (int i = 0; i < M; i++) {
+		ofile << kappa[i] << ' ';
+	}
+	ofile << "\n";
+	for (int end = 0; end < endStates.size(); end++) {
+		ofile << endStates[end] << ' ';
+		for (int i = 0; i < M; i++) {
+			ofile << data[i*endStates.size()+end] << ' ';
+		}
+		ofile << "\n";
+	}
+}
+
+void getHittingProbability(int initial, Database* db) {
+	/*compute the hitting probability of each end state as fn of kappa
+		output the results to a file */
+
+	//parameters
+	int N = db->getN();
+	int num_states = db->getNumStates();
+	std::vector<int> endStates;
+	int M = 200; //number of kappa values to test
+
+	//set the kappa values the test is being done for 
+	double* kappa = new double[M];
+	for (int i = 0; i < M/2; i++) kappa[i] = float(i)/10.0+0.1;
+	for (int i = M/2; i < M; i++) kappa[i] = i-M/2+10.0;
+
+	//declare rate matrix, probability transition matrix, equilibrium measure
+	double* T = new double[num_states*num_states]; //rate matrix
+	double* P = new double[num_states*num_states]; //probability transition matrix
+	double* U = new double[num_states*num_states]; //hitting probability matrix
+	double* eq = new double[num_states];           //equilibrium measure
+	double* Tconst = new double[num_states*num_states]; //rate matrix - only forward entries
+
+	//init the rate matrix with zeros
+	for (int i = 0; i < num_states*num_states; i++) {
+		Tconst[i] = 0;
+	}
+
+	//get bonds->bonds+1 entries from mfpt estimates
+	createTransitionMatrix(Tconst, num_states, db, endStates);
+
+	//create a data array which will store the hitting probabilities
+	double* data = new double[M*endStates.size()];
+
+	//loop over kappa and do computation
+	for (int k = 0; k < M; k++) {
+
+		//get sticky parameter
+		double sticky = kappa[k]; 
+
+		//reset transition matrices
+		for (int i = 0; i < num_states*num_states; i++) {
+			P[i] = U[i] = 0;
+		}
+
+		//copy Tconst into T
+		std::copy(Tconst, Tconst+num_states*num_states, T);
+
+		//make array for equilibrium distribution
+		createMeasure(num_states, db, eq, sticky);
+
+		//fill in transposed entries such that T satisfies detailed balance
+		satisfyDB(T, num_states, db, eq);
+
+		//fill in diagonal with negative sum of row entries
+		fillDiag(T, num_states);
+
+		//use the filled rate matrix to compute probability matrix
+		createProbabilityMatrix(T, num_states, P);
+
+		//solve for hitting probabilities to endStates states
+		computeHittingProbability(P, num_states, endStates, U);
+
+		//store hitting probabilities in data
+		for (int end = 0; end < endStates.size(); end++) {
+			double hit_prob = U[toIndex(initial, endStates[end], num_states)];
+			data[k*endStates.size() + end] = hit_prob;
+			std::cout << hit_prob << "\n";
+		}
+	}
+
+	//write to file
+	writeHittingProbability(kappa, data, endStates, M);
+
+	//free the memory
+	delete []T; delete []Tconst; delete []P; delete []U;
+	delete []eq; delete []kappa; delete []data;
+	
+
+}
+
+void performTPT(int initial, int target, Database* db, bool getIso) {
 	//perform tpt calculations from initial to target states
 
 	//parameters
 	double kappa = 50.0;
+	int N = db->getN();
 	int num_states = db->getNumStates();
 	std::vector<int> endStates;
 
@@ -242,32 +342,24 @@ void performTPT(int N, int initial, int target, Database* db, bool getIso) {
 	computePartitionFn(num_states, db, Z); 
 	computeFreeEnergy(num_states, Z, F);
 
-	//step 1 - construct rate matrix and probability transition matrix
+	//initialize the transition rate matrix
 	double* T = new double[num_states*num_states];
-	double* P = new double[num_states*num_states];
-	double* U = new double[num_states*num_states]; //hitting probability matrix
 	for (int i = 0; i < num_states*num_states; i++) {
-		T[i] = P[i] = U[i] = 0;
+		T[i] =  0;
 	}
 
-	//step 2 - get bonds->bonds+1 entries from mfpt estimates
+	//get bonds -> bonds+1 entries from mfpt estimates
 	createTransitionMatrix(T, num_states, db, endStates);
 
-	//step 2.5 - make array for equilibrium distribution
+	//init array for equilibrium distribution and compute it
 	double* eq = new double[num_states];
 	createMeasure(num_states, db, eq, kappa);
 
-	//step 3 - fill in transposed entries such that T satisfies detailed balance
+	//fill in transposed entries such that T satisfies detailed balance
 	satisfyDB(T, num_states, db, eq);
 
-	//step 4 - fill in diagonal with negative sum of entries
+	//fill in diagonal with negative sum of row entries
 	fillDiag(T, num_states);
-
-	//step 5 - use the filled rate matrix to compute probability matrix
-	createProbabilityMatrix(T, num_states, P);
-	
-	//solve for hitting probabilities to endStates states
-	computeHittingProbability(P, num_states, endStates, U);
 
 	//solve for the committor
 	//initialize committor in q
@@ -275,6 +367,7 @@ void performTPT(int N, int initial, int target, Database* db, bool getIso) {
 	for (int i = 0; i < num_states; i++) q[i] = 0;
 
 	//build target state vector. check if including isomorphic states
+	//Note: this does nothing if states are already lumped
 	std::vector<int> targets; 
 	if (getIso == 1) {
 		//find all states isomorphic to target
@@ -283,36 +376,24 @@ void performTPT(int N, int initial, int target, Database* db, bool getIso) {
 	else if (getIso == 0) {
 		targets.push_back(target);
 	}
-
-	/*
-	//print the list of target states to check if correct
-	for (int i = 0; i < targets.size(); i++) {
-		printf("%d\n", targets[i]);
-	}
-	*/
 	
 	//solve dirichlet problem for committor, q 
 	computeCommittor(q, T, num_states, initial, targets);
-
-	//for (int i = 0; i < num_states; i++) std::cout << q[i] << "\n";
-
 
 	//init and compute the probability fluxes
 	double* flux = new double[num_states*num_states]; 
 	for (int i = 0; i < num_states*num_states; i++) flux[i] = 0;
 	computeFlux(num_states, q, T, eq, flux);
 
-	//for (int i = 0; i < num_states*num_states; i++) std::cout << flux[i] << "\n";
-
-	//make a graph 
+	//make a graph structure of the database
 	Graph* g = makeGraph(db);
 
-	//print out graphviz
+	//print out graphviz file with tpt data
 	printGraphRev(g, initial, F, flux, 1, 1, 0);
 
 	//free the memory
 	delete []T; delete []q; delete []eq; delete []flux;
-	delete []Z; delete []F; delete []P ; delete [] U;
+	delete []Z; delete []F; 
 
 }
 

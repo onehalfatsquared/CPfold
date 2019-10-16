@@ -31,7 +31,10 @@ int main(int argc, char* argv[]) {
 	bd::Database* db = bd::readData(infile);
 
 	//run tpt function
-	bd::performTPT(db->getN(), initial, target, db, getIso);
+	bd::performTPT(initial, target, db, getIso);
+
+	//get hitting probs
+	bd::getHittingProbability(initial, db);
 
 	//std::cout << *db;
 

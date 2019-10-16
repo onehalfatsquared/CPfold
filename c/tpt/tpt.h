@@ -5,7 +5,11 @@ class Database;
 
 //general functions
 //perform tpt on initial and target states
-void performTPT(int N, int initial, int target, Database* db, bool getIso);
+void performTPT(int initial, int target, Database* db, bool getIso);
+// get hitting probabilities to each end state as fn of kappa
+void getHittingProbability(int initial, Database* db);
+//write the hitting probabilities to a file
+void writeHittingProbability(double* kappa, double* data, std::vector<int> endStates, int M); 
 
 //transition matrix functions
 //fill in rate matrix with data from mfpt estimates
