@@ -5,15 +5,22 @@ namespace bd {
 class Database; 
 class Graph;
 
-
+//generic functions
 void printGraph(Graph* g, int source, int draw, int clean, int reduce) ;
 void makeEdge(std::ofstream& out_str, int source, int target, double edgeWidth, double rate) ;
 void makeEdgeClean(std::ofstream& out_str, int source, int target, double edgeWidth);
 void sameRank(std::ofstream& out_str, std::vector<int> states);
 void printCluster(std::ofstream& out_str, int index, int draw);
 
+//for end distrubutions
 void printCluster(std::ofstream& out_str, int index, std::vector<double> end);
 void printGraphEndDistribution(Graph* g, int source, int reduce);
+
+//for comparison of hitting and equilibrium probabilities
+void printClusterEq(std::ofstream& out_str, int index, double eq, double hit, double pw); 
+void printGraphEqHit(Graph* g, int source, double* eq, double* F, int reduce); 
+
+//for isolated a path in a subgraph
 //make a graphviz file with the given path
 void printPath(std::vector<int> path, std::vector<double> val, std::string s);
 //print the most probable path

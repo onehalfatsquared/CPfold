@@ -34,7 +34,9 @@ int main(int argc, char* argv[]) {
 	bd::performTPT(initial, target, db, getIso);
 
 	//get hitting probs
-	bd::getHittingProbability(initial, db);
+	bd::getHittingProbabilityGS(initial, db);
+
+	bd::makeProbCompareGraph(initial, db);
 
 	//std::cout << *db;
 

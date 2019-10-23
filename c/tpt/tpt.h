@@ -7,9 +7,13 @@ class Database;
 //perform tpt on initial and target states
 void performTPT(int initial, int target, Database* db, bool getIso);
 // get hitting probabilities to each end state as fn of kappa
-void getHittingProbability(int initial, Database* db);
+void getHittingProbabilityGS(int initial, Database* db);
 //write the hitting probabilities to a file
-void writeHittingProbability(double* kappa, double* data, std::vector<int> endStates, int M); 
+void writeHittingProbabilityGS(double* kappa, double* data, std::vector<int> endStates, int M);
+//normalize the invariant measure over state with same number of bonds
+void getEqRowHitProbability(int num_states, double* eq, double* eqHit, Database* db); 
+//make graph comparing eq with hitting prob
+void makeProbCompareGraph(int initial, Database* db);
 
 //transition matrix functions
 //fill in rate matrix with data from mfpt estimates

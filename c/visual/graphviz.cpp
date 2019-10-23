@@ -601,5 +601,116 @@ void printGraphRev(Graph* g, int source, double* F, double* flux, int draw, int 
 	delete []drawn;
 }
 
+void printClusterEq(std::ofstream& out_str, int index, double eq, double hit, double pw) {
+	//print a node creation in graphviz - include hit and eq probs
+
+	std::string sEq = std::to_string(eq*100);
+	std::string sH = std::to_string(hit*100);
+	sEq.erase(sEq.end()-4,sEq.end());
+	sH.erase(sH.end()-4,sH.end());
+	std::string P = "(E: " + sEq + ", H: " + sH + ")";
+
+	out_str << "\"" + std::to_string(index) + "\" [label=\"\n\n\n\n\n\n" + P +" \", shape=circle, width = 1, regular = 1," +
+	" penwidth=" + std::to_string(pw) + ", fontsize=50, style = filled, fillcolor=white," 
+	+ "image=\"c" +std::to_string(index) + ".png\"]; \n";
+} 
+
+void printGraphEqHit(Graph* g, int source, double* eq, double* F, int reduce) {
+	//construct a graphviz file to print the graph - compare the equilibrium probability 
+	//with the hitting probability of each state, conditioned on the row (num bonds)
+
+	//set usual input variables
+	int clean = 1;
+
+	//keep track of drawn nodes and ranks
+	std::vector<int> rankVec; std::deque<int> toVisit;
+	int ns = g->getN();
+	bool* drawn = new bool[ns]; for (int i = 0; i < ns; i++) drawn[i] = 0; 
+
+	//declare a file to write output to
+	std::string out;
+	out = "graphvizEqHit.txt";
+	std::ofstream out_str(out);
+
+	//probability tolerance for reduced graphs
+
+	//write the graphviz header
+	out_str << "graph p {\n nodesep = 1.5; ranksep = 4; \n";
+	out_str << "edge [ fontcolor=red, fontsize=48];\n";
+
+	//print the source node
+	double pw = getPW(F[source]);
+	printClusterEq(out_str, source, 1, 1, pw);
+	rankVec.push_back(source);
+	sameRank(out_str, rankVec);
+	rankVec.clear(); drawn[source] = 1;
+
+	//loop over edges of source
+	int E = (*g)[source].getNumEdges();
+	double node_prob = (*g)[source].getProb();
+	for (int edge = 0; edge < E; edge++) {
+		int T = (*g)[source].getEdgeTarget(edge);
+		double rate = (*g)[source].getEdgeRate(edge);
+		double prob = (*g)[source].getEdgeProb(edge);
+		if (reduce == 0 || prob > PTOL) {
+			if (!drawn[T]) {
+				double pw = getPW(F[T]);
+				printClusterEq(out_str, T, eq[T], prob, pw);
+				drawn[T] = 1; rankVec.push_back(T);
+			}
+			double edgeWidth = 40*node_prob*prob;
+			if (clean == 0) {
+				makeEdge(out_str, source, T, edgeWidth, rate);
+			}
+			else if (clean == 1) {
+				makeEdgeClean(out_str, source, T, edgeWidth);
+			}
+			toVisit.push_back(T);
+		}
+	}
+	sameRank(out_str, rankVec); int rankNum = rankVec.size();
+	rankVec.clear();
+
+	//loop over the rest of the nodes
+	int count = 0;
+	while (!toVisit.empty()) {
+		int node = toVisit[0];
+		count++;
+		int E = (*g)[node].getNumEdges();
+		double node_prob = (*g)[node].getProb();
+		for (int edge = 0; edge < E; edge++) {
+			int T = (*g)[node].getEdgeTarget(edge);
+			double rate = (*g)[node].getEdgeRate(edge);
+			double prob = (*g)[node].getEdgeProb(edge);
+			if (rate > 0.01 && (reduce == 0 || prob > PTOL)) {
+				if (!drawn[T]) {
+					double pw = getPW(F[T]);
+					printClusterEq(out_str, T, eq[T], (*g)[T].getProb(), pw);
+					drawn[T] = 1; rankVec.push_back(T);
+					toVisit.push_back(T);
+				}
+				double edgeWidth = 40*node_prob*prob;
+				if (clean == 0) {
+					makeEdge(out_str, node, T, edgeWidth, rate);
+				}
+				else if (clean == 1) {
+					makeEdgeClean(out_str, node, T, edgeWidth);
+				}
+			}
+		}
+		toVisit.pop_front();
+		if (count == rankNum) {
+			count = 0; rankNum = rankVec.size();
+			sameRank(out_str, rankVec); rankVec.clear();
+		}
+	}
+
+	//end reached - put a curly to end
+	out_str << "}";	
+
+	//free memory
+	delete []drawn;
+}
+
 
 }

@@ -644,6 +644,14 @@ void updateFreq(Database* db, std::string filename) {
 	//get the number of particles and possible bonds
 	int N = db->getN();
 	int numBond = N*(N-1)/2;
+	int num_states = db->getNumStates();
+
+	//our states found by mcmc sampler 
+	bool* found = new bool[num_states];
+	for (int i = 0; i < num_states; i++) {
+		found[i] = false;
+	}
+
 
 	//open the file
 	std::ifstream in_str(filename);
@@ -677,15 +685,28 @@ void updateFreq(Database* db, std::string filename) {
 		//if found, update freq
 		if (state == -1) {
 			printf("Could not find state %d in the database\n", counter);
-			return;
+			counter++;
+			//return;
 		}
 		else {
 			(*db)[state].freq = p;
-			printf("State %d in file matches state %d in database. New freq = %f\n",
-				      counter, state, p);
+			printf("State %d in file matches state %d in database. Bonds = %d, New freq = %f\n",
+				      counter, state, (*db)[state].getBonds(), p);
+			found[state] = true;
 			counter++;
 		}
 	}
+
+	//loop over found to out if any states were missed
+	printf("The following states were not found:\n");
+	for (int i = 0; i < num_states; i++) {
+		if (!found[i]) {
+			std::cout << i << ", Num Bonds: " << (*db)[i].getBonds() << "\n";
+		}
+	}
+
+	//delete memory
+	delete []found;
 
 }
 

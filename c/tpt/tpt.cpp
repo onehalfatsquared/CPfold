@@ -228,7 +228,7 @@ void createTransitionMatrix(double* T, int num_states, Database* db,
 	}
 }
 
-void writeHittingProbability(double* kappa, double* data, std::vector<int> endStates, int M) {
+void writeHittingProbabilityGS(double* kappa, double* data, std::vector<int> endStates, int M) {
 	//output the results to a file
 
 	std::ofstream ofile;
@@ -247,7 +247,7 @@ void writeHittingProbability(double* kappa, double* data, std::vector<int> endSt
 	}
 }
 
-void getHittingProbability(int initial, Database* db) {
+void getHittingProbabilityGS(int initial, Database* db) {
 	/*compute the hitting probability of each end state as fn of kappa
 		output the results to a file */
 
@@ -313,25 +313,22 @@ void getHittingProbability(int initial, Database* db) {
 		for (int end = 0; end < endStates.size(); end++) {
 			double hit_prob = U[toIndex(initial, endStates[end], num_states)];
 			data[k*endStates.size() + end] = hit_prob;
-			std::cout << hit_prob << "\n";
 		}
 	}
 
 	//write to file
-	writeHittingProbability(kappa, data, endStates, M);
+	writeHittingProbabilityGS(kappa, data, endStates, M);
 
 	//free the memory
 	delete []T; delete []Tconst; delete []P; delete []U;
 	delete []eq; delete []kappa; delete []data;
-	
-
 }
 
 void performTPT(int initial, int target, Database* db, bool getIso) {
 	//perform tpt calculations from initial to target states
 
 	//parameters
-	double kappa = 50.0;
+	double kappa = 2000.0;
 	int N = db->getN();
 	int num_states = db->getNumStates();
 	std::vector<int> endStates;
@@ -354,6 +351,7 @@ void performTPT(int initial, int target, Database* db, bool getIso) {
 	//init array for equilibrium distribution and compute it
 	double* eq = new double[num_states];
 	createMeasure(num_states, db, eq, kappa);
+	for (int i = 0; i < num_states; i++) std::cout << eq[i] << "\n";
 
 	//fill in transposed entries such that T satisfies detailed balance
 	satisfyDB(T, num_states, db, eq);
@@ -394,8 +392,83 @@ void performTPT(int initial, int target, Database* db, bool getIso) {
 	//free the memory
 	delete []T; delete []q; delete []eq; delete []flux;
 	delete []Z; delete []F; 
+	delete g;
 
 }
+
+void getEqRowHitProbability(int num_states, double* eq, double* eqHit, Database* db) {
+	//normalize the equilibrium probability over states with same number of bonds
+
+	std::vector<int> same_bonds; 
+	bool* found = new bool[num_states];
+	for (int i = 0; i < num_states; i++) found[i] = false;
+
+
+	for (int state = 0; state < num_states; state++) {
+
+		//clear the vector of states with same num of bonds
+		same_bonds.clear();
+		double Z = 0;  //normalizer
+
+		//check if state has been found previously
+		if (!found[state]) {
+			int bonds = (*db)[state].getBonds(); same_bonds.push_back(state);
+			Z += eq[state]; found[state] = true;
+			for (int next = state+1; next < num_states; next++) {
+				int next_bonds = (*db)[next].getBonds(); 
+				if (next_bonds == bonds) {
+					same_bonds.push_back(next);
+					Z += eq[next]; found[next] = true;
+				}
+			}
+		}
+
+		//now re-weight by Z and store in eqHit
+		for (int entry = 0; entry < same_bonds.size(); entry++) {
+			int entry_state = same_bonds[entry];
+			eqHit[entry_state] = eq[entry_state] / Z;
+		}
+	}
+
+	//free memory
+	delete []found;
+
+}
+
+void makeProbCompareGraph(int initial, Database* db) {
+	//compute the invariant measure in high kappa limit, normalize over rows,
+	//make graph, pass it to graphviz code
+
+	//parameters
+	double kappa = 2000.0;
+	int N = db->getN();
+	int num_states = db->getNumStates();
+
+	//init and compute configurational partition function and free energy
+	double* Z = new double[num_states]; double* F = new double[num_states];
+	for (int i = 0; i < num_states; i++) Z[i] = F[i] = 0;
+	computePartitionFn(num_states, db, Z); 
+	computeFreeEnergy(num_states, Z, F);
+
+	double* eq = new double[num_states];           //equilibrium measure
+	double* eqHit = new double[num_states];        // normalized equilibrium measure
+	createMeasure(num_states, db, eq, kappa);
+	getEqRowHitProbability(num_states, eq, eqHit, db);
+
+	//make a graph structure of the database
+	Graph* g = makeGraph(db);
+
+	//call graphviz creator
+	printGraphEqHit(g, initial, eqHit, F, 1);
+
+	//free memory
+	delete []Z; delete []F; delete []eq; delete []eqHit;
+	delete g;
+
+
+}
+
+//TODO ROUND THE PROBS THEN DONE//
 
 
 
