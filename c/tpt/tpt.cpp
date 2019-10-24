@@ -159,7 +159,7 @@ void computeFreeEnergy(int num_states, double* Z, double* F) {
 void computePartitionFn(int num_states, Database* db, double* Z) {
 	//compute the configurational part of the partition fn from each cluster
 
-	createMeasure(num_states, db, Z, KAP);
+	createMeasure(num_states, db, Z, 1);
 }
 
 void createMeasure(int num_states, Database* db, double* eq, double kappa) {
