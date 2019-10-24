@@ -14,6 +14,8 @@ add_subdirectory(visual)
 include_directories(visual)
 add_subdirectory(tpt)
 include_directories(tpt)
+add_subdirectory(design)
+include_directories(design)
 add_subdirectory(exe)
 
 file(COPY input DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/exe)
