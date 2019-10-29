@@ -15,7 +15,7 @@ void initKappaVals(int numInteractions, double* kappaVals);
 void makeKappaMap(int numTypes, double* kappaVals, 
 									std::map<std::pair<int,int>,double>& kappa);
 void constructSurfaceTOY(int N, Database* db, int initial, int target, bool useFile);
-
+double getHitProbability(int num_states, int initial, std::vector<int> targets, double* U);
 
 
 

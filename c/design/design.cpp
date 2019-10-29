@@ -169,11 +169,22 @@ void makeKappaMap(int numTypes, double* kappaVals,
 
 }
 
+double getHitProbability(int num_states, int initial, std::vector<int> targets, double* U) {
+	//get the hitting probability for the group of states in targets
+
+	double prob = 0; 
+	for (int i = 0; i < targets.size(); i++) {
+		prob += U[toIndex(initial, targets[i], num_states)];
+	}
+
+	return prob;
+}
+
 
 
 void constructSurfaceTOY(int N, Database* db, int initial, int target, bool useFile) {
 	//plot the surface of hitting probabilities for initial to target states
-	//toy model where 3 sticky parameters is hard coded
+	//toy model where 3 sticky parameters is hard coded - 2 unique
 
 	//get database info
 	int num_states = db->getNumStates(); 
@@ -209,51 +220,67 @@ void constructSurfaceTOY(int N, Database* db, int initial, int target, bool useF
 	//get bonds->bonds+1 entries from mfpt estimates
 	std::vector<int> ground; //vector to hold all ground states
 	createTransitionMatrix(Tconst, num_states, db, ground);
+	for (int i = 0; i < ground.size(); i++) {
+		std::cout << ground[i] << "\n";
+	}
 
 	//find all target states consistent with input target
 	std::vector<int> targets; 
 	findIsomorphic(N, num_states, target, db, targets);
+	for (int i = 0; i < targets.size(); i++) {
+		std::cout << targets[i] << "\n";
+	}
 
 	//declare the kappa mapping
 	std::map<std::pair<int,int>,double> kappa;
 
+	//declare outfile
+	std::ofstream ofile;
+	ofile.open("hittingProbSurface.txt");
+
 	//do hitting probability calculation
-	int M = 50; //num points in each dimension
+	int M = 60; //num points in each dimension
 	for (int x = 0; x < M; x++) {
 		for (int y = 0; y < M; y++) {
-			for (int z = 0; z < M; z++) {
-				//set kappa
-				kappaVals[0] = 1+ (double)x / 2; 
-				kappaVals[1] = 1+ (double)y / 2; 
-				kappaVals[2] = 1+ (double)z / 2; 
+			//set kappa
+			kappaVals[0] = 0.5+ (double)x / 4; 
+			kappaVals[1] = 0.5+ (double)y / 4; 
+			kappaVals[2] = 0.5+ (double)x / 4; 
 
-				//make the map
-				makeKappaMap(3, kappaVals, kappa);
-				//do rewieght
-				reweight(N, num_states, db, particleTypes, eq, kappa);
-				//reset transition matrices
-				for (int i = 0; i < num_states*num_states; i++) {
-					P[i] = U[i] = 0;
-				}
-				//copy Tconst into T
-				std::copy(Tconst, Tconst+num_states*num_states, T);
-				//fill in transposed entries such that T satisfies detailed balance
-				satisfyDB(T, num_states, db, eq);
-				//fill in diagonal with negative sum of row entries
-				fillDiag(T, num_states);
-				//use the filled rate matrix to compute probability matrix
-				createProbabilityMatrix(T, num_states, P);
-				//solve for hitting probabilities to endStates states
-				computeHittingProbability(P, num_states, ground, U);
+			//make the map
+			makeKappaMap(2, kappaVals, kappa);
+			//std::cout << kappa[{0,0}] << ' ' << kappa[{1,0}] << ' ' << kappa[{1,1}] << "\n";
+			//do rewieght
+			reweight(N, num_states, db, particleTypes, eq, kappa);
+			//reset transition matrices
+			for (int i = 0; i < num_states*num_states; i++) {
+				P[i] = U[i] = 0;
 			}
+			//copy Tconst into T
+			std::copy(Tconst, Tconst+num_states*num_states, T);
+			//fill in transposed entries such that T satisfies detailed balance
+			satisfyDB(T, num_states, db, eq);
+			//fill in diagonal with negative sum of row entries
+			fillDiag(T, num_states);
+			//use the filled rate matrix to compute probability matrix
+			createProbabilityMatrix(T, num_states, P);
+			//solve for hitting probabilities to endStates states
+			computeHittingProbability(P, num_states, ground, U);
+			//get hit prob to targets
+			double p = getHitProbability(num_states, initial, targets, U);
+
+			//output to file
+			ofile << kappaVals[0] << ' ' << kappaVals[1] << ' ' << p << "\n";
 
 		}
+		std::cout << x << "\n";
 	}
 
 
 
 
-
+	//close file
+	ofile.close();
 
 	//free memory
 	delete []particleTypes; delete []kappaVals; delete []eq;

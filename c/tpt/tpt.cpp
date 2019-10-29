@@ -245,6 +245,7 @@ void writeHittingProbabilityGS(double* kappa, double* data, std::vector<int> end
 		}
 		ofile << "\n";
 	}
+	ofile.close();
 }
 
 void getHittingProbabilityGS(int initial, Database* db) {
