@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
 	int N = db->getN();
 
 	//do stuff
-	bd::constructSurface(N, db, initial, target, useFile);
+	bd::constructSurfaceTOY(N, db, initial, target, useFile);
 
 
 

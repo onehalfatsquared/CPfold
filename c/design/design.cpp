@@ -169,22 +169,11 @@ void makeKappaMap(int numTypes, double* kappaVals,
 
 }
 
-void getGroundStates(int N, Database* db, std::vector<int>& gs) {
-	//return a vector with all the ground states in it
-
-	int ns = db->getNumStates(); 
-	for (int i = 0; i < ns; i++) {
-		int b = (*db)[i].getBonds();
-		if (b == 2*N-3 || b == 2*N-2) {
-			gs.push_back(i);
-		}
-	}
-}
 
 
-
-void constructSurface(int N, Database* db, int initial, int target, bool useFile) {
+void constructSurfaceTOY(int N, Database* db, int initial, int target, bool useFile) {
 	//plot the surface of hitting probabilities for initial to target states
+	//toy model where 3 sticky parameters is hard coded
 
 	//get database info
 	int num_states = db->getNumStates(); 
@@ -201,31 +190,74 @@ void constructSurface(int N, Database* db, int initial, int target, bool useFile
 	}
 	int numInteractions = numTypes*(numTypes+1)/2;
 
-	//set up sticky parameter map
+	//set up sticky parameter values
 	double* kappaVals = new double[numInteractions];
 	initKappaVals(numInteractions, kappaVals);
-	std::map<std::pair<int,int>,double> kappa;
-	makeKappaMap(numTypes, kappaVals, kappa);
+
+	//declare rate matrix, probability transition matrix, equilibrium measure
+	double* T = new double[num_states*num_states]; //rate matrix
+	double* P = new double[num_states*num_states]; //probability transition matrix
+	double* U = new double[num_states*num_states]; //hitting probability matrix
+	double* Tconst = new double[num_states*num_states]; //rate matrix - only forward entries
+	double* eq = new double[num_states];           //equilibrium measure
+
+	//init the rate matrix with zeros
+	for (int i = 0; i < num_states*num_states; i++) {
+		Tconst[i] = 0;
+	}
+
+	//get bonds->bonds+1 entries from mfpt estimates
+	std::vector<int> ground; //vector to hold all ground states
+	createTransitionMatrix(Tconst, num_states, db, ground);
 
 	//find all target states consistent with input target
 	std::vector<int> targets; 
 	findIsomorphic(N, num_states, target, db, targets);
 
-	//get all the ground states
-	std::vector<int> ground;
-	getGroundStates(N, db, ground);
-
-	//create the reweighted equilibrium measure
-	double* eq = new double[num_states];
-	reweight(N, num_states, db, particleTypes, eq, kappa); 
+	//declare the kappa mapping
+	std::map<std::pair<int,int>,double> kappa;
 
 	//do hitting probability calculation
+	int M = 50; //num points in each dimension
+	for (int x = 0; x < M; x++) {
+		for (int y = 0; y < M; y++) {
+			for (int z = 0; z < M; z++) {
+				//set kappa
+				kappaVals[0] = 1+ (double)x / 2; 
+				kappaVals[1] = 1+ (double)y / 2; 
+				kappaVals[2] = 1+ (double)z / 2; 
+
+				//make the map
+				makeKappaMap(3, kappaVals, kappa);
+				//do rewieght
+				reweight(N, num_states, db, particleTypes, eq, kappa);
+				//reset transition matrices
+				for (int i = 0; i < num_states*num_states; i++) {
+					P[i] = U[i] = 0;
+				}
+				//copy Tconst into T
+				std::copy(Tconst, Tconst+num_states*num_states, T);
+				//fill in transposed entries such that T satisfies detailed balance
+				satisfyDB(T, num_states, db, eq);
+				//fill in diagonal with negative sum of row entries
+				fillDiag(T, num_states);
+				//use the filled rate matrix to compute probability matrix
+				createProbabilityMatrix(T, num_states, P);
+				//solve for hitting probabilities to endStates states
+				computeHittingProbability(P, num_states, ground, U);
+			}
+
+		}
+	}
+
+
 
 
 
 
 	//free memory
 	delete []particleTypes; delete []kappaVals; delete []eq;
+	delete []T; delete []P;  delete []U; delete []Tconst;
 }
 
 

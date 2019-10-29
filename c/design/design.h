@@ -14,8 +14,7 @@ void reweight(int N, int num_states, Database* db, int* particleTypes, double* e
 void initKappaVals(int numInteractions, double* kappaVals);
 void makeKappaMap(int numTypes, double* kappaVals, 
 									std::map<std::pair<int,int>,double>& kappa);
-void constructSurface(int N, Database* db, int initial, int target, bool useFile);
-void getGroundStates(int N, Database* db, std::vector<int>& gs);
+void constructSurfaceTOY(int N, Database* db, int initial, int target, bool useFile);
 
 
 
