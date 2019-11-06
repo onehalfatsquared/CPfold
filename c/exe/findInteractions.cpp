@@ -12,6 +12,13 @@
 	 compute the hitting probabilities given a set of identities for the particles
 */
 
+/* Initial conditions for target
+	N = 6. Trapezoid: 10
+				 Chevron  : 65
+				 Triangle : 144
+*/
+
+
 
 
 int main(int argc, char* argv[]) {
@@ -31,8 +38,11 @@ int main(int argc, char* argv[]) {
 	bd::Database* db = bd::readData(infile);
 	int N = db->getN();
 
+
 	//do stuff
-	bd::constructSurfaceTOY(N, db, initial, target, useFile);
+	//bd::constructSurfaceTOY(N, db, initial, target, useFile);
+	//bd::hittingProbMaxTOYperms(N, db, initial, target);
+	bd::hittingProbMaxTOY(N, db, initial, target, useFile);
 
 
 

@@ -5,6 +5,7 @@
 #include "database.h"
 #include "graph.h"
 #include "graphviz.h"
+#include "tpt.h"
 
 /* Input Description:
 	 Input File - location of file containing mfpt data. Likely NxLump.txt
@@ -38,14 +39,19 @@ int main(int argc, char* argv[]) {
 	bd::Graph* g = bd::makeGraph(db);
 	printf("Database has been stored as a graph.\n");
 
+	//get the geometric partition functions
+	int ns = db->getNumStates();
+	double* Z = new double[ns];
+	computePartitionFn(ns, db, Z); 
+
 	//print out the ending distribution
 	bd::endDistribution(g);
 
 	//print out most probable path
-	bd::MPP(g, source);
+	//bd::MPP(g, source);
 
 	//print the graph
-	bd::printGraph(g, source, draw, clean, reduce);
+	bd::printGraphPF(g, source, Z, draw, clean, reduce);
 
 	//print out path with fastest rate
 	if (target == -1) {
@@ -57,10 +63,10 @@ int main(int argc, char* argv[]) {
 
 	//construct the subgraph that ends at target
 	bd::Graph* sub = bd::targetSubgraph(g, source, target);
-	printGraph(sub, source, draw, clean, reduce);
+	//printGraph(sub, source, draw, clean, reduce);
 
 	//print most probable path ending at target
-	bd::MPP(sub,source);
+	//bd::MPP(sub,source);
 
 	//construct subgraph that starts at some node
 	bd::Graph* sub2 = bd::sourceSubgraph(g, 17);
@@ -71,11 +77,12 @@ int main(int argc, char* argv[]) {
 	bd::findConditionalEnd(g, source);
 
 	//get graph with end state probabilities
-	bd::printGraphEndDistribution(g, source, reduce);
+	//bd::printGraphEndDistribution(g, source, reduce);
 
 
 	//free memory - delete database
 	delete db; delete g; delete sub; delete sub2;
+	delete []Z;
 
 	return 0;
 }

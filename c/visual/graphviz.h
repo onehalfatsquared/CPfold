@@ -41,4 +41,8 @@ void printClusterRev(std::ofstream& out_str, int index, double pw);
 double getPW(double f);
 double getMax(int num_states, double* array);
 
+//for including partition function data in irrevserible case
+void printGraphPF(Graph* g, int source, double* Z, int draw, int clean, 
+									 int reduce); 
+
 }
