@@ -68,51 +68,6 @@ int setTypes(int N, int* particleTypes, int IC) {
 	return numTypes;
 }
 
-int readDesignFile(int N, int* particleTypes) {
-	//read the file to get particle identities
-
-	int max = -1; //use to determine number of types
-	int count = 0; //use to determine if input mathces the system
-
-	//file location
-	std::string filename = "input/design/particles.txt";
-
-	//open the file
-	std::ifstream in_str(filename);
-
-	//check if the file can be opened
-	if (!in_str) {
-		fprintf(stderr, "Cannot open file %s\n", filename.c_str());
-		return -1;
-	}
-
-	//store the entries
-	int id; 
-	while (in_str >> id) {
-		//increment the counter for the particle number (1 based indexing)
-		count++; 
-
-		//if the particle number doesnt exceed the total, store it
-		if (count <= N) {
-			particleTypes[count-1] = id;
-		}
-
-		//get the max of the particle ids
-		if (id > max) {
-			max = id;
-		}
-	}
-
-	//check if the number of entries in file matches the db we recieved
-	if (count != N) {
-		fprintf(stderr, "The supplied design file is incompatible with the database file.");
-		return -1;
-	}
-
-	//return number of particle types
-	return max+1;
-}
-
 double getStickyProduct(int N, int state,  Database* db, int* particleTypes, 
 												std::map<std::pair<int,int>,double> kappa) {
 	//return the product of sticky param ^ num bonds for each type
@@ -174,22 +129,6 @@ void initKappaVals(int numInteractions, double* kappaVals) {
 	for (int i = 0; i < numInteractions; i++) {
 		kappaVals[i] = 3.0;
 	}
-}
-
-void makeKappaMap(int numTypes, double* kappaVals, 
-									std::map<std::pair<int,int>,double>& kappa) {
-	//fill the map with values in kappaVals
-
-	int counter = 0; 
-
-	for (int i = 0; i < numTypes; i++) {
-		for (int j = i; j < numTypes; j++) {
-			kappa[{i,j}] = kappaVals[counter];
-			kappa[{j,i}] = kappaVals[counter];
-			counter++;
-		}
-	}
-
 }
 
 double getHitProbability(int num_states, int initial, std::vector<int> targets, double* U) {
@@ -553,9 +492,6 @@ void constructSurfaceTOY(int N, Database* db, int initial, int target, bool useF
 		}
 		std::cout << x << "\n";
 	}
-
-
-
 
 	//close file
 	ofile.close();

@@ -12,7 +12,7 @@ double morseP(double r, double rho, double E){
 
 double morseEval(double* particles, int rho, double* E, int N, int* P) {
   //compute total energy of system with pairwise morse potential //not necc?
-	double S = 0; int i, j; int rep = 0;
+	double S = 0; int i, j; int rep = 0.0;
     for(i=0;i<N;i++){
         for(j=i+1;j<N;j++){
             if(j!=i){
@@ -36,7 +36,7 @@ double morseEval(double* particles, int rho, double* E, int N, int* P) {
 
 void morseGrad(double* particles, int rho, double* E, int N, int* P, double* g) {
   //compute gradient of energy of system with pairwise morse potential
-	int i, j; int rep = 0;
+	int i, j; int rep = 0.0;
 	double* S = new double[DIMENSION];
 	for(i=0;i<N;i++){
     S[0] = S[1] = 0;

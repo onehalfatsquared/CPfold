@@ -64,4 +64,124 @@ void printCluster(double* X, int N) {
 }
 
 
+void makeKappaMap(int numTypes, double* kappaVals, 
+									std::map<std::pair<int,int>,double>& kappa) {
+	//fill the map with values in kappaVals
+
+	int counter = 0; 
+
+	for (int i = 0; i < numTypes; i++) {
+		for (int j = i; j < numTypes; j++) {
+			kappa[{i,j}] = kappaVals[counter];
+			kappa[{j,i}] = kappaVals[counter];
+			counter++;
+		}
+	}
+}
+
+void fillP(int N, int* particleTypes, int* P, double* E,
+					 std::map<std::pair<int,int>,double>& kappa) {
+	//fill interaction matrices with values
+
+	for (int i = 0; i < N; i++) {
+		P[toIndex(i,i+1,N)] = 1; E[toIndex(i,i+1,N)] = 10; 
+		P[toIndex(i+1,i,N)] = 1; E[toIndex(i+1,i,N)] = 10; 
+		for (int j = i+2; j < N; j++) {
+			int p1 = particleTypes[i]; 
+			int p2 = particleTypes[j];
+			double kval = kappa[{p1,p2}];
+			if (kval > 0.25) {
+				double energy = stickyNewton(8.0, RANGE, kval, BETA); 
+				P[toIndex(i,j,N)] = 1; E[toIndex(i,j,N)] = energy; 
+				P[toIndex(j,i,N)] = 1; E[toIndex(j,i,N)] = energy; 
+			}
+			else{
+				P[toIndex(i,j,N)] = 1; E[toIndex(i,j,N)] = 0.01; 
+				P[toIndex(j,i,N)] = 1; E[toIndex(j,i,N)] = 0.01; 
+			}
+		}
+	}
+}
+
+void readKappaFile(int numInteractions, double* kappa) {
+	//read the file to get particle identities
+
+	//file location
+	std::string filename = "input/design/kappa.txt";
+
+	//open the file
+	std::ifstream in_str(filename);
+
+	//check if the file can be opened
+	if (!in_str) {
+		fprintf(stderr, "Cannot open file %s\n", filename.c_str());
+		return;
+	}
+
+	//store the entries
+	double k; int count = 0; 
+	while (in_str >> k) {
+		//increment the counter for the particle number (1 based indexing)
+		count++; 
+
+		//if the particle number doesnt exceed the total, store it
+		if (count <= numInteractions) {
+			kappa[count-1] = k;
+		}
+	}
+
+	//check if the number of entries in file matches the db we recieved
+	if (count != numInteractions) {
+		fprintf(stderr, "The supplied design file is incompatible with the database file.");
+		return;
+	}
+
+}
+
+int readDesignFile(int N, int* particleTypes) {
+	//read the file to get particle identities
+
+	int max = -1; //use to determine number of types
+	int count = 0; //use to determine if input mathces the system
+
+	//file location
+	std::string filename = "input/design/particles.txt";
+
+	//open the file
+	std::ifstream in_str(filename);
+
+	//check if the file can be opened
+	if (!in_str) {
+		fprintf(stderr, "Cannot open file %s\n", filename.c_str());
+		return -1;
+	}
+
+	//store the entries
+	int id; 
+	while (in_str >> id) {
+		//increment the counter for the particle number (1 based indexing)
+		count++; 
+
+		//if the particle number doesnt exceed the total, store it
+		if (count <= N) {
+			particleTypes[count-1] = id;
+		}
+
+		//get the max of the particle ids
+		if (id > max) {
+			max = id;
+		}
+	}
+
+	//check if the number of entries in file matches the db we recieved
+	if (count != N) {
+		fprintf(stderr, "The supplied design file is incompatible with the database file.");
+		return -1;
+	}
+
+	//return number of particle types
+	return max+1;
+}
+
+
 }

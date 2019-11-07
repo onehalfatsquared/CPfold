@@ -3,10 +3,11 @@
 #include "bDynamics.h"
 #include "../defines.h"
 
+
 int main(int argc, char* argv[]) {
 
 	//handle input
-	if (argc != 2) {
+	if (argc != 3) {
 		fprintf(stderr, "Usage: %s <Num Particles> <Final Time>", argv[0]);
 		return 1;
 	}
@@ -19,11 +20,16 @@ int main(int argc, char* argv[]) {
 	int method = 1;
 
 	//initialize interaction matrices
+	int* types = new int[N];
+	int numTypes = bd::readDesignFile(N, types);
+	int numInteractions = numTypes*(numTypes+1)/2;
+	double* kappa = new double[numInteractions];
+	bd::readKappaFile(numInteractions, kappa);
+	std::map<std::pair<int,int>, double> kmap; 
+	bd::makeKappaMap(numTypes, kappa, kmap);
 	int* P = new int[N*N];
 	double* E = new double[N*N];
-	for (int i = 0; i < N*N; i++) {
-		P[i] = 1; E[i] = 10;
-	}
+	bd::fillP(N, types, P, E, kmap);
 
 	//set the initial and final state storage
 	double* X0 = new double[DIMENSION*N];
@@ -39,7 +45,7 @@ int main(int argc, char* argv[]) {
 	bd::printCluster(X0, N);
 
 	//free memory
-	delete []P; delete []E; delete []X0;
+	delete []P; delete []E; delete []X0; delete []kappa; delete []types;
 
 	//exit
 	return 0;

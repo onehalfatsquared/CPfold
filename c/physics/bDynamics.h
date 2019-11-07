@@ -2,10 +2,21 @@
 #include "nauty.h"
 #include "adjacency.h"
 #include "pair.h"
+#include <fstream>
+#include <map>
+#include <iostream>
 #include <vector>
 #include <eigen3/Eigen/Dense>
 namespace bd { 
 class Database;
+
+//general stuff
+void makeKappaMap(int numTypes, double* kappaVals, 
+									std::map<std::pair<int,int>,double>& kappa);
+void fillP(int N, int* particleTypes, int* P, double* E,
+					 std::map<std::pair<int,int>,double>& kappa);
+void readKappaFile(int numInteractions, double* kappa);
+int readDesignFile(int N, int* particleTypes);
 
 //particle and potential stuff
 //evaluate the morse potential between 2 particles
@@ -37,6 +48,7 @@ void EM(double* X0, int N, int Nt, double k,
 //solve sde system
 void solveSDE(double* X0, int N, double T, int rho, double beta,
 							double* E, int* P, int method, int pot);
+
 
 
 
