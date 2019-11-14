@@ -44,8 +44,6 @@ void runTrajectoryChain(double* X, int pot, Database* db, int state, int samples
 void updatePM(int new_state, std::vector<Pair>& PM); 
 void checkState(double* X, int N, int state, int& new_state, Database* db, int& timer,
 							 int& reset, int& reflect);
-void refine(int N, double* X, int* M);
-void makeNM(int N, int* M, Eigen::VectorXd x, Eigen::MatrixXd& J, Eigen::VectorXd& F);
 double sampleSTD(double* X, int n);
 bool findMatrix(int* M, int* old, int old_bonds, int N, Database* db, int& timer, 
 	int& reset, int& reflect, int& new_state);

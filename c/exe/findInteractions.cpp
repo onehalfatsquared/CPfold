@@ -42,7 +42,8 @@ int main(int argc, char* argv[]) {
 	//do stuff
 	//bd::constructSurfaceTOY(N, db, initial, target, useFile);
 	//bd::hittingProbMaxTOYperms(N, db, initial, target);
-	bd::hittingProbMaxTOY(N, db, initial, target, useFile);
+	//bd::hittingProbMaxTOY(N, db, initial, target, useFile);
+	bd::estimateHittingProbability(N, db, target);
 
 
 

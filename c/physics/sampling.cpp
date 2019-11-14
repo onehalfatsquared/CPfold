@@ -19,69 +19,6 @@ double sampleSTD(double* X, int n) {
 	return sqrt(std);
 }
 
-void makeNM(int N, int* M, Eigen::VectorXd x, Eigen::MatrixXd& J, Eigen::VectorXd& F) {
-	//make the matrix and vector to solve for Newtons method
-
-	double XD, YD;
-	int count = 0;
-
-	//loop over and construct system
-	for (int i = 0; i <N; i ++) {
-		for (int j = i+1; j < N; j++) {
-			if (M[toIndex(i,j,N)] == 1) {
-				XD = x(2*i) - x(2*j);
-				YD = x(2*i+1) - x(2*j+1);
-				F(count) = XD*XD + YD*YD -1.0;
-				J(count, 2*i) = 2*XD; J(count, 2*j) = -2*XD;
-				J(count, 2*i+1) = 2*YD; J(count, 2*j+1) = -2*YD;
-				count +=1;
-			}
-		}
-	}
-}
-
-void refine(int N, double* X, int* M) {
-	//refine a potentially unphysical state with NM - fill an adjacency matrix
-
-	//set parameters to newtons method
-	int max_iter = 50;
-	double tol = 1e-8;
-
-	int b = 0; //num bonds
-	for (int i = 0; i < N*N; i++) b+=M[i];
-	b /= 2;
-
-	//initialize the matrix and vectors
-	Eigen::MatrixXd J(b,2*N); 
-	Eigen::VectorXd F(b); 
-	Eigen::VectorXd dx(2*N);  
-	Eigen::VectorXd x(2*N); 
-
-	//initialize x. fill others with zeros.
-	for (int i = 0; i < 2*N; i++) {
-		x(i) = X[i];
-	}
-	dx.fill(0.0); F.fill(0.0); J.fill(0.0);
-
-	//fill F and J. do solve with svd decomp.
-	int iter;
-	for (iter = 0; iter < max_iter; iter++) {
-		makeNM(N, M, x, J, F);
-		dx = J.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(-F);
-		x = x+dx;
-		if (dx.norm() < tol) {
-			break;
-		}
-	}
-
-	//build adjacency matrix
-	for (int i = 0; i < N*N; i++) M[i] = 0;
-	double* XM = new double[2*N]; for (int i = 0; i < 2*N; i++) XM[i]=x(i);
-	getAdj(XM, N, M);
-
-	//free memory
-	delete []XM;
-}
 
 bool findMatrix(int* M, int* old, int old_bonds, int N, Database* db, int& timer, int& reset, int& reflect, 
 																					int& new_state) {
@@ -89,8 +26,8 @@ bool findMatrix(int* M, int* old, int old_bonds, int N, Database* db, int& timer
 
 	for (int i = 0; i < (*db).getNumStates(); i++) {
 		extractAM(N, i, old, db);
-		int S = checkSame(old, M, N); 
-		if (S == 1) {//found matrix
+		bool S = checkSame(old, M, N); 
+		if (S) {//found matrix
 			int new_bonds = (*db)[i].getBonds();
 			if (new_bonds == old_bonds + 1 || (old_bonds == 10 && new_bonds ==12 )) {//keep these
 				new_state = i; reflect = 1;
@@ -117,8 +54,8 @@ void checkState(double* X, int N, int state, int& new_state, Database* db, int& 
 	getAdj(X, N, M);
 
 	//check if state is connected
-	int C = checkConnected(M, N);
-	if (C == 0) {//not connected
+	bool C = checkConnected(M, N);
+	if (!C) {//not connected
 		reset = 1; timer -= 1;
 		delete []M;
 		return;
@@ -128,19 +65,19 @@ void checkState(double* X, int N, int state, int& new_state, Database* db, int& 
 	int* old = new int[N*N]; for (int i = 0; i < N*N; i++) old[i]=0;
 	int old_bonds = (*db)[state].getBonds();
 	extractAM(N, state, old, db);
-	int S = checkSame(old, M, N);
+	bool S = checkSame(old, M, N);
 
-	if (S == 1) {//same matrix
+	if (S) {//same matrix
 		delete []M; delete []old;
 		return;
 	}
 	else {//not the same, find matrix in database
 		S = findMatrix(M, old, old_bonds, N, db, timer, reset, reflect, new_state);
-		if (S == 0) {
+		if (!S) {
 			//may output an unphysical state. refine with newton, check again
 			refine(N, X, M);
 			S = findMatrix(M, old, old_bonds, N, db, timer, reset, reflect, new_state);
-			if (S == 0) { //state still not found after refine, ignore this sample
+			if (!S) { //state still not found after refine, ignore this sample
 				reset = 1; timer = 0;
 				printf("State not found in database\n\n\n\n\n");
 			}

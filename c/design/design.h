@@ -18,12 +18,16 @@ double getHitProbability(int num_states, int initial, std::vector<int> targets, 
 double solveAbsorbProblem(int initial, double* kappaVals, Database* db, int* particleTypes, 
 								 					double* Tconst, std::vector<int> ground, std::vector<int> targets);
 
-double computeGrad(int initial, int numInteractions, double* kappaVals, Database* db, 
+double computeGradHP(int initial, int numInteractions, double* kappaVals, Database* db, 
 								 int* particleTypes, double* Tconst, std::vector<int> ground, 
 								 std::vector<int> targets, double* g);
 
 void hittingProbMaxTOY(int N, Database* db, int initial, int target, bool useFile);
 void hittingProbMaxTOYperms(int N, Database* db, int initial, int target);
+
+//sampling functions
+int findMatrix(int N, double* X, Database* db);
+void estimateHittingProbability(int N, Database* db, int target);
 
 
 

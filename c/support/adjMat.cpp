@@ -45,28 +45,28 @@ void printAM(int N, int* AM) {
 	}
 }
 
-int checkConnected(int* M, int N) {
+bool checkConnected(int* M, int N) {
 	//check if subdiagonal sums to N-1
 	int S = 0;
 	for (int i = 0; i < N-1; i++) {
 		S += M[(N+1)*i+1];
 	}
 	if (S == N-1) {
-		return 1;
+		return true;
 	}
 	else {
-		return 0;
+		return false;
 	}
 }
 
-int checkSame(int* M1, int* M2, int N) {
+bool checkSame(int* M1, int* M2, int N) {
 	//check if adjacency matrices M1 and M2 are the same
 	for (int i = 0; i < N*N; i++) {
 		if (M1[i]-M2[i] != 0) {
-			return 0;
+			return false;
 		}
 	}
-	return 1;
+	return true;
 }
 
 void getAdj(double* X, int N, int* M) {
@@ -152,6 +152,70 @@ void findIsomorphic(int N, int num_states, int state, Database* db, std::vector<
 			iso.push_back(i);
 		}
 	} 
+}
+
+void makeNM(int N, int* M, Eigen::VectorXd x, Eigen::MatrixXd& J, Eigen::VectorXd& F) {
+	//make the matrix and vector to solve for Newtons method
+
+	double XD, YD;
+	int count = 0;
+
+	//loop over and construct system
+	for (int i = 0; i <N; i ++) {
+		for (int j = i+1; j < N; j++) {
+			if (M[toIndex(i,j,N)] == 1) {
+				XD = x(2*i) - x(2*j);
+				YD = x(2*i+1) - x(2*j+1);
+				F(count) = XD*XD + YD*YD -1.0;
+				J(count, 2*i) = 2*XD; J(count, 2*j) = -2*XD;
+				J(count, 2*i+1) = 2*YD; J(count, 2*j+1) = -2*YD;
+				count +=1;
+			}
+		}
+	}
+}
+
+void refine(int N, double* X, int* M) {
+	//refine a potentially unphysical state with NM - fill an adjacency matrix
+
+	//set parameters to newtons method
+	int max_iter = 50;
+	double tol = 1e-8;
+
+	int b = 0; //num bonds
+	for (int i = 0; i < N*N; i++) b+=M[i];
+	b /= 2;
+
+	//initialize the matrix and vectors
+	Eigen::MatrixXd J(b,2*N); 
+	Eigen::VectorXd F(b); 
+	Eigen::VectorXd dx(2*N);  
+	Eigen::VectorXd x(2*N); 
+
+	//initialize x. fill others with zeros.
+	for (int i = 0; i < 2*N; i++) {
+		x(i) = X[i];
+	}
+	dx.fill(0.0); F.fill(0.0); J.fill(0.0);
+
+	//fill F and J. do solve with svd decomp.
+	int iter;
+	for (iter = 0; iter < max_iter; iter++) {
+		makeNM(N, M, x, J, F);
+		dx = J.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(-F);
+		x = x+dx;
+		if (dx.norm() < tol) {
+			break;
+		}
+	}
+
+	//build adjacency matrix
+	for (int i = 0; i < N*N; i++) M[i] = 0;
+	double* XM = new double[2*N]; for (int i = 0; i < 2*N; i++) XM[i]=x(i);
+	getAdj(XM, N, M);
+
+	//free memory
+	delete []XM;
 }
 
 

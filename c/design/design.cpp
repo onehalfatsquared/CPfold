@@ -10,6 +10,7 @@
 #include <eigen3/Eigen/Dense>
 #include "point.h"
 #include "pair.h"
+#include "adjacency.h"
 #include "database.h"
 #include "bDynamics.h"
 #include "tpt.h"
@@ -186,7 +187,7 @@ double solveAbsorbProblem(int initial, double* kappaVals, Database* db, int* par
 	return p;
 }
 
-double computeGrad(int initial, int numInteractions, double* kappaVals, Database* db, 
+double computeGradHP(int initial, int numInteractions, double* kappaVals, Database* db, 
 								 int* particleTypes, double* Tconst, std::vector<int> ground, 
 								 std::vector<int> targets, double* g) {
 	//compute the gradient of the hitting probability in kappa
@@ -274,7 +275,7 @@ void hittingProbMaxTOYperms(int N, Database* db, int initial, int target) {
 		//optimization - steepest ascent
 		for (int it = 0; it < max_its; it++) {
 			//compute the gradient of kappa
-			hit = computeGrad(initial, numInteractions, kappaVals, db, particleTypes, 
+			hit = computeGradHP(initial, numInteractions, kappaVals, db, particleTypes, 
 												Tconst,  ground, targets, g);
 
 			//update kappa - set to 0.1 if it goes negative
@@ -367,7 +368,7 @@ void hittingProbMaxTOY(int N, Database* db, int initial, int target, bool useFil
 	//optimization - steepest ascent
 	for (int it = 0; it < max_its; it++) {
 		//compute the gradient of kappa
-		hit = computeGrad(initial, numInteractions, kappaVals, db, particleTypes, 
+		hit = computeGradHP(initial, numInteractions, kappaVals, db, particleTypes, 
 											Tconst,  ground, targets, g);
 
 		//update kappa - set to 0.1 if it goes negative
@@ -499,6 +500,144 @@ void constructSurfaceTOY(int N, Database* db, int initial, int target, bool useF
 	//free memory
 	delete []particleTypes; delete []kappaVals; delete []eq;
 	delete []T; delete []P;  delete []U; delete []Tconst;
+}
+
+
+
+
+
+/****************************************************/
+/*********** Some sampling stuff *******************/
+/****************************************************/
+
+int findMatrix(int N, double* X, Database* db) {
+	//find the adjacency matrix for state X in the database
+
+	//construct the AM
+	int* M = new int[N*N]; for (int i = 0; i < N*N; i++) M[i]=0;
+	getAdj(X,N,M);
+	//refine(N, X, M); //refines X and fills M
+	int* dbM = new int[N*N];
+
+	//define the return variable to be -1 if not found
+	int state = -1;
+
+	//loop over the database to search
+	for (int i = 0; i < db->getNumStates(); i++) {
+		extractAM(N, i, dbM, db);
+		bool S = checkSame(dbM, M, N);
+		if (S) { //found matrix
+			state = i;
+			break;
+		}
+	}
+
+	//free memory
+	delete []M; delete []dbM;
+
+	return state;
+}
+
+void estimateHittingProbability(int N, Database* db, int target) {
+	//perform brownian dynamics with file specified interactions to estimate
+	//previously determined hitting probabilities
+
+	//set parameters
+	int rho = RANGE;
+	double beta = BETA;
+	int method = 1;
+	int num_states = db->getNumStates();
+	int num_trajectories = 50;
+	int T_cut = 20;
+	double DT = 0.01;
+
+	//initialize interaction matrices
+	int* types = new int[N];
+	int numTypes = bd::readDesignFile(N, types);
+	int numInteractions = numTypes*(numTypes+1)/2;
+	double* kappa = new double[numInteractions];
+	bd::readKappaFile(numInteractions, kappa);
+	std::map<std::pair<int,int>, double> kmap; 
+	bd::makeKappaMap(numTypes, kappa, kmap);
+	int* P = new int[N*N];
+	double* E = new double[N*N];
+	bd::fillP(N, types, P, E, kmap);
+
+	//set the initial and final state storage
+	double* X0 = new double[DIMENSION*N];
+
+	//set potential type
+	int pot = POTENTIAL; //0 morse, 1 lj
+
+	//get ground states
+	std::vector<int> ground; //vector to hold all ground states
+	double* Tconst = new double[num_states*num_states];
+	createTransitionMatrix(Tconst, num_states, db, ground);
+	for (int i = 0; i < ground.size(); i++) {
+		std::cout << ground[i] << "\n";
+	}
+
+	//find all target states consistent with input target
+	std::vector<int> targets; 
+	findIsomorphic(N, num_states, target, db, targets);
+	for (int i = 0; i < targets.size(); i++) {
+		std::cout << targets[i] << "\n";
+	}
+
+	//construct a map from state to number of hits
+	std::map<int,double> hitSamples;
+	for (int i = 0; i < ground.size(); i++) {
+		hitSamples.insert(std::pair<int,double>(ground[i],0.0));
+	}
+
+	//loop over some number of trajectories to get first hit probs
+	int traj = 0;
+	while (traj < num_trajectories) {
+		setupChain(X0,N);
+
+		double T = 0; 
+		while (T < T_cut) {
+			//solve the sde, determine new state
+			solveSDE(X0, N, DT, rho, beta, E, P, method, pot);
+			T += DT;
+			int new_state = findMatrix(N, X0, db);
+
+			//check if new state is a ground state, if yes, increment and break
+			std::map<int, double>::iterator it = hitSamples.find(new_state); 
+			if (it != hitSamples.end()) {
+			  it->second ++;
+			  traj++;
+			  std::cout << "Finished trajectory " << traj << "\n";
+			  break;
+			}
+		}
+
+		if (T > T_cut) {
+			std::cout << "Did not find a ground state in the allotted time\n";
+		}
+	}
+
+	//normalize the empirical probabilities by num_trajectories
+	//get total probability for the target
+	double targetProb = 0;
+	for (auto it = hitSamples.begin(); it != hitSamples.end(); it++) {
+		it->second /= num_trajectories;
+		double prob = it->second;
+		int state = it->first;
+		printf("Ground State %d, Probability %f\n", state, prob);
+
+		std::vector<int>::iterator itV = std::find(targets.begin(), targets.end(), state);
+		if (itV != targets.end()) {
+			targetProb += prob;
+		}
+	}
+
+	printf("Total Target Probability: %f\n", targetProb);
+
+	//free memory
+	delete []types; delete []kappa; delete []P; delete []E; delete []X0;
+	delete []Tconst;
+
 }
 
 
