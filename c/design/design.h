@@ -5,6 +5,7 @@ namespace bd {
 class Database; 
 
 //general functions
+void getBondTypes(int N, int* particleTypes, Database* db, std::vector<int> targets);
 int setTypes(int N, int* particleTypes, int IC);
 double getStickyProduct(int N, int state,  Database* db, int* particleTypes, 
 												std::map<std::pair<int,int>,double> kappa);

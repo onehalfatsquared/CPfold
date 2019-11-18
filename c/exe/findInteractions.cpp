@@ -44,8 +44,8 @@ int main(int argc, char* argv[]) {
 	//bd::hittingProbMaxTOYperms(N, db, initial, target);
 	//bd::hittingProbMaxTOY(N, db, initial, target, useFile);
 	//bd::estimateHittingProbability(N, db, target);
-	//bd::eqProbMaxTOY(N, db, initial, target, useFile);
-	bd::eqProbMaxTOYperms(N, db, initial, target);
+	bd::eqProbMaxTOY(N, db, initial, target, useFile);
+	//bd::eqProbMaxTOYperms(N, db, initial, target);
 
 
 

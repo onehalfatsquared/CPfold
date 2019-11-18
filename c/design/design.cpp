@@ -24,6 +24,35 @@ namespace bd{
 /*********** General Functions    *******************/
 /****************************************************/
 
+void getBondTypes(int N, int* particleTypes, Database* db, std::vector<int> targets) {
+	//for each state in targets, check how many of each bond type each state has
+	//hard-coded for 2 types
+
+	for (int index = 0; index < targets.size(); index++) {
+		int AA = 0; int AB = 0; int BB = 0;
+		int state = targets[index];
+		for (int i = 0; i < N; i++) {
+			for (int j = i+2; j < N; j++) {
+				if ( (*db)[state].isInteracting(i,j,N)) {
+					int p1 = particleTypes[i];
+					int p2 = particleTypes[j];
+					if (p1 == 0 && p2 == 0) {
+						AA++;
+					}
+					else if (p1 == 1 && p2 == 1) {
+						BB++;
+					}
+					else {
+						AB++;
+					}
+				}
+			}
+		}
+
+		printf("State: %d, AA: %d, AB %d, BB %d\n", state, AA, AB, BB);
+	}
+}
+
 void allPerms(int N, std::deque<std::string>& perms) {
 	//generate all permutations of N 0s and 1s
 
@@ -44,7 +73,7 @@ void setTypes(int N, int* particleTypes, std::deque<std::string> perms, int perm
 	std::string p = perms[perm];
 	for (int i = 0; i < N; i++) {
 		particleTypes[i] = p[i]-'0';
-		std::cout << particleTypes[i] << "\n";
+		//std::cout << particleTypes[i] << "\n";
 	}
 }
 
@@ -132,7 +161,7 @@ void initKappaVals(int numInteractions, double* kappaVals) {
 	//initially set the valyes to all 1 for each interaction
 
 	for (int i = 0; i < numInteractions; i++) {
-		kappaVals[i] = 100;
+		kappaVals[i] = 3;
 	}
 }
 
@@ -385,6 +414,8 @@ void hittingProbMaxTOYperms(int N, Database* db, int initial, int target) {
 		initKappaVals(numInteractions, kappaVals);
 		double hit;
 
+		printf("Testing permutation %d of %d\n", p+1, num_perms);
+
 		//optimization - steepest ascent
 		for (int it = 0; it < max_its; it++) {
 			//compute the gradient of kappa
@@ -591,7 +622,7 @@ void eqProbMaxTOY(int N, Database* db, int initial, int target, bool useFile) {
 	int num_states = db->getNumStates(); 
 
 	//set iteration settings
-	int max_its = 60000; double tol = 1e-6; double step = 0.9;
+	int max_its = 120000; double tol = 1e-6; double step = 0.9;
 
 	//set up particle identity
 	int* particleTypes = new int[N];
@@ -615,12 +646,16 @@ void eqProbMaxTOY(int N, Database* db, int initial, int target, bool useFile) {
 		std::cout << targets[i] << "\n";
 	}
 
+	getBondTypes(N, particleTypes, db, targets);
+
+	return;
+
 	//init a gradient array
 	double* g = new double[numInteractions];
 
 	//get the permutation
-	//initKappaVals(numInteractions, kappaVals);
-	readKappaFile(numInteractions, kappaVals);
+	initKappaVals(numInteractions, kappaVals);
+	//readKappaFile(numInteractions, kappaVals);
 	double eq;
 
 	//optimization - steepest ascent
@@ -698,6 +733,8 @@ void eqProbMaxTOYperms(int N, Database* db, int initial, int target) {
 		initKappaVals(numInteractions, kappaVals);
 		double eq;
 
+		printf("Testing permutation %d of %d\n", p+1, num_perms);
+
 		//optimization - steepest ascent
 		for (int it = 0; it < max_its; it++) {
 			//compute the gradient of kappa
@@ -739,6 +776,13 @@ void eqProbMaxTOYperms(int N, Database* db, int initial, int target) {
 	delete []particleTypes; delete []kappaVals; 
 	delete []g; delete []permProb;
 }
+
+
+/****************************************************/
+/******** Transition Rate  Optimization   ***********/
+/****************************************************/
+
+
 
 
 /****************************************************/

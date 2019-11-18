@@ -15,6 +15,24 @@
 #include "../defines.h"
 namespace bd{
 
+double computeTransitionRate(int num_states, double* q, double* T, double* eq) {
+	//compute the average transition rate from A to B with committor fn
+
+	double S = 0; 
+	int i, j;
+
+	for (int entry = 0; entry < num_states*num_states; entry++) {
+		index2ij(entry, num_states, i, j);
+		if (i != j) {
+			S += eq[i] * T[entry] * (q[j]-q[i]) * (q[j]-q[i]);
+		}
+	}
+
+	S /= 2;
+
+	return S;
+}
+
 void computeFlux(int num_states, double* q, double* T, double* eq, double* flux) {
 	//compute the probability flux from generator, invariant measure, and committor
 
@@ -329,7 +347,7 @@ void performTPT(int initial, int target, Database* db, bool getIso) {
 	//perform tpt calculations from initial to target states
 
 	//parameters
-	double kappa = 2000.0;
+	double kappa = 200.0;
 	int N = db->getN();
 	int num_states = db->getNumStates();
 	std::vector<int> endStates;
@@ -383,6 +401,9 @@ void performTPT(int initial, int target, Database* db, bool getIso) {
 	double* flux = new double[num_states*num_states]; 
 	for (int i = 0; i < num_states*num_states; i++) flux[i] = 0;
 	computeFlux(num_states, q, T, eq, flux);
+
+	double R = computeTransitionRate(num_states, q, T, eq);
+	std::cout << "Trans rate " << R << "\n";
 
 	//make a graph structure of the database
 	Graph* g = makeGraph(db);
