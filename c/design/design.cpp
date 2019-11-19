@@ -595,6 +595,9 @@ void hittingProbMaxTOY(int N, Database* db, int initial, int target, bool useFil
 
 	std::cout << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << ' ' << "\n";
 
+	double R = getRate(initial, kappaVals, db, particleTypes, Tconst, targets);
+	printf("The average transition rate with this kappa is %f\n", R);
+
 
 	//free memory
 	delete []particleTypes; delete []kappaVals; 
@@ -827,7 +830,7 @@ void eqProbMaxTOYperms(int N, Database* db, int initial, int target) {
 
 	//print out the hitting probability with permutation
 	for (int p = 0; p < num_perms; p++) {
-		printf("Hitting Prob: %f, ID: %s\n", permProb[p], perms[p].c_str());
+		printf("Eq Prob: %f, ID: %s\n", permProb[p], perms[p].c_str());
 	}
 
 	//std::cout << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << ' ' << "\n";
@@ -1004,13 +1007,17 @@ void rateMaxTOY(int N, Database* db, int initial, int target, bool useFile) {
 
 	std::cout << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << ' ' << "\n";
 
+	double hp = solveAbsorbProblem(initial, kappaVals, db, particleTypes, Tconst, 
+																 ground, targets);
+	printf("The hitting probability at this kappa is %f\n", hp);
+
 
 	//free memory
 	delete []particleTypes; delete []kappaVals; 
 	delete []g; delete []Tconst;
 }
 
-void rateMaxTOYperms(int N, Database* db, int initial, int target, bool useFile) {
+void rateMaxTOYperms(int N, Database* db, int initial, int target) {
 	//use optimization scheme to get max rate for target in toy model
 	//uses the file for the permutation
 
@@ -1022,14 +1029,7 @@ void rateMaxTOYperms(int N, Database* db, int initial, int target, bool useFile)
 
 	//set up particle identity
 	int* particleTypes = new int[N];
-	int numTypes;
-	if (useFile) { //use the fle to set identities
-		numTypes = readDesignFile(N, particleTypes);
-	}
-	else { //uses the function to set identities
-		int IC = 1; 
-		numTypes = setTypes(N, particleTypes, IC);
-	}
+	int numTypes = 2;
 	int numInteractions = numTypes*(numTypes+1)/2;
 
 	//set up sticky parameter values

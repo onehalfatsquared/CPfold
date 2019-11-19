@@ -20,7 +20,6 @@
 
 
 
-
 int main(int argc, char* argv[]) {
 
 	//handle input
@@ -38,15 +37,23 @@ int main(int argc, char* argv[]) {
 	bd::Database* db = bd::readData(infile);
 	int N = db->getN();
 
-
 	//do stuff
+
+	//make surface of hitting probs w/ fixed AB interactions
 	//bd::constructSurfaceTOY(N, db, initial, target, useFile);
-	//bd::hittingProbMaxTOYperms(N, db, initial, target);
+
+	//do a maximization using the particle labels in file
 	//bd::hittingProbMaxTOY(N, db, initial, target, useFile);
-	//bd::estimateHittingProbability(N, db, target);
 	//bd::eqProbMaxTOY(N, db, initial, target, useFile);
-	//bd::rateMaxTOY(N, db, initial, target, useFile);
-	bd::eqProbMaxTOYperms(N, db, initial, target);
+	bd::rateMaxTOY(N, db, initial, target, useFile);
+
+	//do maximization over all distinct permutations of particles
+	//bd::hittingProbMaxTOYperms(N, db, initial, target);
+	//bd::eqProbMaxTOYperms(N, db, initial, target);
+	//bd::rateMaxTOYperms(N, db, initial, target);
+
+	//do some sampling
+	//bd::estimateHittingProbability(N, db, target);
 
 
 
