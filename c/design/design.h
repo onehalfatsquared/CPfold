@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <map>
+#include <deque>
 namespace bd { 
 class Database; 
 
@@ -13,6 +14,9 @@ void reweight(int N, int num_states, Database* db, int* particleTypes, double* e
 						  std::map<std::pair<int,int>,double> kappa);
 void initKappaVals(int numInteractions, double* kappaVals);
 void constructSurfaceTOY(int N, Database* db, int initial, int target, bool useFile);
+void allPerms(int N, std::deque<std::string>&);
+void distinctPerms(int N, std::deque<std::string>&);
+void checkPerm(std::string , std::deque<std::string>&);
 
 //hitting probability optimization
 double getHitProbability(int num_states, int initial, std::vector<int> targets, double* U);

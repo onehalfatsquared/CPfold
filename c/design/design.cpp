@@ -82,8 +82,6 @@ void checkPerm(std::string word, std::deque<std::string>& perms) {
 	}
 
 	perms.push_back(word);
-	std::cout << word << "\n";
-
 }
 
 void allPerms(int N, std::deque<std::string>& perms) {
@@ -463,7 +461,9 @@ void hittingProbMaxTOYperms(int N, Database* db, int initial, int target) {
 	double* g = new double[numInteractions];
 
 	//loop over all permutations
-	std::deque<std::string> perms; allPerms(N,perms);
+	std::deque<std::string> perms; 
+	//allPerms(N,perms);
+	distinctPerms(N, perms);
 	int num_perms = perms.size();
 	double* permProb = new double[num_perms];
 
@@ -782,7 +782,9 @@ void eqProbMaxTOYperms(int N, Database* db, int initial, int target) {
 	double* g = new double[numInteractions];
 
 	//loop over all permutations
-	std::deque<std::string> perms; distinctPerms(N,perms);
+	std::deque<std::string> perms; 
+	//allPerms(N, perms);
+	distinctPerms(N,perms);
 	int num_perms = perms.size();
 	double* permProb = new double[num_perms];
 
@@ -1059,7 +1061,9 @@ void rateMaxTOYperms(int N, Database* db, int initial, int target, bool useFile)
 	double* g = new double[numInteractions];
 
 	//loop over all permutations
-	std::deque<std::string> perms; allPerms(N,perms);
+	std::deque<std::string> perms; 
+	//allPerms(N,perms);
+	distinctPerms(N, perms);
 	int num_perms = perms.size();
 	double* permRate = new double[num_perms];
 
