@@ -34,6 +34,15 @@ double computeGradEQ(int initial, int numInteractions, double* kappaVals, Databa
 double getEqProb(int initial, double* kappaVals, Database* db, 
 								 int* particleTypes, std::vector<int> targets);
 
+//average transition rate optimization
+void rateMaxTOY(int N, Database* db, int initial, int target, bool useFile);
+void rateMaxTOYperms(int N, Database* db, int initial, int target);
+double computeGradRate(int initial, int numInteractions, double* kappaVals, Database* db, 
+								 int* particleTypes, double* Tconst, std::vector<int> targets, double* g);
+double getRate(int initial, double* kappaVals, Database* db, int* particleTypes, 
+							 double* Tconst, std::vector<int> targets);
+
+
 
 //sampling functions
 int findMatrix(int N, double* X, Database* db);

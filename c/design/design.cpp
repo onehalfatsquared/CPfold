@@ -53,8 +53,41 @@ void getBondTypes(int N, int* particleTypes, Database* db, std::vector<int> targ
 	}
 }
 
+void checkPerm(std::string word, std::deque<std::string>& perms) {
+	//check if reflected and swapped word is in perms, if not add it
+
+	//check reflections
+	std::string rword = word; std::reverse(rword.begin(), rword.end());
+	std::deque<std::string>::iterator itR = std::find(perms.begin(), perms.end(), rword);
+	if (itR != perms.end()) {
+		return;
+	}
+
+	//check swaps
+	std::string swapWord = word; 
+	for (int i = 0; i < word.length(); i++) {
+		if (word[i] == '0') swapWord[i] = '1';
+		if (word[i] == '1') swapWord[i] = '0';
+	}
+	std::deque<std::string>::iterator itS = std::find(perms.begin(), perms.end(), swapWord);
+	if (itS != perms.end()) {
+		return;
+	}
+
+	//check reflections of swaps
+	std::string rword2 = swapWord; std::reverse(rword2.begin(), rword2.end());
+	std::deque<std::string>::iterator itR2 = std::find(perms.begin(), perms.end(), rword2);
+	if (itR2 != perms.end()) {
+		return;
+	}
+
+	perms.push_back(word);
+	std::cout << word << "\n";
+
+}
+
 void allPerms(int N, std::deque<std::string>& perms) {
-	//generate all permutations of N 0s and 1s
+	//generate all perms of N 0s and 1s
 
 	std::string p0 = "0"; std::string p1 = "1";
 	perms.push_back(p0); perms.push_back(p1);
@@ -65,6 +98,32 @@ void allPerms(int N, std::deque<std::string>& perms) {
 		perms.push_back(f+p0); perms.push_back(f+p1);
 		elements += 1;
 	}
+}
+
+void distinctPerms(int N, std::deque<std::string>& perms) {
+	//generate all permutations of N 0s and 1s w/o reflections
+
+	//first generate all (N-1) length possibilities, fill preliminary deque
+	std::string p0 = "0"; std::string p1 = "1";
+	std::deque<std::string> prelim;
+	prelim.push_back(p0); prelim.push_back(p1);
+	int elements = 2;
+	int final_size = pow(2,N-1); 
+	while (elements < final_size) {
+		std::string f = prelim.front(); prelim.pop_front();
+		prelim.push_back(f+p0); prelim.push_back(f+p1);
+		elements += 1;
+	}
+
+	//next, add 0 and 1 to each (N-1) length permuation, only add it to perms
+	//if its reflection is not already in it
+	for (int i = 0; i < prelim.size(); i++) {
+		std::string f = prelim[i];
+		checkPerm(f+p0, perms); checkPerm(f+p1, perms);
+	}
+
+	printf("Found %ld distinct permutations\n", perms.size());
+
 }
 
 void setTypes(int N, int* particleTypes, std::deque<std::string> perms, int perm) {
@@ -575,7 +634,7 @@ double getEqProb(int initial, double* kappaVals, Database* db,
 		prob += eq[targets[i]];
 	}
 
-	//free memroy
+	//free memory
 	delete []eq;
 
 	return prob;
@@ -723,7 +782,7 @@ void eqProbMaxTOYperms(int N, Database* db, int initial, int target) {
 	double* g = new double[numInteractions];
 
 	//loop over all permutations
-	std::deque<std::string> perms; allPerms(N,perms);
+	std::deque<std::string> perms; distinctPerms(N,perms);
 	int num_perms = perms.size();
 	double* permProb = new double[num_perms];
 
@@ -782,6 +841,277 @@ void eqProbMaxTOYperms(int N, Database* db, int initial, int target) {
 /******** Transition Rate  Optimization   ***********/
 /****************************************************/
 
+double getRate(int initial, double* kappaVals, Database* db, int* particleTypes, 
+							 double* Tconst, std::vector<int> targets) {
+	//do re-weighting and get the transition rate to the target state
+
+	//get parameters from database
+	int N = db->getN();
+	int num_states = db->getNumStates();
+
+	//initialize the transition rate matrix
+	double* T = new double[num_states*num_states];
+	//copy Tconst into T
+	std::copy(Tconst, Tconst+num_states*num_states, T);
+
+	//init array for equilibrium distribution and compute it
+	double* eq = new double[num_states];
+	//declare and fill kappa map
+	std::map<std::pair<int,int>,double> kappa;
+	makeKappaMap(2, kappaVals, kappa);   
+	//do reweight to fill eq
+	reweight(N, num_states, db, particleTypes, eq, kappa);
+
+	//fill in transposed entries such that T satisfies detailed balance
+	satisfyDB(T, num_states, db, eq);
+
+	//fill in diagonal with negative sum of row entries
+	fillDiag(T, num_states);
+
+	//solve for the committor
+	//initialize committor in q
+	double* q = new double[num_states];
+	for (int i = 0; i < num_states; i++) q[i] = 0;
+	
+	//solve dirichlet problem for committor, q 
+	computeCommittor(q, T, num_states, initial, targets);
+
+	//get the average transition rate
+	double R = computeTransitionRate(num_states, q, T, eq);
+
+	//free memory 
+	delete []T; delete []eq; delete []q;
+
+	return R;
+}
+
+double computeGradRate(int initial, int numInteractions, double* kappaVals, Database* db, 
+								 int* particleTypes, double* Tconst, std::vector<int> targets, double* g) {
+	//compute the gradient of the avg transition rate in kappa
+	//returns the avg transition rate at current point
+
+	//declare parameters
+	double h = 1e-5; //step size for finite differences
+
+	//get the hitting probability at the current kappa vals
+	double f0 = getRate(initial, kappaVals, db, particleTypes, Tconst, targets);
+
+	//std::cout << "Hitting Prob = " << f0 << "\n";
+
+	//take a step h in each direction and compute new hitting prob
+	for (int k = 0; k < numInteractions; k++) {
+		if (kappaVals[k] < 0.011) {
+			g[k] = 0;
+		}
+		else {
+			kappaVals[k] += h;
+			double f1 = getRate(initial, kappaVals, db, particleTypes, Tconst, targets);
+			kappaVals[k] -= h;
+
+			g[k] = (f1 - f0) / h;
+		}
+	}
+
+	return f0;
+}
+
+
+
+void rateMaxTOY(int N, Database* db, int initial, int target, bool useFile) {
+	//use optimization scheme to get max rate for target in toy model
+	//uses the file for the permutation
+
+	//get database info
+	int num_states = db->getNumStates(); 
+
+	//set iteration settings
+	int max_its = 5000; double tol = 1e-10; double step = 0.9;
+
+	//set up particle identity
+	int* particleTypes = new int[N];
+	int numTypes;
+	if (useFile) { //use the fle to set identities
+		numTypes = readDesignFile(N, particleTypes);
+	}
+	else { //uses the function to set identities
+		int IC = 1; 
+		numTypes = setTypes(N, particleTypes, IC);
+	}
+	int numInteractions = numTypes*(numTypes+1)/2;
+
+	//set up sticky parameter values
+	double* kappaVals = new double[numInteractions];
+
+	//declare rate matrix
+	double* Tconst = new double[num_states*num_states]; //rate matrix - only forward entries
+
+	//init the rate matrix with zeros
+	for (int i = 0; i < num_states*num_states; i++) {
+		Tconst[i] = 0;
+	}
+
+	//get bonds->bonds+1 entries from mfpt estimates
+	std::vector<int> ground; //vector to hold all ground states
+	createTransitionMatrix(Tconst, num_states, db, ground);
+	for (int i = 0; i < ground.size(); i++) {
+		std::cout << ground[i] << "\n";
+	}
+
+	//find all target states consistent with input target
+	std::vector<int> targets; 
+	findIsomorphic(N, num_states, target, db, targets);
+	for (int i = 0; i < targets.size(); i++) {
+		std::cout << targets[i] << "\n";
+	}
+
+	//init a gradient array
+	double* g = new double[numInteractions];
+
+	//get the permutation
+	//initKappaVals(numInteractions, kappaVals);
+	readKappaFile(numInteractions, kappaVals);
+	double R;
+
+	//optimization - steepest ascent
+	for (int it = 0; it < max_its; it++) {
+		//compute the gradient of kappa
+		R = computeGradRate(initial, numInteractions, kappaVals, db, particleTypes, 
+											Tconst, targets, g);
+
+		//update kappa - set to 0.1 if it goes negative
+		for (int k = 0; k < numInteractions; k++) {
+			kappaVals[k] += step*g[k];
+			if (kappaVals[k] < 0) {
+				kappaVals[k] = 0.01;
+			}
+			else if (kappaVals[k] > 100) {
+				kappaVals[k] = 99.9;
+			}
+		}
+
+		//check for gradient tolerance
+		double res = 0;
+		for (int k = 0; k < numInteractions; k++) res += abs(g[k]);
+		std::cout << "Iteration " << it << ", Res: " << res << "\n";
+		if (res < tol) {
+			break;
+		}
+	}
+
+	std::cout << "Maximum Rate: " << R << "\n";
+
+	std::cout << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << ' ' << "\n";
+
+
+	//free memory
+	delete []particleTypes; delete []kappaVals; 
+	delete []g; delete []Tconst;
+}
+
+void rateMaxTOYperms(int N, Database* db, int initial, int target, bool useFile) {
+	//use optimization scheme to get max rate for target in toy model
+	//uses the file for the permutation
+
+	//get database info
+	int num_states = db->getNumStates(); 
+
+	//set iteration settings
+	int max_its = 5000; double tol = 1e-10; double step = 0.9;
+
+	//set up particle identity
+	int* particleTypes = new int[N];
+	int numTypes;
+	if (useFile) { //use the fle to set identities
+		numTypes = readDesignFile(N, particleTypes);
+	}
+	else { //uses the function to set identities
+		int IC = 1; 
+		numTypes = setTypes(N, particleTypes, IC);
+	}
+	int numInteractions = numTypes*(numTypes+1)/2;
+
+	//set up sticky parameter values
+	double* kappaVals = new double[numInteractions];
+
+	//declare rate matrix
+	double* Tconst = new double[num_states*num_states]; //rate matrix - only forward entries
+
+	//init the rate matrix with zeros
+	for (int i = 0; i < num_states*num_states; i++) {
+		Tconst[i] = 0;
+	}
+
+	//get bonds->bonds+1 entries from mfpt estimates
+	std::vector<int> ground; //vector to hold all ground states
+	createTransitionMatrix(Tconst, num_states, db, ground);
+	for (int i = 0; i < ground.size(); i++) {
+		std::cout << ground[i] << "\n";
+	}
+
+	//find all target states consistent with input target
+	std::vector<int> targets; 
+	findIsomorphic(N, num_states, target, db, targets);
+	for (int i = 0; i < targets.size(); i++) {
+		std::cout << targets[i] << "\n";
+	}
+
+	//init a gradient array
+	double* g = new double[numInteractions];
+
+	//loop over all permutations
+	std::deque<std::string> perms; allPerms(N,perms);
+	int num_perms = perms.size();
+	double* permRate = new double[num_perms];
+
+	for (int p = 0; p < num_perms; p++) {
+		//get the permutation
+		setTypes(N, particleTypes, perms, p);
+		initKappaVals(numInteractions, kappaVals);
+		double R;
+
+		printf("Testing permutation %d of %d\n", p+1, num_perms);
+
+		//optimization - steepest ascent
+		for (int it = 0; it < max_its; it++) {
+			//compute the gradient of kappa
+			R = computeGradRate(initial, numInteractions, kappaVals, db, particleTypes, 
+												Tconst, targets, g);
+
+			//update kappa - set to 0.1 if it goes negative
+			for (int k = 0; k < numInteractions; k++) {
+				kappaVals[k] += step*g[k];
+				if (kappaVals[k] < 0) {
+					kappaVals[k] = 0.01;
+				}
+				else if (kappaVals[k] > 100) {
+				kappaVals[k] = 99.9;
+				}
+			}
+
+			//check for gradient tolerance
+			double res = 0;
+			for (int k = 0; k < numInteractions; k++) res += abs(g[k]);
+			//std::cout << "Iteration " << it << ", Res: " << res << "\n";
+			if (res < tol) {
+				break;
+			}
+		}
+
+		permRate[p] = R;
+	}
+
+	//print out the hitting probability with permutation
+	for (int p = 0; p < num_perms; p++) {
+		printf("Average Rate: %f, ID: %s\n", permRate[p], perms[p].c_str());
+	}
+
+	//std::cout << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << ' ' << "\n";
+
+
+	//free memory
+	delete []particleTypes; delete []kappaVals; 
+	delete []g; delete []permRate; delete []Tconst;
+}
 
 
 
