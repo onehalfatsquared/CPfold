@@ -222,6 +222,26 @@ void initKappaVals(int numInteractions, double* kappaVals) {
 	}
 }
 
+void checkPositive(int numInteractions, double* kappaVals) {
+	//check if each kappa is positive, if not set to 0.01
+
+	for (int i = 0; i < numInteractions; i++) {
+		if (kappaVals[i] < 0) {
+			kappaVals[i] = 0.01;
+		}
+	}
+}
+
+void applyMax(int numInteractions, double* kappaVals, double M) {
+	//check if each kappa is below max, M. set to M-0.01 if not
+
+	for (int i = 0; i < numInteractions; i++) {
+		if (kappaVals[i] > M) {
+			kappaVals[i] = M-0.01;
+		}
+	}
+}
+
 void constructSurfaceTOY(int N, Database* db, int initial, int target, bool useFile) {
 	//plot the surface of hitting probabilities for initial to target states
 	//toy model where 3 sticky parameters is hard coded - 2 unique
@@ -986,13 +1006,9 @@ void rateMaxTOY(int N, Database* db, int initial, int target, bool useFile) {
 		//update kappa - set to 0.1 if it goes negative
 		for (int k = 0; k < numInteractions; k++) {
 			kappaVals[k] += step*g[k];
-			if (kappaVals[k] < 0) {
-				kappaVals[k] = 0.01;
-			}
-			else if (kappaVals[k] > 100) {
-				kappaVals[k] = 99.9;
-			}
 		}
+		checkPositive(numInteractions, kappaVals);
+		applyMax(numInteractions, kappaVals, 100);
 
 		//check for gradient tolerance
 		double res = 0;
@@ -1084,13 +1100,9 @@ void rateMaxTOYperms(int N, Database* db, int initial, int target) {
 			//update kappa - set to 0.1 if it goes negative
 			for (int k = 0; k < numInteractions; k++) {
 				kappaVals[k] += step*g[k];
-				if (kappaVals[k] < 0) {
-					kappaVals[k] = 0.01;
-				}
-				else if (kappaVals[k] > 100) {
-				kappaVals[k] = 99.9;
-				}
 			}
+			checkPositive(numInteractions, kappaVals);
+			applyMax(numInteractions, kappaVals, 100);
 
 			//check for gradient tolerance
 			double res = 0;
@@ -1118,6 +1130,191 @@ void rateMaxTOYperms(int N, Database* db, int initial, int target) {
 }
 
 
+/****************************************************/
+/*** Hit Prob Optimization w/ rate constraint   *****/
+/****************************************************/
+
+void applyRateConstraint(double R, double c, double r, int numInteractions, 
+												 double* gH, double* gR) {
+	//determine if the constraint needs to be applied and return appropriate gradient
+
+	if (R < c) {//constraint active
+		for (int i = 0; i < numInteractions; i++) gH[i] += r*gR[i];
+	}
+
+}
+
+
+double lineSearch(int initial, int numInteractions, double* kappaVals, Database* db, int* particleTypes, 
+									double* Tconst, std::vector<int> ground, std::vector<int> targets, 
+									double c, double r, double H, double R, double* g, double& step) {
+	//perform a line search to get a step size for the objective fn
+	//step is passed by reference, returns difference in obj fn
+
+	//define initial step size and reducing factor
+	double step0 = 2; double alpha = 0.5;
+
+	//see if the constraint needs to be applied
+	int apply = 0;
+	if (R < c) {
+		apply = 1;
+	}
+
+	//evaluate objective fn
+	double obj = H + r*apply*(R-c);
+
+	//printf("Original Objective: %f\n", obj);
+
+	//declare array for test kappaVals
+	double* testKappa = new double[numInteractions];
+
+
+	//perform line searches
+	double objNew; double delta = -1; 
+	int maxReductions = 20; 
+	for (int i = 0; i < maxReductions; i++) {
+		//get the new kappa values
+		step0 *= alpha;
+		for (int k = 0; k < numInteractions; k++) testKappa[k] = kappaVals[k] + g[k]*step0;
+		checkPositive(numInteractions, testKappa);
+
+		//evaluate the objective
+		double Hnew = solveAbsorbProblem(initial, testKappa, db, particleTypes, Tconst, 
+																	 ground, targets);
+		double Rnew = getRate(initial, testKappa, db, particleTypes, Tconst, targets);
+		int applyNew = 0;
+		if (Rnew < c) {
+			applyNew = 1;
+		}
+		objNew = Hnew + r*applyNew*(Rnew-c);
+		//printf("New obj: %f\n", objNew);
+
+		delta = objNew - obj;
+		if (delta > 0) {
+			break;
+		}
+	}
+
+	step = step0;
+
+
+	//free memory
+	delete []testKappa;
+
+	return delta;
+
+}
+
+void hittingProbMaxTOYc(int N, Database* db, int initial, int target, bool useFile) {
+	//use optimization scheme to get max hitting probability for target in toy model
+	//has constraint for transition rate
+	//uses the file for the permutation
+
+	//get database info
+	int num_states = db->getNumStates(); 
+
+	//set iteration settings
+	int max_its = 2000; double objTol = 1e-5; 
+	double c = 0.12; //rate must be > c (target dependent)
+	double r = 200;    //cost 
+
+	//set up particle identity
+	int* particleTypes = new int[N];
+	int numTypes;
+	if (useFile) { //use the fle to set identities
+		numTypes = readDesignFile(N, particleTypes);
+	}
+	else { //uses the function to set identities
+		int IC = 1; 
+		numTypes = setTypes(N, particleTypes, IC);
+	}
+	int numInteractions = numTypes*(numTypes+1)/2;
+
+	//set up sticky parameter values
+	double* kappaVals = new double[numInteractions];
+
+	//declare rate matrix
+	double* Tconst = new double[num_states*num_states]; //rate matrix - only forward entries
+
+	//init the rate matrix with zeros
+	for (int i = 0; i < num_states*num_states; i++) {
+		Tconst[i] = 0;
+	}
+
+	//get bonds->bonds+1 entries from mfpt estimates
+	std::vector<int> ground; //vector to hold all ground states
+	createTransitionMatrix(Tconst, num_states, db, ground);
+	for (int i = 0; i < ground.size(); i++) {
+		std::cout << ground[i] << "\n";
+	}
+
+	//find all target states consistent with input target
+	std::vector<int> targets; 
+	findIsomorphic(N, num_states, target, db, targets);
+	for (int i = 0; i < targets.size(); i++) {
+		std::cout << targets[i] << "\n";
+	}
+
+	//init a gradient array
+	double* gH = new double[numInteractions];
+	double* gR = new double[numInteractions];
+
+	//get the permutation
+	//initKappaVals(numInteractions, kappaVals);
+	readKappaFile(numInteractions, kappaVals);
+	double hit;
+	double R; 
+
+	//optimization - steepest ascent w/ line search
+	for (int it = 0; it < max_its; it++) {
+		//compute the gradient of hitting prob and rate
+		hit = computeGradHP(initial, numInteractions, kappaVals, db, particleTypes, 
+											Tconst,  ground, targets, gH);
+		R = computeGradRate(initial, numInteractions, kappaVals, db, particleTypes, 
+												Tconst, targets, gR);
+
+		double obj = hit;
+		if (R < c) {
+			obj += r*(R-c);
+		}
+
+
+		//apply the rate penalty if needed
+		applyRateConstraint(R, c, r, numInteractions, gH, gR);
+
+		//find a step size to give decrease in obj fn
+		double step = 0; 
+		double delta = lineSearch(initial, numInteractions, kappaVals, db, particleTypes, 
+															Tconst, ground, targets, c, r, hit, R, gH, step);
+
+		//take the step
+		for (int i = 0; i < numInteractions; i++) {
+			kappaVals[i] += step * gH[i];
+		}
+		checkPositive(numInteractions, kappaVals);
+
+		//output progress
+		printf("Iteration: %d, OBJ: %f, Delta: %f\n", it, obj, delta);
+
+
+		//check for objective function tolerance 
+		if (delta < objTol) {
+			break;
+		}
+	}
+
+	std::cout << "Maximum Probability: " << hit << "\n";
+
+	std::cout << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << ' ' << "\n";
+
+	double Rf = getRate(initial, kappaVals, db, particleTypes, Tconst, targets);
+	printf("The average transition rate with this kappa is %f\n", Rf);
+
+
+	//free memory
+	delete []particleTypes; delete []kappaVals; 
+	delete []Tconst; delete []gH; delete []gR; 
+}
 
 /****************************************************/
 /*********** Some sampling stuff *******************/

@@ -45,12 +45,15 @@ int main(int argc, char* argv[]) {
 	//do a maximization using the particle labels in file
 	//bd::hittingProbMaxTOY(N, db, initial, target, useFile);
 	//bd::eqProbMaxTOY(N, db, initial, target, useFile);
-	bd::rateMaxTOY(N, db, initial, target, useFile);
+	//bd::rateMaxTOY(N, db, initial, target, useFile);
 
 	//do maximization over all distinct permutations of particles
 	//bd::hittingProbMaxTOYperms(N, db, initial, target);
 	//bd::eqProbMaxTOYperms(N, db, initial, target);
 	//bd::rateMaxTOYperms(N, db, initial, target);
+
+	//constrained maximization
+	bd::hittingProbMaxTOYc(N, db, initial, target, useFile);
 
 	//do some sampling
 	//bd::estimateHittingProbability(N, db, target);

@@ -17,6 +17,8 @@ void constructSurfaceTOY(int N, Database* db, int initial, int target, bool useF
 void allPerms(int N, std::deque<std::string>&);
 void distinctPerms(int N, std::deque<std::string>&);
 void checkPerm(std::string , std::deque<std::string>&);
+void checkPositive(int numInteractions, double* kappaVals); 
+void applyMax(int numInteractions, double* kappaVals, double M);
 
 //hitting probability optimization
 double getHitProbability(int num_states, int initial, std::vector<int> targets, double* U);
@@ -45,6 +47,9 @@ double computeGradRate(int initial, int numInteractions, double* kappaVals, Data
 								 int* particleTypes, double* Tconst, std::vector<int> targets, double* g);
 double getRate(int initial, double* kappaVals, Database* db, int* particleTypes, 
 							 double* Tconst, std::vector<int> targets);
+
+//hitting probability optimization with rate constraints
+void hittingProbMaxTOYc(int N, Database* db, int initial, int target, bool useFile);
 
 
 
