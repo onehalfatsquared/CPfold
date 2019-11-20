@@ -50,6 +50,11 @@ double getRate(int initial, double* kappaVals, Database* db, int* particleTypes,
 
 //hitting probability optimization with rate constraints
 void hittingProbMaxTOYc(int N, Database* db, int initial, int target, bool useFile);
+double lineSearch(int initial, int numInteractions, double* kappaVals, Database* db, int* particleTypes, 
+									double* Tconst, std::vector<int> ground, std::vector<int> targets, 
+									double c, double r, double H, double R, double* g, double& step);
+void applyRateConstraint(double R, double c, double r, int numInteractions, 
+												 double* gH, double* gR); 
 
 
 

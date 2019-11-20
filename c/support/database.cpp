@@ -667,6 +667,7 @@ void updateFreq(Database* db, std::string filename) {
 	std::string id; double p; double e;
 	int counter = 0;
 
+	double Z = 0; //sum of eq probabilities to re-normalize at end
 
 	//read each line
 	while (in_str >> identity) {
@@ -689,6 +690,7 @@ void updateFreq(Database* db, std::string filename) {
 			//return;
 		}
 		else {
+			Z += p;
 			(*db)[state].freq = p;
 			printf("State %d in file matches state %d in database. Bonds = %d, New freq = %f\n",
 				      counter, state, (*db)[state].getBonds(), p);
@@ -697,13 +699,31 @@ void updateFreq(Database* db, std::string filename) {
 		}
 	}
 
-	//loop over found to out if any states were missed
-	printf("The following states were not found:\n");
+
+	//loop over found to see if any states were missed
+	printf("The following states were not found in eq file:\n");
 	for (int i = 0; i < num_states; i++) {
-		if (!found[i]) {
+		if (!found[i]) { //not found, set freq to 0
 			std::cout << i << ", Num Bonds: " << (*db)[i].getBonds() << "\n";
+			(*db)[i].freq = 0;
+		}
+		else { //found set freq to new normalized values
+			(*db)[i].freq /= Z;
 		}
 	}
+
+	printf("Eq probability of found states sums to %f. Re-normalizing.\n", Z);
+
+	//print out all states with 12 bonds to see if these are the missed ones
+	if (N == 7) {
+		printf("The following states have 12 bonds:\n");
+		for (int i = 0; i < num_states; i++) {
+			if ((*db)[i].getBonds() == 12) {
+				std::cout << i << "\n";
+			}
+		}
+	}
+
 
 	//delete memory
 	delete []found;
