@@ -45,6 +45,8 @@ void rateMaxTOY(int N, Database* db, int initial, int target, bool useFile);
 void rateMaxTOYperms(int N, Database* db, int initial, int target);
 double computeGradRate(int initial, int numInteractions, double* kappaVals, Database* db, 
 								 int* particleTypes, double* Tconst, std::vector<int> targets, double* g);
+double getRateTPT(int initial, double* kappaVals, Database* db, int* particleTypes, 
+							 double* Tconst, std::vector<int> targets);
 double getRate(int initial, double* kappaVals, Database* db, int* particleTypes, 
 							 double* Tconst, std::vector<int> targets);
 

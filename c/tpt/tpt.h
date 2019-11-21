@@ -35,13 +35,15 @@ void createProbabilityMatrix(double* T, int num_states, double* P);
 void computeCommittor(double* q, double* T, int num_states, int initial, std::vector<int>);
 //compute the probability flux from committor
 void computeFlux(int num_states, double* q, double* T, double* eq, double* flux);
-//compute the average transition rate from A to B
-double computeTransitionRate(int num_states, double* q, double* T, double* eq);
+//compute the average transition rate from A to B on reactive trajectories
+double computeTransitionRateTPT(int num_states, double* q, double* T, double* eq);
 //compute free energy of each cluster - from configurational partition fn
 void computeFreeEnergy(int num_states, double* Z, double* F); 
 //compute hitting probabilities for end states in reversible case
 void computeHittingProbability(double* P, int num_states, std::vector<int> endStates, 
 															 double* U);
+//compute the mfpt from worm to target states
+void computeMFPTs(int num_states, double* T, std::vector<int> targets, double* m);
 
 
 

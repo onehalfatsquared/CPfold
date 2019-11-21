@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
 	//bd::constructSurfaceTOY(N, db, initial, target, useFile);
 
 	//do a maximization using the particle labels in file
-	bd::hittingProbMaxTOY(N, db, initial, target, useFile);
+	//bd::hittingProbMaxTOY(N, db, initial, target, useFile);
 	//bd::eqProbMaxTOY(N, db, initial, target, useFile);
 	//bd::rateMaxTOY(N, db, initial, target, useFile);
 
@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
 	//bd::hittingProbMaxTOYc(N, db, initial, target, useFile);
 
 	//do some sampling
-	//bd::estimateHittingProbability(N, db, target);
+	bd::estimateHittingProbability(N, db, target);
 
 
 

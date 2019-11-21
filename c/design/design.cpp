@@ -868,7 +868,44 @@ void eqProbMaxTOYperms(int N, Database* db, int initial, int target) {
 
 double getRate(int initial, double* kappaVals, Database* db, int* particleTypes, 
 							 double* Tconst, std::vector<int> targets) {
-	//do re-weighting and get the transition rate to the target state
+	//get transition rate as 1/mfpt to targets
+
+	//get parameters from database
+	int N = db->getN();
+	int num_states = db->getNumStates();
+
+	//initialize the transition rate matrix
+	double* T = new double[num_states*num_states];
+	//copy Tconst into T
+	std::copy(Tconst, Tconst+num_states*num_states, T);
+
+	//init array for equilibrium distribution and compute it
+	double* eq = new double[num_states];
+	//declare and fill kappa map
+	std::map<std::pair<int,int>,double> kappa;
+	makeKappaMap(2, kappaVals, kappa);   
+	//do reweight to fill eq
+	reweight(N, num_states, db, particleTypes, eq, kappa);
+
+	//fill in transposed entries such that T satisfies detailed balance
+	satisfyDB(T, num_states, db, eq);
+
+	//fill in diagonal with negative sum of row entries
+	fillDiag(T, num_states);
+
+	//construct array of mfpts and caluclate it
+	double* m = new double[num_states];
+	computeMFPTs(num_states, T, targets, m);
+	double mfpt = m[1];
+
+	//free memory
+	delete []T; delete []eq; delete []m;
+
+	return 1.0/mfpt;
+}
+double getRateTPT(int initial, double* kappaVals, Database* db, int* particleTypes, 
+							 double* Tconst, std::vector<int> targets) {
+	//do re-weighting and get the transition rate to the target state - reactive traj
 
 	//get parameters from database
 	int N = db->getN();
@@ -902,7 +939,7 @@ double getRate(int initial, double* kappaVals, Database* db, int* particleTypes,
 	computeCommittor(q, T, num_states, initial, targets);
 
 	//get the average transition rate
-	double R = computeTransitionRate(num_states, q, T, eq);
+	double R = computeTransitionRateTPT(num_states, q, T, eq);
 
 	//free memory 
 	delete []T; delete []eq; delete []q;
@@ -950,7 +987,7 @@ void rateMaxTOY(int N, Database* db, int initial, int target, bool useFile) {
 	int num_states = db->getNumStates(); 
 
 	//set iteration settings
-	int max_its = 5000; double tol = 1e-10; double step = 0.9;
+	int max_its = 3000; double tol = 1e-5; double step = 0.9;
 
 	//set up particle identity
 	int* particleTypes = new int[N];
@@ -1215,7 +1252,7 @@ void hittingProbMaxTOYc(int N, Database* db, int initial, int target, bool useFi
 
 	//set iteration settings
 	int max_its = 2000; double objTol = 1e-5; 
-	double c = 0.12; //rate must be > c (target dependent)
+	double c = 0.5; //rate must be > c (target dependent)
 	double r = 200;    //cost 
 
 	//set up particle identity
@@ -1400,6 +1437,9 @@ void estimateHittingProbability(int N, Database* db, int target) {
 		hitSamples.insert(std::pair<int,double>(ground[i],0.0));
 	}
 
+	//vector of hitting times
+	std::vector<double> avgT;
+
 	//loop over some number of trajectories to get first hit probs
 	int traj = 0;
 	while (traj < num_trajectories) {
@@ -1417,7 +1457,12 @@ void estimateHittingProbability(int N, Database* db, int target) {
 			if (it != hitSamples.end()) {
 			  it->second ++;
 			  traj++;
-			  std::cout << "Finished trajectory " << traj << "\n";
+			  printf("Finished trajectory %d. Hit took %f seconds\n", traj, T);
+			  printCluster(X0, N);
+			  std::vector<int>::iterator itV = std::find(targets.begin(), targets.end(), new_state);
+				if (itV != targets.end()) {
+					avgT.push_back(T);
+				}
 			  break;
 			}
 		}
@@ -1443,6 +1488,15 @@ void estimateHittingProbability(int N, Database* db, int target) {
 	}
 
 	printf("Total Target Probability: %f\n", targetProb);
+
+	//get average time for transitions
+	double S = 0; 
+	for (int i = 0; i < avgT.size(); i++) {
+		S += avgT[i];
+	}
+	S /= avgT.size();
+
+	printf("Average transition time: %f\n", S);
 
 	//free memory
 	delete []types; delete []kappa; delete []P; delete []E; delete []X0;

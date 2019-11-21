@@ -5,6 +5,7 @@
 #include <string.h>
 #include <vector>
 #include <eigen3/Eigen/Dense>
+#include <eigen3/Eigen/QR>
 #include "point.h"
 #include "database.h"
 #include "bDynamics.h"
@@ -15,7 +16,43 @@
 #include "../defines.h"
 namespace bd{
 
-double computeTransitionRate(int num_states, double* q, double* T, double* eq) {
+void computeMFPTs(int num_states, double* T, std::vector<int> targets, double* m) {
+	//compute the mean first passage time of the worm to target state
+
+	//initialize the matrix and vectors
+	Eigen::MatrixXd QM(num_states,num_states); 
+	Eigen::VectorXd b(num_states); 
+	Eigen::VectorXd tau(num_states);      
+
+	//fill the matrix and RHS appropriately
+	//copy T into TM, fill b with zeros
+	for (int i = 0; i < num_states*num_states; i++) {
+		QM(i) = T[i]; 
+	}
+	b.fill(-1.0);
+
+	//target
+	for (int ind = 0; ind < targets.size(); ind++) {
+		int target = targets[ind];
+		for (int j = 0; j < num_states; j++) {
+			QM(target,j) = 0; QM(j,target) = 0;
+		}
+		b(target) = 0;
+	}
+
+	//solve the linear system
+	tau = QM.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(b);
+	//std::cout << tau << "\n";
+
+	//store solution in m
+	for (int i = 0; i < tau.size(); i++) {
+		m[i] = abs(tau(i));
+	}
+
+
+}
+
+double computeTransitionRateTPT(int num_states, double* q, double* T, double* eq) {
 	//compute the average transition rate from A to B with committor fn
 
 	double S = 0; 
@@ -347,7 +384,7 @@ void performTPT(int initial, int target, Database* db, bool getIso) {
 	//perform tpt calculations from initial to target states
 
 	//parameters
-	double kappa = 200.0;
+	double kappa = 6.0;
 	int N = db->getN();
 	int num_states = db->getNumStates();
 	std::vector<int> endStates;
@@ -402,8 +439,11 @@ void performTPT(int initial, int target, Database* db, bool getIso) {
 	for (int i = 0; i < num_states*num_states; i++) flux[i] = 0;
 	computeFlux(num_states, q, T, eq, flux);
 
-	double R = computeTransitionRate(num_states, q, T, eq);
+	double R = computeTransitionRateTPT(num_states, q, T, eq);
 	std::cout << "Trans rate " << R << "\n";
+	double* m = new double[num_states];
+	computeMFPTs(num_states, T, targets, m);
+	std::cout << 1/m[1] << "\n";
 
 	//make a graph structure of the database
 	Graph* g = makeGraph(db);
@@ -414,7 +454,7 @@ void performTPT(int initial, int target, Database* db, bool getIso) {
 	//free the memory
 	delete []T; delete []q; delete []eq; delete []flux;
 	delete []Z; delete []F; 
-	delete g;
+	delete g; delete []m;
 
 }
 
