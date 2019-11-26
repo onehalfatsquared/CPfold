@@ -17,7 +17,9 @@
 namespace bd{
 
 void computeMFPTs(int num_states, double* T, std::vector<int> targets, double* m) {
-	//compute the mean first passage time of the worm to target state
+	//compute the mean first passage time of every state to targets
+	//solves A*tau = -1, where is A is rate matrix with rows/cols of the targets
+	//zero'd out (removed)
 
 	//find number of non-zero'd entries
 	int num_targets = targets.size();
