@@ -41,6 +41,7 @@ int main(int argc, char* argv[]) {
 
 	//make surface of hitting probs w/ fixed AB interactions
 	//bd::constructSurfaceTOY(N, db, initial, target, useFile);
+	bd::constructScatterTOY(N, db, initial, target, useFile);
 
 	//do a maximization using the particle labels in file
 	//bd::hittingProbMaxTOY(N, db, initial, target, useFile);
@@ -56,7 +57,7 @@ int main(int argc, char* argv[]) {
 	//bd::hittingProbMaxTOYc(N, db, initial, target, useFile);
 
 	//do some sampling
-	bd::estimateHittingProbability(N, db, target);
+	//bd::estimateHittingProbability(N, db, target);
 
 
 

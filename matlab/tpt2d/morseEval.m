@@ -9,7 +9,8 @@ function u = morseEval(particles,rho,E,N,P)
                 %Morse interaction
                 r = euDist(particles,i,j);
                 if P(min(i,j),max(i,j))==1
-                    u = u + morseD(r,rho,E(min(i,j),max(i,j))); 
+                    Y = exp(-rho*(r-1));
+                    u = u + E(i,j)*(Y*Y-2*Y); 
                 else
                     %steric repulsion
                     if r<1

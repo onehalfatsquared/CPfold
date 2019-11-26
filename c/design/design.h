@@ -13,12 +13,15 @@ double getStickyProduct(int N, int state,  Database* db, int* particleTypes,
 void reweight(int N, int num_states, Database* db, int* particleTypes, double* eq,
 						  std::map<std::pair<int,int>,double> kappa);
 void initKappaVals(int numInteractions, double* kappaVals);
-void constructSurfaceTOY(int N, Database* db, int initial, int target, bool useFile);
 void allPerms(int N, std::deque<std::string>&);
 void distinctPerms(int N, std::deque<std::string>&);
 void checkPerm(std::string , std::deque<std::string>&);
 void checkPositive(int numInteractions, double* kappaVals); 
 void applyMax(int numInteractions, double* kappaVals, double M);
+
+//generic plots
+void constructSurfaceTOY(int N, Database* db, int initial, int target, bool useFile);
+void constructScatterTOY(int N, Database* db, int initial, int target, bool useFile);
 
 //hitting probability optimization
 double getHitProbability(int num_states, int initial, std::vector<int> targets, double* U);

@@ -5,7 +5,7 @@
 #include <string.h>
 #include <vector>
 #include <eigen3/Eigen/Dense>
-#include <eigen3/Eigen/QR>
+//#include <eigen3/Eigen/QR>
 #include "point.h"
 #include "database.h"
 #include "bDynamics.h"
@@ -19,37 +19,52 @@ namespace bd{
 void computeMFPTs(int num_states, double* T, std::vector<int> targets, double* m) {
 	//compute the mean first passage time of the worm to target state
 
-	//initialize the matrix and vectors
-	Eigen::MatrixXd QM(num_states,num_states); 
-	Eigen::VectorXd b(num_states); 
-	Eigen::VectorXd tau(num_states);      
+	//find number of non-zero'd entries
+	int num_targets = targets.size();
+	int M = num_states - num_targets;
+	Eigen::MatrixXd QM(M,M); 
+	Eigen::VectorXd b(M); 
+	Eigen::VectorXd tau(M);  
 
-	//fill the matrix and RHS appropriately
-	//copy T into TM, fill b with zeros
-	for (int i = 0; i < num_states*num_states; i++) {
-		QM(i) = T[i]; 
+	//construct a boolean array to check if a row should be skipped
+	bool* skip = new bool[num_states]; for (int i = 0; i < num_states; i++) skip[i] = false;
+	for (int i = 0; i < num_targets; i++) skip[targets[i]] = true;
+
+	//fill in transition matrix for all non-skipped rows/cols
+	int i_index = 0;
+	for (int i = 0; i < num_states; i++) {
+		if (!skip[i]) {
+			int j_index = 0;
+			for (int j = 0; j < num_states; j++) {
+				if (!skip[j]) {
+					QM(i_index, j_index) = T[toIndex(i,j,num_states)];
+					j_index++;
+				}
+			}
+			i_index++;
+		}
 	}
+
+	//fill b with -1
 	b.fill(-1.0);
 
-	//target
-	for (int ind = 0; ind < targets.size(); ind++) {
-		int target = targets[ind];
-		for (int j = 0; j < num_states; j++) {
-			QM(target,j) = 0; QM(j,target) = 0;
+	//solve for tau
+	tau = QM.lu().solve(b);
+
+	//store solution in m - re-add lost zeros
+	int lostIndex = 0;
+	for (int i = 0; i < num_states; i++) {
+		if (!skip[i]) {
+			m[i] = abs(tau(lostIndex));
+			lostIndex++;
 		}
-		b(target) = 0;
+		else {
+			m[i] = 0;
+		}
 	}
 
-	//solve the linear system
-	tau = QM.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(b);
-	//std::cout << tau << "\n";
-
-	//store solution in m
-	for (int i = 0; i < tau.size(); i++) {
-		m[i] = abs(tau(i));
-	}
-
-
+	//free memory
+	delete []skip;
 }
 
 double computeTransitionRateTPT(int num_states, double* q, double* T, double* eq) {

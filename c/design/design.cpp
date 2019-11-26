@@ -344,6 +344,104 @@ void constructSurfaceTOY(int N, Database* db, int initial, int target, bool useF
 	delete []T; delete []P;  delete []U; delete []Tconst;
 }
 
+void constructScatterTOY(int N, Database* db, int initial, int target, bool useFile) {
+	//Construct a scatter plot of avg rate vs equilibrium probability using 
+	//a 3d grid of kappa values
+
+	//get database info
+	int num_states = db->getNumStates(); 
+
+	//set up particle identity
+	int* particleTypes = new int[N];
+	int numTypes;
+	if (useFile) { //use the fle to set identities
+		numTypes = readDesignFile(N, particleTypes);
+	}
+	else { //uses the function to set identities
+		int IC = 1; 
+		numTypes = setTypes(N, particleTypes, IC);
+	}
+	int numInteractions = numTypes*(numTypes+1)/2;
+
+	//set up sticky parameter values
+	double* kappaVals = new double[numInteractions];
+	initKappaVals(numInteractions, kappaVals);
+
+	//declare rate matrix, probability transition matrix, equilibrium measure
+	double* T = new double[num_states*num_states]; //rate matrix
+	double* Tconst = new double[num_states*num_states]; //rate matrix - only forward entries
+	double* eq = new double[num_states];           //equilibrium measure
+	double* m = new double[num_states];            //mfpts 
+
+	//init the rate matrix with zeros
+	for (int i = 0; i < num_states*num_states; i++) {
+		Tconst[i] = 0;
+	}
+
+	//get bonds->bonds+1 entries from mfpt estimates
+	std::vector<int> ground; //vector to hold all ground states
+	createTransitionMatrix(Tconst, num_states, db, ground);
+	for (int i = 0; i < ground.size(); i++) {
+		std::cout << ground[i] << "\n";
+	}
+
+	//find all target states consistent with input target
+	std::vector<int> targets; 
+	findIsomorphic(N, num_states, target, db, targets);
+	for (int i = 0; i < targets.size(); i++) {
+		std::cout << targets[i] << "\n";
+	}
+
+	//declare the kappa mapping
+	std::map<std::pair<int,int>,double> kappa;
+
+	//declare outfile
+	std::ofstream ofile;
+	ofile.open("rateEqScatter.txt");
+
+	//do hitting probability calculation
+	int M = 20; //num points in each dimension
+	for (int x = 0; x < M; x++) {
+		for (int y = 0; y < M; y++) {
+			for (int z = 0; z < M; z++) {
+				//set kappa
+				kappaVals[0] = 0.5+ (double)x / 1; 
+				kappaVals[1] = 0.5+ (double)y / 1; 
+				kappaVals[2] = 0.5+ (double)x / 1; 
+
+				//make the map
+				makeKappaMap(2, kappaVals, kappa);
+				//std::cout << kappa[{0,0}] << ' ' << kappa[{1,0}] << ' ' << kappa[{1,1}] << "\n";
+				//do rewieght
+				reweight(N, num_states, db, particleTypes, eq, kappa);
+				//get eq prob
+				double eqProb = getEqProb(initial, kappaVals, db, particleTypes, targets);
+				//copy Tconst into T
+				std::copy(Tconst, Tconst+num_states*num_states, T);
+				//fill in transposed entries such that T satisfies detailed balance
+				satisfyDB(T, num_states, db, eq);
+				//fill in diagonal with negative sum of row entries
+				fillDiag(T, num_states);
+				//get the transition rate
+				computeMFPTs(num_states, T, targets, m);
+
+
+				//output to file
+				ofile << eqProb << ' ' << 1/m[initial] << "\n";
+
+			}
+		}
+		std::cout << x << "\n";
+	}
+
+	//close file
+	ofile.close();
+
+	//free memory
+	delete []particleTypes; delete []kappaVals; delete []eq;
+	delete []T; delete []Tconst; delete []m;
+}
+
 /****************************************************/
 /******** Hitting Probability Optimization   ********/
 /****************************************************/
