@@ -145,5 +145,6 @@ void printProbs(Database* db1, Database* db2);
 //update database entries from outside data
 void updateFreq(Database* db, std::string filename);
 int findMatch(std::string identity, Database* db);
+void updateHyperstatic(Database* db, double beta, double E); 
 
 }

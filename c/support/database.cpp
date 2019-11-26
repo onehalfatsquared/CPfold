@@ -730,6 +730,64 @@ void updateFreq(Database* db, std::string filename) {
 
 }
 
+void updateHyperstatic(Database* db, double beta, double E) {
+	//The equilibrium probability for hyperstatic clusters needs to be updated
+	//differently from the others
+	//computes eq prob from theory and re-normalizes all states
+
+	//get database info
+	int N = db->getN();
+	int num_states = db->getNumStates();
+
+	// N = 7, just the 12 bond flower states
+	if (N == 7) {
+		//find index of all flower states, count them,  and compute sum eqProb of 11 bond states
+		std::vector<int> flowers;
+		double A = 0; 
+		int num_flowers = 0;
+		double totalProb = 0;
+		for (int i = 0; i < num_states; i++) {
+			totalProb += (*db)[i].getFrequency();
+			int b = (*db)[i].getBonds();
+			if (b == 12) {
+				flowers.push_back(i);
+				num_flowers++;
+			}
+			else if (b == 11) {
+				A += (*db)[i].getFrequency();
+			}
+		}
+
+		//get the eq prob of the flower conditional on rigidity
+		double gamma = exp(beta*E);
+		double c = 0.027;  //could change?
+		double px = c*gamma/(1+c*gamma);
+		double eqFlower = px/(1-px) * A;
+		double eqPerFlower = eqFlower / num_flowers;
+
+		totalProb += eqFlower;
+
+		//update the database with new eq probs for the flower
+		for (int i = 0; i < num_states; i++) {
+			int b = (*db)[i].getBonds();
+			if (b == 12) {
+				(*db)[i].freq = eqPerFlower / totalProb;
+			}
+			else {
+				(*db)[i].freq /= totalProb;
+			}
+		}
+
+
+
+
+
+
+
+	}
+
+}
+
 
 
 }
