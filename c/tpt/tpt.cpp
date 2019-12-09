@@ -249,8 +249,8 @@ void createMeasure(int num_states, Database* db, double* eq, double kappa) {
 		int b = (*db)[i].getBonds();
 		double prob = (*db)[i].getFrequency();
 
-		//new eq prob is prob*(ratio)^(beta*bonds)
-		double new_prob = prob*pow(stickyRatio,beta*b);
+		//new eq prob is prob*(ratio)^(bonds)
+		double new_prob = prob*pow(stickyRatio,b);
 
 		//increment Z and add to array
 		Z += new_prob;

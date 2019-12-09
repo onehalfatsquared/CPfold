@@ -178,6 +178,46 @@ double getStickyProduct(int N, int state,  Database* db, int* particleTypes,
 	return stickyProd;
 }
 
+void rewieght7(int N, int num_states, Database* db, int* particleTypes, double* eq,
+						  std::map<std::pair<int,int>,double> kappa) {
+	//reweight in the case of 7 particles
+
+	double kap0 = KAP;                 //sticky parameter for initial measurement
+	double beta = BETA;                //inverse temp
+	double r = RANGE;                  //range of potential
+	double E = stickyNewton(8.0, r, kap0, beta); //energy corresponding to kap0
+	double a = 2*r*r*E;                // parameter multiplying rigidity matrix
+	double alpha2 = sqrt(beta*a);      //alpha^2 parameter
+
+	double Z = 0;                     //normalizing constant for eq
+
+	//loop over states, get the equilibrium measure entry
+	for (int i = 0; i < num_states; i++) {
+		//get initial eq prob and number of bonds
+		int b = (*db)[i].getBonds();
+		double prob = (*db)[i].getFrequency();
+
+		//get the denominator of reweight factor - KAP^b_i
+		double denom = pow(KAP, b);
+
+		//get the numerator of the re-weight factor
+		double num = getStickyProduct(N, i, db, particleTypes, kappa); 
+
+		//compute the new probability
+		double new_prob = prob * num / denom;
+
+		//debug line for corect reweight
+		//printf("Test: Old %f, New %f\n", prob, new_prob);
+
+		//increment Z and add to array
+		Z += new_prob;
+		eq[i] = new_prob;
+	}
+
+	//re-normalize
+	for (int i = 0; i < num_states; i++) eq[i] /= Z;
+
+}
 void reweight(int N, int num_states, Database* db, int* particleTypes, double* eq,
 						  std::map<std::pair<int,int>,double> kappa) {
 	//perform the re-weighting of the eq measure for new sticky params
@@ -194,10 +234,10 @@ void reweight(int N, int num_states, Database* db, int* particleTypes, double* e
 		double prob = (*db)[i].getFrequency();
 
 		//get the denominator of reweight factor - KAP^b_i
-		double denom = pow(KAP, b*BETA);
+		double denom = pow(KAP, b);
 
 		//get the numerator of the re-weight factor
-		double num = pow(getStickyProduct(N, i, db, particleTypes, kappa),BETA); 
+		double num = getStickyProduct(N, i, db, particleTypes, kappa); 
 
 		//compute the new probability
 		double new_prob = prob * num / denom;
@@ -399,15 +439,26 @@ void constructScatterTOY(int N, Database* db, int initial, int target, bool useF
 	std::ofstream ofile;
 	ofile.open("rateEqScatter.txt");
 
+	//construct an array of kappa vals to use
+	//multiples of some base value
+	int M = 30; //num points in each dimension
+	double base = 0.25; //smallest kappa to use
+	double mult = 1.3; //multiplies base to get next value
+	double* Ks = new double[M]; Ks[0] = base;
+	for (int i = 1; i < M; i++) {
+		Ks[i] = Ks[i-1] * mult;
+	}
+
 	//do hitting probability calculation
-	int M = 20; //num points in each dimension
 	for (int x = 0; x < M; x++) {
 		for (int y = 0; y < M; y++) {
 			for (int z = 0; z < M; z++) {
 				//set kappa
-				kappaVals[0] = 0.5+ (double)x / 1; 
-				kappaVals[1] = 0.5+ (double)y / 1; 
-				kappaVals[2] = 0.5+ (double)x / 1; 
+				kappaVals[0] = Ks[x];
+				kappaVals[1] = Ks[y];
+				kappaVals[2] = Ks[z];
+
+				//std::cout << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << "\n";
 
 				//make the map
 				makeKappaMap(2, kappaVals, kappa);
@@ -439,7 +490,7 @@ void constructScatterTOY(int N, Database* db, int initial, int target, bool useF
 
 	//free memory
 	delete []particleTypes; delete []kappaVals; delete []eq;
-	delete []T; delete []Tconst; delete []m;
+	delete []T; delete []Tconst; delete []m; delete []Ks;
 }
 
 /****************************************************/
