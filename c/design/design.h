@@ -12,6 +12,13 @@ double getStickyProduct(int N, int state,  Database* db, int* particleTypes,
 												std::map<std::pair<int,int>,double> kappa);
 void reweight(int N, int num_states, Database* db, int* particleTypes, double* eq,
 						  std::map<std::pair<int,int>,double> kappa);
+void reweight7(int N, int num_states, Database* db, int* particleTypes, double* eq,
+						  std::map<std::pair<int,int>,double> kappa);
+void getReweightMaps(std::map<std::pair<int,int>,double> kappa,
+										 std::map<std::pair<int,int>,double>& a_new,
+										 std::map<std::pair<int,int>,double>& gamma_new); 
+double getPdet(int N, int state, Database* db, int* particleTypes, 
+							 double a, std::map<std::pair<int,int>,double> a_new);
 void initKappaVals(int numInteractions, double* kappaVals);
 void allPerms(int N, std::deque<std::string>&);
 void distinctPerms(int N, std::deque<std::string>&);

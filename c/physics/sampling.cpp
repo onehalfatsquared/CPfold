@@ -5,6 +5,7 @@
 #include "bDynamics.h"
 #include "sampling.h"
 #include "database.h"
+#include "../defines.h"
 #include <omp.h>
 namespace bd{
 
@@ -273,8 +274,13 @@ void estimateMFPT(int N, int state, Database* db) {
 	const Cluster& c = (*db)[state].getRandomIC();
 
 	//cluster structs to arrays
-	double* X = new double[2*N];
+	double* X = new double[DIMENSION*N];
+#if (DIMENSION == 2) 
 	c.makeArray2d(X, N);
+#endif
+#if (DIMENSION == 3)
+	c.makeArray3d(X, N);
+#endif
 
 	//equilibrate the trajectories
 	equilibrate(X, pot, db, state, eq, N, DT, rho, E, beta, P, method);

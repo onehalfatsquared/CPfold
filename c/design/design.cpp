@@ -178,7 +178,111 @@ double getStickyProduct(int N, int state,  Database* db, int* particleTypes,
 	return stickyProd;
 }
 
-void rewieght7(int N, int num_states, Database* db, int* particleTypes, double* eq,
+void getReweightMaps(std::map<std::pair<int,int>,double> kappa,
+										 std::map<std::pair<int,int>,double>& a_new,
+										 std::map<std::pair<int,int>,double>& gamma_new) {
+	//create seperate maps for a values and gamma values
+	// a = U''(d) = 2*range^2*E_{ij}
+	//gamma = exp(beta*E)
+
+	double beta = BETA;                //inverse temp
+	double r = RANGE;                  //range of potential
+
+	//loop over kappa map and fill other two maps appropriately
+	std::map<std::pair<int,int>,double>::iterator it;
+	for (it = kappa.begin(); it != kappa.end(); it++) {
+		std::pair<int,int> key = it->first;
+		double k_val           = it->second;
+		double E = stickyNewton(8.0, r, k_val, beta);
+		double a = 2*r*r*E; double gam = exp(beta*E);
+		//std::cout << k_val - gam/(sqrt(a)) << "\n";
+		a_new[key] = a; gamma_new[key] = gam;
+	}
+}
+
+double getPdet(int N, int state, Database* db, int* particleTypes, 
+							 double a, std::map<std::pair<int,int>,double> a_new) {
+	//get sqrt of ratio of pseudo determinant of dynamical matrix for cluster
+
+	//get the number of bonds, adjacency matrix, and coordinates from db
+	int b = (*db)[state].getBonds();
+	int* M = new int[N*N]; 
+	extractAM(N, state, M, db);
+	const Cluster& c = (*db)[state].getRandomIC();
+	//cluster structs to arrays
+	double* X = new double[DIMENSION*N];
+#if (DIMENSION == 2) 
+	c.makeArray2d(X, N);
+#endif
+#if (DIMENSION == 3)
+	c.makeArray3d(X, N);
+#endif
+
+	//init the jacobian matrix
+	Eigen::MatrixXd J(b, 2*N); J.fill(0.0);
+	Eigen::MatrixXd J_new(b, 2*N); J_new.fill(0.0);
+	double m = sqrt(a);
+
+	//init distances, bond counter
+	double XD, YD, ZD;
+	int count = 0;
+
+	//loop over bonds and construct rigidity matrices, J and J_new
+	for (int i = 0; i < N; i ++) {
+		for (int j = i+1; j < N; j++) {
+			if (M[bd::toIndex(i,j,N)] == 1) {
+				//compute distances
+				XD = X[DIMENSION*i] - X[DIMENSION*j];
+				YD = X[DIMENSION*i+1] - X[DIMENSION*j+1];
+#if (DIMENSION == 3) 
+				ZD = X[DIMENSION*i+2] - X[DIMENSION*j+2];
+#endif 
+
+				//get particle types and row multiplier
+				int p1 = particleTypes[i];
+				int p2 = particleTypes[j];
+				double m_new = sqrt(a_new[{p1,p2}]);
+
+				//compute jacobian entries
+				J(count, DIMENSION*i) = 2*XD*m; J(count, DIMENSION*j) = -2*XD*m;
+				J(count, DIMENSION*i+1) = 2*YD*m; J(count, DIMENSION*j+1) = -2*YD*m;
+				J_new(count, DIMENSION*i) = 2*XD*m_new; J_new(count, DIMENSION*j) = -2*XD*m_new;
+				J_new(count, DIMENSION*i+1) = 2*YD*m_new; J_new(count, DIMENSION*j+1) = -2*YD*m_new;
+#if (DIMENSION == 3) 
+				J(count, DIMENSION*i+2) = 2*ZD*m; J(count, DIMENSION*j+2) = -2*ZD*m;
+				J_new(count, DIMENSION*i+2) = 2*ZD*m_new; J_new(count, DIMENSION*j+2) = -2*ZD*m_new;
+#endif
+
+				count +=1;
+			}
+		}
+	}
+
+	//compute the pseudo-determinant of each dynamical matrix
+	Eigen::VectorXd s = J.jacobiSvd().singularValues();
+	Eigen::VectorXd s_new = J_new.jacobiSvd().singularValues();
+	double det = 1; double det_new = 1;
+  for (int i = 0; i < s.size(); i++) {
+    if (abs(s(i)) > N_TOL) {  
+      det *= abs(s(i))*abs(s(i));
+    }
+  }
+  for (int i = 0; i < s_new.size(); i++) {
+    if (abs(s_new(i)) > N_TOL) {  
+      det_new *= abs(s_new(i))*abs(s_new(i));
+    }
+  }
+
+	//take sqrt of ratio of determinants
+	double D = sqrt(det/det_new);
+
+	//free memory and return D
+	delete []M; delete []X;
+
+	return D;
+}
+
+void reweight7(int N, int num_states, Database* db, int* particleTypes, double* eq,
 						  std::map<std::pair<int,int>,double> kappa) {
 	//reweight in the case of 7 particles
 
@@ -188,6 +292,7 @@ void rewieght7(int N, int num_states, Database* db, int* particleTypes, double* 
 	double E = stickyNewton(8.0, r, kap0, beta); //energy corresponding to kap0
 	double a = 2*r*r*E;                // parameter multiplying rigidity matrix
 	double alpha2 = sqrt(beta*a);      //alpha^2 parameter
+	double gamma = exp(beta*E);        //gamma parameter
 
 	double Z = 0;                     //normalizing constant for eq
 
@@ -196,15 +301,38 @@ void rewieght7(int N, int num_states, Database* db, int* particleTypes, double* 
 		//get initial eq prob and number of bonds
 		int b = (*db)[i].getBonds();
 		double prob = (*db)[i].getFrequency();
+		double new_prob;
 
-		//get the denominator of reweight factor - KAP^b_i
-		double denom = pow(KAP, b);
+		//determine which reweight to use
+		if (b != 12) { //do standard re-weight
+			//get the denominator of reweight factor - KAP^b_i
+			double denom = pow(kap0, b);
 
-		//get the numerator of the re-weight factor
-		double num = getStickyProduct(N, i, db, particleTypes, kappa); 
+			//get the numerator of the re-weight factor
+			double num = getStickyProduct(N, i, db, particleTypes, kappa); 
 
-		//compute the new probability
-		double new_prob = prob * num / denom;
+			//compute the new probability
+			new_prob = prob * num / denom;
+		}
+		else if (b == 12) { //special reweight
+			//get the denominator of reweight factor - KAP^b_i
+			double denom = pow(gamma, b);
+
+			//get a and gamma parameters for each new kappa
+			std::map<std::pair<int,int>,double> a_new;
+			std::map<std::pair<int,int>,double> gamma_new;
+			getReweightMaps(kappa, a_new, gamma_new);
+
+			//get the numerator of reweight factor
+			double num = getStickyProduct(N, i, db, particleTypes, gamma_new); 
+
+			//get the pseudo-determinant factor
+			double det = 0;
+			det = getPdet(N, i, db, particleTypes, a, a_new);
+
+			//compute new prob
+			new_prob = prob * det * num / denom;
+		}
 
 		//debug line for corect reweight
 		//printf("Test: Old %f, New %f\n", prob, new_prob);
