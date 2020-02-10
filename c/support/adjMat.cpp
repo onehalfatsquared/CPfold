@@ -1,5 +1,8 @@
 #include <math.h>
 #include <stdio.h>
+#include <fstream>
+#include <cstdlib>
+#include <iostream>
 #include "nauty.h"
 #include "database.h"
 #include "adjacency.h"
@@ -39,7 +42,7 @@ void printAM(int N, int* AM) {
 	//print out the adj matrix 
 	for (int i = 0; i < N; i++) {
 		for (int j = 0; j < N; j++) {
-			printf("%d ", AM[toIndex(N,i,j)]);
+			printf("%d ", AM[toIndex(i,j,N)]);
 		}
 		printf("\n");
 	}
@@ -72,9 +75,21 @@ bool checkSame(int* M1, int* M2, int N) {
 void getAdj(double* X, int N, int* M) {
 	//get the adjacnecy matrix from a cluster X
 
-	int i, j; 
+	//init a particle array to 0, then fill it from X
 	double* particles = new double[DIMENSION*N]; double* Z = new double[DIMENSION];
+	for (int p = 0; p < DIMENSION*N; p++) {
+		particles[p] = 0;
+	}
 	c2p(X, particles, N);
+
+	/*
+	for (int q = 0; q < 2*N; q++) {
+		std::cout << particles[q] << "\n";
+	}
+	*/
+
+	//compute the distance between particles, construct adj matrix
+	int i, j; 
 	for (int index = 0; index < N*N; index++) {
 		index2ij(index, N, i, j);
 		if (j > i) {
@@ -84,6 +99,7 @@ void getAdj(double* X, int N, int* M) {
 			}
 		}
 	}
+
 	delete []particles; delete []Z;
 }
 

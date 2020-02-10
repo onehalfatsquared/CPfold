@@ -4,7 +4,7 @@
 namespace bd {
 
 void c2p(double* cluster, double* particles, int N) {
-	//converts array of form (x1,y1,x2,y2,...) to (x1,x,2,x3,x4,...)
+	//converts array of form (x1,y1,x2,y2,...) to (x1,x2,x3,x4,...)
 
 #if (DIMENSION == 2) 
 	for (int i = 0; i < 2*N; i++) {
@@ -34,6 +34,11 @@ void c2p(double* cluster, double* particles, int N) {
 
 double euDist(double* particles, int i, int j, int N, double* Z) {
 	//computes euclidean distance between particles i and j
+
+	//printf("Particles %d and %d\n", i+1, j+1);
+	//printf("x: %f, Y: %f\n", particles[i], particles[N+i]);
+	//printf("x: %f, Y: %f\n", particles[j], particles[N+j]);
+	
   Z[0] = particles[i]-particles[j];
   Z[1] = particles[N+i]-particles[N+j];
 #if (DIMENSION == 3)

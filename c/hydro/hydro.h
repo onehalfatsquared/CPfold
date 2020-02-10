@@ -17,12 +17,7 @@ class HydroCluster {
 
 		double* clusters;
 		int cNum;
-		double t_last;
-		int N; int maxT; 
-
-		//accessor functions
-		int getN() const {return N;}
-		int getMaxT() const {return maxT;}
+		int N; int maxT;
 
 	private:	
 
@@ -46,8 +41,11 @@ class HCC {
 		//friend std::ostream& operator<<(std::ostream&, const Database&);
 
 		HydroCluster* hc; 
+		int N; int maxT; 
 
 		//accessor functions
+		int getN() const {return N;}
+		int getMaxT() const {return maxT;}
 		int getNumClusters() const {return num_clusters;}
 
 	private:	
@@ -66,6 +64,10 @@ class HCC {
 HCC* extractData(std::string& filename, int N, int maxT);
 
 //transition detection functions
+void getCoordinates(HydroCluster& hc, double* X, int N, int time);
+void getAdj(double* X, int N, int* M, double cutoff);
+void checkState(int N, double* X, int state, Database* db,
+							  bool& reset, int& new_state);
 void determineTransitions(HCC* hc, Database* db);
 
 //test functions

@@ -13,7 +13,7 @@
 int main(int argc, char* argv[]) {
 
 	//handle input
-	if (argc != 4) {
+	if (argc != 5) {
 		fprintf(stderr, "Usage: <Hydrodynamics data> <empty db file> <dt> <n_save>  %s\n", argv[0]);
 		return 1;
 	}
@@ -23,7 +23,7 @@ int main(int argc, char* argv[]) {
 	std::string infile2 (argv[2]);
 	double dt = atof(argv[3]);
 	int n_save = atoi(argv[4]);
-	int maxT = 5000;
+	int maxT = 2000;
 
 	//construct empty database from file with no mfpt data
 	bd::Database* db = bd::readData(infile2);
@@ -34,10 +34,12 @@ int main(int argc, char* argv[]) {
 
 
 	//fill data structure with hydrodynamics data
+	std::cout << "Reading in Hydrodynamics data. \n";
 	bd::HCC* hc = bd::extractData(infile, N, maxT);
 	std::cout << "Hydro data has been stored. \n";
 
 	//bd::testExtract(hc);
+	bd::determineTransitions(hc, db);
 
 	//get the transition data - in db
 
