@@ -41,7 +41,7 @@ int main(int argc, char* argv[]) {
 
 	//make surface of hitting probs w/ fixed AB interactions
 	//bd::constructSurfaceTOY(N, db, initial, target, useFile);
-	bd::constructScatterTOY(N, db, initial, target, useFile);
+	//bd::constructScatterTOY(N, db, initial, target, useFile);
 
 	//do a maximization using the particle labels in file
 	//bd::hittingProbMaxTOY(N, db, initial, target, useFile);
@@ -55,14 +55,23 @@ int main(int argc, char* argv[]) {
 
 	//constrained maximization
 	//bd::hittingProbMaxTOYc(N, db, initial, target, useFile);
+	//bd::eqProbMaxTOYc(N, db, initial, target, useFile);
 
 	//do some sampling
 	//bd::estimateHittingProbability(N, db, target);
 
+	//evaluate the eq prob and rate at kappa in file
+	bd::evalStats(N, db, initial, target, useFile);
+	//bd::computeParetoFront(N, db, initial, target, useFile);
+
+	//tpt stuff
+	//performTPT(N, db, initial, target, useFile);
 
 
 
 
+
+//
 
 	//free memory - delete database
 	delete db; 

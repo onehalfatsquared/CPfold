@@ -16,6 +16,8 @@ add_subdirectory(tpt)
 include_directories(tpt)
 add_subdirectory(design)
 include_directories(design)
+add_subdirectory(hydro)
+include_directories(hydro)
 add_subdirectory(exe)
 
 file(COPY input DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/exe)

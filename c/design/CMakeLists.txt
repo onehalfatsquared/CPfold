@@ -1,5 +1,6 @@
 set(SOURCES
 	design.cpp
+	designTPT.cpp
 	)
 
 add_library(design ${SOURCES})
