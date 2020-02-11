@@ -191,7 +191,7 @@ void checkState(int N, double* X, int state, Database* db,
 		B += M[i];
 	}
 	B /= 2;
-	std::cout << B << "\n";
+	//std::cout << B << "\n";
 
 	if (success) {//same matrix
 		delete []M; delete []old;
@@ -213,7 +213,7 @@ void checkState(int N, double* X, int state, Database* db,
 }
 
 //maybe parralelize this later?
-void determineTransitions(HCC* hc, Database* db) {
+void determineTransitions(HCC* hc, Database* db, double tps) {
 	//takes a collection of cluster trajectories, determines the folding pathway and
 	//times, constructs an adjacency matrix and time distribution
 
@@ -226,32 +226,34 @@ void determineTransitions(HCC* hc, Database* db) {
 	//declare all the things we need
 	double* X = new double[N*DIMENSION];    //store a configuration
 	double* Xold = new double[N*DIMENSION]; //store previous config
-	int timer = 0;
+	int timer = 0;                          //store time since last bond
+	//array of vectors to compute a probability distribution, and time distribution
 	std::vector<int>* transition_times = new std::vector<int>[ns*ns];
+	
+	//variables for state change check
 	int old_state;
 	int new_state;
 	bool reset;
 	int bonds;
 
 	//loop over each cluster in HHC
-	for (int i = 8; i < 9; i++) {
+	for (int i = 0; i < nc; i++) {
 		//create a reference to the i-th collection of clusters
 		HydroCluster& currentCluster = (*hc)[i];
-		printf("Now analyzing cluster %d\n", i);
+		printf("Now analyzing cluster %d of %d\n", i+1, nc);
 
 		//put the 0-th cluster in temp - get details
 		getCoordinates(currentCluster, Xold, N, 0);
 		old_state = currentCluster.cNum; 
 		new_state = currentCluster.cNum; 
-		//for (int k = 0; k < 12; k++) std::cout << Xold[k] << "\n";
 
 		//loop over all the timesteps - detect transitions
 		for (int time = 1; time < maxT; time++) {
 
-			//get the next set of coordinates - incremenent timer
+			//get the next set of coordinates - increment timer
 			getCoordinates(currentCluster, X, N, time);
-			if (X[0] == 0) {
-				std::cout << time << "\n";
+			if (X[0] == 0) { //check if we reached the end of the time series
+				//std::cout << time << "\n";
 				break;
 			}
 			timer++;
@@ -260,9 +262,8 @@ void determineTransitions(HCC* hc, Database* db) {
 			checkState(N, X, old_state, db, reset, new_state);
 
 
-			if (reset) {
-				std::cout << "something bad happened\n";
-				timer--;
+			if (reset) { //either a bond broke, or two bonds formed at once - ignore rest of traj.
+				break;
 			}
 
 			if (new_state != old_state) { //new state reached, update data
@@ -282,8 +283,53 @@ void determineTransitions(HCC* hc, Database* db) {
 			if (!reset) {
 				memcpy(Xold, X, DIMENSION*N*sizeof(double)); // copy X to Xold
 			}
-
 		}
+	}
+
+	//transition_times now has all the data, put it into db
+	//loop over transitions from every initial -> final state
+	std::vector<Pair> PM;
+	for (int initial_state = 0; initial_state < ns; initial_state++) {
+		//compute the mfpt and number of transitions to each final state
+		double mfpt = 0; double Z = 0;
+		PM.clear();
+
+		for (int final_state = 0; final_state < ns; final_state++) {
+			//get the vector of transition times
+			int index = toIndex(initial_state, final_state, ns);
+			std::vector<int> transitions = transition_times[index];
+
+			//get the vector size and add to mfpt if non-zero
+			int num_transitions = transitions.size();
+			if (num_transitions > 0) {
+				PM.push_back(Pair(final_state, num_transitions));
+				Z += num_transitions;
+				for (int entry = 0; entry < num_transitions; entry++) {
+					mfpt += transitions[entry];
+				}
+			}
+		}
+
+		//divide by Z to get mean time
+		mfpt /= Z;
+
+		//place data in the db
+		//make a temp vector with same num of elements as P
+		std::vector<bd::Pair> temp; 
+		for (int i = 0; i < PM.size(); i++) {
+			temp.push_back(bd::Pair(PM[i].index, 0));
+		}
+
+		//update database
+		(*db)[initial_state].mfpt = mfpt*tps;
+		(*db)[initial_state].num = 0;
+		(*db)[initial_state].denom = 0;
+		(*db)[initial_state].num_neighbors = PM.size();
+		(*db)[initial_state].P = PM;
+		(*db)[initial_state].Z = temp;
+		(*db)[initial_state].Zerr = temp;
+		(*db)[initial_state].sigma = 0;
+
 	}
 
 	//free the memory

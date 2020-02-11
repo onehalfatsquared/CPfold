@@ -32,25 +32,25 @@ int main(int argc, char* argv[]) {
 	//get num of particles from db
 	int N = db->getN();
 
+	//get timestep info
+	double tps = dt*n_save;  //elapsed time per timestep
+
 
 	//fill data structure with hydrodynamics data
 	std::cout << "Reading in Hydrodynamics data. \n";
 	bd::HCC* hc = bd::extractData(infile, N, maxT);
 	std::cout << "Hydro data has been stored. \n";
 
+	//use HD data to fill a database 
 	//bd::testExtract(hc);
-	bd::determineTransitions(hc, db);
-
-	//get the transition data - in db
+	bd::determineTransitions(hc, db, tps);
 
 	//output the database to file
+	std::string out = "HydroDB.txt";
+	std::ofstream out_str(out);
+	out_str << *db; 
 
-
-
-
-
-	
-
+	//free the memory - just delete the class objects
 	delete hc; delete db;
 	return 0;
 }

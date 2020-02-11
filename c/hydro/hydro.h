@@ -68,7 +68,7 @@ void getCoordinates(HydroCluster& hc, double* X, int N, int time);
 void getAdj(double* X, int N, int* M, double cutoff);
 void checkState(int N, double* X, int state, Database* db,
 							  bool& reset, int& new_state);
-void determineTransitions(HCC* hc, Database* db);
+void determineTransitions(HCC* hc, Database* db, double tps);
 
 //test functions
 void testExtract(HCC* hc);
