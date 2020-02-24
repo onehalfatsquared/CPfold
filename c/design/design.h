@@ -49,6 +49,8 @@ double computeGradEQ(int initial, int numInteractions, double* kappaVals, Databa
 								 int* particleTypes, std::vector<int> targets, double* g);
 double getEqProb(int initial, double* kappaVals, Database* db, 
 								 int* particleTypes, std::vector<int> targets);
+double printEqProb(int initial, double* kappaVals, Database* db, 
+								 int* particleTypes, std::vector<int> targets);
 
 //average transition rate optimization
 void rateMaxTOY(int N, Database* db, int initial, int target, bool useFile);
@@ -63,12 +65,16 @@ double getRate(int initial, double* kappaVals, Database* db, int* particleTypes,
 //hitting probability optimization with rate constraints
 void hittingProbMaxTOYc(int N, Database* db, int initial, int target, bool useFile);
 void eqProbMaxTOYc(int N, Database* db, int initial, int target, bool useFile);
+void rateMaxTOYc(int N, Database* db, double c, int initial, int target, bool useFile);
 double lineSearchHit(int initial, int numInteractions, double* kappaVals, Database* db, int* particleTypes, 
 									double* Tconst, std::vector<int> ground, std::vector<int> targets, 
 									double c, double r, double H, double R, double* g, double& step);
 double lineSearchEq(int initial, int numInteractions, double* kappaVals, Database* db, int* particleTypes, 
 									double* Tconst, std::vector<int> targets, 
 									double c, double r, double H, double R, double* g, double& step);
+double lineSearchRate(int initial, int numInteractions, double* kappaVals, Database* db, int* particleTypes, 
+									double* Tconst, std::vector<int> targets, 
+									double c, double r, double eq, double R, double* g, double& step);
 void applyRateConstraint(double R, double c, double r, int numInteractions, 
 												 double* gH, double* gR); 
 
@@ -81,6 +87,10 @@ void estimateHittingProbability(int N, Database* db, int target);
 //testing
 void evalStats(int N, Database* db, int initial, int target, bool useFile);
 void computeParetoFront(int N, Database* db, int initial, int target, bool useFile);
+double rateMaxPareto(double c, int initial, Database* db, int num_states, int* particleTypes, 
+										 int numInteractions, double* kappaVals, double* Tconst, 
+										 std::vector<int> ground, std::vector<int> targets);
+void computeParetoFrontGD(int N, Database* db, int initial, int target, bool useFile);
 
 /* designTPT functions. Intended as an interfacing layer between design code and 
   TPT code. TPT code was built before support for several particle types. 

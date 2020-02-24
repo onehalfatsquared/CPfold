@@ -311,7 +311,9 @@ void determineTransitions(HCC* hc, Database* db, double tps) {
 		}
 
 		//divide by Z to get mean time
-		mfpt /= Z;
+		if (Z > 0) {
+			mfpt /= Z;
+		}
 
 		//place data in the db
 		//make a temp vector with same num of elements as P

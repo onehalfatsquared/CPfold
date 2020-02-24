@@ -112,6 +112,7 @@ void buildNautyGraph(int N, int M, int state, Database* db, graph* g) {
 	//add edges for every non-zero entry in adjacnecy matrix
 	for (int i = 0; i < N; i++) {
 		for (int j = i+1; j < N; j++) {
+			//std::cout << i << ' ' << j << "\n";
 			if ((*db)[state].isInteracting(i,j,N)) {
 				ADDONEEDGE(g, i, j, M);
 			}

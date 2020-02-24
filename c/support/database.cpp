@@ -165,7 +165,7 @@ std::ostream& State::print(std::ostream& out_str, int N, int* lumpMap) const {
 	out_str << num_neighbors << ' ';
 	for (int i = 0; i < num_neighbors; i ++) {
 		out_str << lumpMap[P[i].index] << ' ' << P[i].value << ' ';
-		out_str << Z[i].value << ' ' << Zerr[i].value << ' ';
+		out_str << 0 << ' ' << 0 << ' ';
 	}
 	
 	out_str << '\n';
@@ -432,7 +432,7 @@ void lumpEntries(Database* db, int state, std::vector<int> perms) {
 		double nextSQ = nextMFPT*nextMFPT;
 		double nextSigma = (*db)[perms[i]].getSigma();
 		//progogate error in mfpt reciprocals
-		if (mfpt > 0) {
+		if (mfpt > 0 && nextMFPT > 0) {
 			mfpt = 1 / (1/mfpt + 1/nextMFPT); 
 			sigma = sqrt(sigma*sigma + nextSigma*nextSigma/(nextSQ*nextSQ));
 		}
@@ -541,6 +541,28 @@ void combineMFPTdata(Database* db1, Database* db2) {
 			printf("Old errors: %f and %f. New Error: %f. Relative Error %f \n", 
 						sigma1, sigma2, sigma, sigma/mfpt);
 		}
+	}
+}
+
+void combineHittingData(Database* db1, Database* db2) {
+	//combine the hitting data in the two databases, store in the first
+	
+	//get database properties, assumes both have same num states
+	int N = db1->getN(); int ns = db1->getNumStates();
+
+	//loop over the states and combine estimates
+	for (int state = 0; state < ns; state++) {
+		//get new mfpt and error bar estimate - minimize var of a linear combination
+		
+		//combine the hit counts via pairs
+		std::vector<Pair> p1 = (*db1)[state].getP();
+		std::vector<Pair> p2 = (*db2)[state].getP();
+		combinePairs(p1, p2);
+
+
+		//add back to database 1
+		(*db1)[state].num_neighbors = p1.size();
+		(*db1)[state].P = p1;
 	}
 }
 

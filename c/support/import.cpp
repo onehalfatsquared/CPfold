@@ -52,6 +52,7 @@ void findIsomorphic(int N, int num_states, int* AM, Database* db, std::vector<in
 		buildNautyGraph(N, M, i, db, g2);
 		densenauty(g2, lab2, ptn, orbits, &options, &stats, M, N, cg2);
 
+
 		/* Compare canonically labelled graphs */
 		if (checkIsomorphic(N, M, cg1, cg2) == 1) { //graphs are isomorphic, add to iso
 			iso.push_back(i);
@@ -81,7 +82,7 @@ void structureMap(std::string& filename, Database* db, int* M2A, int& NC) {
 	//declare storage for adjacency matrix
 	int* M = new int[N*N];
 
-	//declare a vector to store isoorphic states
+	//declare a vector to store isomorphic states
 	std::vector<int> iso;
 
 	//declare storage for each line of file, and buffer to get values
@@ -95,6 +96,7 @@ void structureMap(std::string& filename, Database* db, int* M2A, int& NC) {
 
 	while (std::getline(in_str, line)) {
 		//if line begins in "C", get line. extract coordinates
+
 		if (line[0] == 'C') {
 			//std::cout << line << "\n";
 			strcpy(buffer,line.c_str());
@@ -114,10 +116,11 @@ void structureMap(std::string& filename, Database* db, int* M2A, int& NC) {
 			//for (int i = 0; i < 2*N; i++) printf("aaaaa %f\n",X[i]);
 
 			//do refining
-
-
-			for (int i = 0; i < N*N; i++) M[i] = 0;
+			for (int i = 0; i < N*N; i++) {
+				M[i] = 0;
+			}
 			getAdj(X, N, M);
+			//printAM(N,M);
 			findIsomorphic(N, ns, M, db, iso);
 			for (int i = 0; i < iso.size(); i++) {
 				printf("Andreas Cluster %d is isomorphic to my cluster %d\n", clust, iso[i]);

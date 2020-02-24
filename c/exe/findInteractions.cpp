@@ -56,13 +56,15 @@ int main(int argc, char* argv[]) {
 	//constrained maximization
 	//bd::hittingProbMaxTOYc(N, db, initial, target, useFile);
 	//bd::eqProbMaxTOYc(N, db, initial, target, useFile);
+	//bd::rateMaxTOYc(N, db, 0.9, initial, target, useFile);
 
 	//do some sampling
 	//bd::estimateHittingProbability(N, db, target);
 
 	//evaluate the eq prob and rate at kappa in file
-	bd::evalStats(N, db, initial, target, useFile);
+	//bd::evalStats(N, db, initial, target, useFile);
 	//bd::computeParetoFront(N, db, initial, target, useFile);
+	bd::computeParetoFrontGD(N, db, initial, target, useFile);
 
 	//tpt stuff
 	//performTPT(N, db, initial, target, useFile);
