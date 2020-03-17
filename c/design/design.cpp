@@ -167,7 +167,7 @@ double getStickyProduct(int N, int state,  Database* db, int* particleTypes,
 
 	//loop over the adjacency matrix, determine bond types, get factors
 	for (int i = 0; i < N; i++) {
-		for (int j = i+1; j < N; j++) {
+		for (int j = i+2; j < N; j++) {
 			if ((*db)[state].isInteracting(i,j,N)) {
 				int p1 = particleTypes[i]; int p2 = particleTypes[j];
 				stickyProd *= kappa[{p1,p2}];
@@ -300,13 +300,14 @@ void reweight7(int N, int num_states, Database* db, int* particleTypes, double* 
 	for (int i = 0; i < num_states; i++) {
 		//get initial eq prob and number of bonds
 		int b = (*db)[i].getBonds();
+		int ntBonds = b - (N-1);               //number of non-trivial bonds
 		double prob = (*db)[i].getFrequency();
 		double new_prob;
 
 		//determine which reweight to use
 		if (b != 12) { //do standard re-weight
 			//get the denominator of reweight factor - KAP^b_i
-			double denom = pow(kap0, b);
+			double denom = pow(kap0, ntBonds);
 
 			//get the numerator of the re-weight factor
 			double num = getStickyProduct(N, i, db, particleTypes, kappa); 
@@ -316,7 +317,7 @@ void reweight7(int N, int num_states, Database* db, int* particleTypes, double* 
 		}
 		else if (b == 12) { //special reweight
 			//get the denominator of reweight factor - KAP^b_i
-			double denom = pow(gamma, b);
+			double denom = pow(gamma, ntBonds);
 
 			//get a and gamma parameters for each new kappa
 			std::map<std::pair<int,int>,double> a_new;
@@ -329,6 +330,9 @@ void reweight7(int N, int num_states, Database* db, int* particleTypes, double* 
 			//get the pseudo-determinant factor
 			double det = 0;
 			det = getPdet(N, i, db, particleTypes, a, a_new);
+
+			//debug the flower reweight
+			//printf("prob = %f\n det = %f\n num = %f\n denom = %f\n\n", prob, det, num, denom);
 
 			//compute new prob
 			new_prob = prob * det * num / denom;
@@ -360,10 +364,11 @@ void reweight(int N, int num_states, Database* db, int* particleTypes, double* e
 		for (int i = 0; i < num_states; i++) {
 			//get initial eq prob and number of bonds
 			int b = (*db)[i].getBonds();
+			int ntBonds = b - (N-1);               //number of non-trivial bonds
 			double prob = (*db)[i].getFrequency();
 
 			//get the denominator of reweight factor - KAP^b_i
-			double denom = pow(KAP, b);
+			double denom = pow(KAP, ntBonds);
 
 			//get the numerator of the re-weight factor
 			double num = getStickyProduct(N, i, db, particleTypes, kappa); 
@@ -400,8 +405,8 @@ void checkPositive(int numInteractions, double* kappaVals) {
 	//check if each kappa is positive, if not set to 0.01
 
 	for (int i = 0; i < numInteractions; i++) {
-		if (kappaVals[i] < 0) {
-			kappaVals[i] = 0.01;
+		if (kappaVals[i] < 0.05) {
+			kappaVals[i] = 0.05;
 		}
 	}
 }
@@ -577,9 +582,15 @@ void constructScatterTOY(int N, Database* db, int initial, int target, bool useF
 	ofile.open("rateEqScatter.txt");
 
 	//construct an array of kappa vals to use
+	int M;
 	//multiples of some base value
-	int M = 33; //num points in each dimension
-	double base = 0.05; //smallest kappa to use - 0.25
+	if (N == 6) {
+		M = 33; //num points in each dimension
+	}
+	if (N == 7) {
+		M = 25;
+	}
+	double base = 0.05; //smallest kappa to use - 0.05
 	double mult = 1.6; //multiplies base to get next value - 1.3
 	double* Ks = new double[M]; Ks[0] = base;
 	for (int i = 1; i < M; i++) {
@@ -630,7 +641,7 @@ void constructScatterTOY(int N, Database* db, int initial, int target, bool useF
 					rk[0] = kappaVals[0]; rk[1] = kappaVals[1]; rk[2] = kappaVals[2]; 
 				}
 				if (eqProb > 0.43 && eqProb < 0.51 && rate > 0.64) {
-					std::cout  << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << "\n";
+					//std::cout  << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << "\n";
 				}
 
 
@@ -639,6 +650,134 @@ void constructScatterTOY(int N, Database* db, int initial, int target, bool useF
 
 			}
 		}
+		std::cout << x << "\n";
+	}
+
+	//print out the maxima and argmax
+	printf("Max EQ is %f with %f, %f, %f. The rate is %f\n", eqM, ek[0], ek[1], ek[2], eRate);
+	printf("Max rate is %f with %f, %f, %f. The EQ is %f\n", rM, rk[0], rk[1], rk[2], rateE);
+
+	//close file
+	ofile.close();
+
+	//free memory
+	delete []particleTypes; delete []kappaVals; delete []eq;
+	delete []T; delete []Tconst; delete []m; delete []Ks;
+	delete []ek; delete []rk;
+}
+
+void constructScatterTOY1(int N, Database* db, int initial, int target) {
+	/*Construct a scatter plot of avg rate vs equilibrium probability using 
+	  a 1d grid of kappa values. 
+	  Keep track of the kappa values that lead to both the highest eq prob 
+	  and the highest rate.                                         */
+
+
+	//get database info
+	int num_states = db->getNumStates(); 
+
+	//set up particle identity
+	int* particleTypes = new int[N];
+	int IC = 0; 
+	int numTypes = setTypes(N, particleTypes, IC);
+	int numInteractions = 1;
+
+	//set up sticky parameter values
+	double* kappaVals = new double[numInteractions];
+	initKappaVals(numInteractions, kappaVals);
+
+	//declare rate matrix, probability transition matrix, equilibrium measure
+	double* T = new double[num_states*num_states]; //rate matrix
+	double* Tconst = new double[num_states*num_states]; //rate matrix - only forward entries
+	double* eq = new double[num_states];           //equilibrium measure
+	double* m = new double[num_states];            //mfpts 
+
+	//init the rate matrix with zeros
+	for (int i = 0; i < num_states*num_states; i++) {
+		Tconst[i] = 0;
+	}
+
+	//get bonds->bonds+1 entries from mfpt estimates
+	std::vector<int> ground; //vector to hold all ground states
+	createTransitionMatrix(Tconst, num_states, db, ground);
+	for (int i = 0; i < ground.size(); i++) {
+		std::cout << ground[i] << "\n";
+	}
+
+	//find all target states consistent with input target
+	std::vector<int> targets; 
+	findIsomorphic(N, num_states, target, db, targets);
+	for (int i = 0; i < targets.size(); i++) {
+		std::cout << targets[i] << "\n";
+	}
+
+	//declare the kappa mapping
+	std::map<std::pair<int,int>,double> kappa;
+
+	//declare outfile
+	std::ofstream ofile;
+	ofile.open("rateEqScatter.txt");
+
+	//construct an array of kappa vals to use
+	int M;
+	//multiples of some base value
+	if (N == 6) {
+		M = 33; //num points in each dimension
+	}
+	if (N == 7) {
+		M = 25;
+	}
+	double base = 0.05; //smallest kappa to use - 0.05
+	double mult = 1.6; //multiplies base to get next value - 1.3
+	double* Ks = new double[M]; Ks[0] = base;
+	for (int i = 1; i < M; i++) {
+		Ks[i] = Ks[i-1] * mult;
+	}
+
+	//store max values
+	double eqM = 0; double rM = 0;
+	double eRate;   double rateE;
+	double* ek = new double[numInteractions];
+	double* rk = new double[numInteractions];
+
+	//do hitting probability calculation
+	for (int x = 0; x < M; x++) {
+		//set kappa
+		kappaVals[0] = Ks[x];
+
+		//make the map
+		makeKappaMap(1, kappaVals, kappa);
+		//std::cout << kappa[{0,0}] << ' ' << kappa[{1,0}] << ' ' << kappa[{1,1}] << "\n";
+		//do rewieght
+		reweight(N, num_states, db, particleTypes, eq, kappa);
+		//get eq prob
+		double eqProb = getEqProb(initial, kappaVals, db, particleTypes, targets);
+		//copy Tconst into T
+		std::copy(Tconst, Tconst+num_states*num_states, T);
+		//fill in transposed entries such that T satisfies detailed balance
+		satisfyDB(T, num_states, db, eq);
+		//fill in diagonal with negative sum of row entries
+		fillDiag(T, num_states);
+		//get the transition rate
+		computeMFPTs(num_states, T, targets, m);
+		double rate = 1/m[initial];
+
+		//update maxima
+		if (eqProb > eqM) {
+			eqM = eqProb; eRate = rate;
+			ek[0] = kappaVals[0]; ek[1] = kappaVals[1]; ek[2] = kappaVals[2]; 
+		}
+		if (rate > rM) {
+			rM = rate; rateE = eqProb;
+			rk[0] = kappaVals[0]; rk[1] = kappaVals[1]; rk[2] = kappaVals[2]; 
+		}
+		if (eqProb > 0.43 && eqProb < 0.51 && rate > 0.64) {
+			//std::cout  << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << "\n";
+		}
+
+
+		//output to file
+		ofile << eqProb << ' ' << rate << "\n";
 		std::cout << x << "\n";
 	}
 
@@ -664,7 +803,8 @@ double getHitProbability(int num_states, int initial, std::vector<int> targets, 
 
 	double prob = 0; 
 	for (int i = 0; i < targets.size(); i++) {
-		prob += U[toIndex(initial, targets[i], num_states)];
+		double p = U[toIndex(initial, targets[i], num_states)];
+		prob += p;
 	}
 
 	return prob;
@@ -964,7 +1104,7 @@ double printEqProb(int initial, double* kappaVals, Database* db,
 	//get the new equilibrium probability of target state
 	double prob = 0;
 	for (int i = 0;  i< targets.size(); i++) {
-		std::cout << targets[i] << ' ' << eq[targets[i]] << "\n"; 
+		printf("State %d, Eq prob %f\n", targets[i], eq[targets[i]]);
 		prob += eq[targets[i]];
 	}
 
@@ -2179,6 +2319,63 @@ void estimateHittingProbability(int N, Database* db, int target) {
 /*********** Extraneous Testing stuff ***************/
 /****************************************************/
 
+void printHitProbability(int num_states, int initial, std::vector<int> targets, double* U) {
+	//print hitting probability among one group of ground states
+
+	double prob = 0; 
+	std::vector<double> probs;
+	for (int i = 0; i < targets.size(); i++) {
+		double p = U[toIndex(initial, targets[i], num_states)];
+		prob += p;
+		probs.push_back(p);
+	}
+
+	for (int i = 0; i < targets.size(); i++) {
+		printf("State %d, hit prob %f\n", targets[i], probs[i]/prob);
+	}
+}
+
+void solveAbsorbProblem(int initial, double* kappaVals, Database* db, int* particleTypes, 
+								 					double* Tconst, std::vector<int> targets) {
+	//set up and solve the absorbtion probability problem - only to targets
+
+	//get parameters from database
+	int N = db->getN();
+	int num_states = db->getNumStates();
+
+	//declare rate matrix, probability transition matrix, equilibrium measure
+	double* T = new double[num_states*num_states]; //rate matrix
+	double* P = new double[num_states*num_states]; //probability transition matrix
+	double* U = new double[num_states*num_states]; //hitting probability matrix
+	double* eq = new double[num_states];           //equilibrium measure
+
+	//declare the kappa map
+	std::map<std::pair<int,int>,double> kappa;
+
+	//compute the hitting probability at the current kappa vals
+	//make the map
+	makeKappaMap(2, kappaVals, kappa);
+	//do rewieght
+	reweight(N, num_states, db, particleTypes, eq, kappa);
+	//reset transition matrices
+	for (int i = 0; i < num_states*num_states; i++) {
+		P[i] = U[i] = 0;
+	}
+	//copy Tconst into T
+	std::copy(Tconst, Tconst+num_states*num_states, T);
+	//fill in transposed entries such that T satisfies detailed balance
+	satisfyDB(T, num_states, db, eq);
+	//fill in diagonal with negative sum of row entries
+	fillDiag(T, num_states);
+	//use the filled rate matrix to compute probability matrix
+	createProbabilityMatrix(T, num_states, P);
+	//solve for hitting probabilities to endStates states
+	computeHittingProbability(P, num_states, targets, U);
+	//get hit prob to targets
+	printHitProbability(num_states, initial, targets, U);
+
+	delete []T; delete []P; delete []U; delete []eq;
+}
 
 void evalStats(int N, Database* db, int initial, int target, bool useFile) {
 	//evaluate the eq prob, hitting prob, rate, and configurations for the
@@ -2213,17 +2410,21 @@ void evalStats(int N, Database* db, int initial, int target, bool useFile) {
 	//get bonds->bonds+1 entries from mfpt estimates
 	std::vector<int> ground; //vector to hold all ground states
 	createTransitionMatrix(Tconst, num_states, db, ground);
+	std::cout << "All ground states:\n";
 	for (int i = 0; i < ground.size(); i++) {
 		std::cout << ground[i] << "\n";
 	}
+	std::cout << "\n";
 
 	//find all target states consistent with input target
 	std::vector<int> targets; //targets.push_back(target);
 	// /*
 	findIsomorphic(N, num_states, target, db, targets);
+	std::cout << "All permutations of target state:\n";
 	for (int i = 0; i < targets.size(); i++) {
 		std::cout << targets[i] << "\n";
 	}
+	std::cout << "\n";
 	// */
 
 	//get the permutation
@@ -2244,19 +2445,30 @@ void evalStats(int N, Database* db, int initial, int target, bool useFile) {
 
 	double dydx = gR[0]/gE[0] + gR[1]/gE[1] + gR[2]/gE[2];
 
-	//print the previous states
+	//print info about the current run
 	printf("Kappa Values: %f, %f, %f\n", kappaVals[0], kappaVals[1], kappaVals[2]);
-	printf("Equilibrium Probability: %f\n", eq);
-	printf("Hitting Probability: %f\n", hit);
-	printf("Folding Rate: %f\n", rate);
+	printf("Total Equilibrium Probability: %f\n", eq);
+	printf("Total Hitting Probability: %f\n", hit);
+	printf("Total Average Folding Rate: %f\n", rate);
 	printf("Equilibrium Gradient: %f, %f, %f\n", gE[0], gE[1], gE[2]);
 	printf("Rate Gradient: %f, %f, %f\n", gR[0], gR[1], gR[2]);
 	printf("Rate vs. p derivative: %f\n", dydx);
+	std::cout << "\n";
 
+	//print the eq prob of each permutation individually
+	std::cout << "Equilibrium Probabilities:\n";
 	printEqProb(initial, kappaVals, db, particleTypes, targets);
+	std::cout << "\n";
+
+	//print the hitting prob of each permutation individually
+	std::cout << "Hitting Probabilities:\n";
+	solveAbsorbProblem(initial, kappaVals, db, particleTypes, Tconst, targets);
+	std::cout << "\n";
 
 	//print the bond types
+	std::cout << "Bond distributions:\n";
 	getBondTypes(N, particleTypes, db, targets);
+	std::cout << "\n";
 
 	//free memory
 	delete []particleTypes; delete []Tconst; delete []kappaVals;
@@ -2379,7 +2591,7 @@ void computeParetoFront(int N, Database* db, int initial, int target, bool useFi
 	ofile.close();
 }
 
-double rateMaxPareto(double c, int initial, Database* db, int num_states, int* particleTypes, 
+double rateMaxPareto(double& c, int initial, Database* db, int num_states, int* particleTypes, 
 										 int numInteractions, double* kappaVals, double* Tconst, 
 										 std::vector<int> ground, std::vector<int> targets) {
 	//use optimization scheme to get max rate for target in toy model
@@ -2387,8 +2599,8 @@ double rateMaxPareto(double c, int initial, Database* db, int num_states, int* p
 	//uses the file for the permutation
 
 	//set iteration settings
-	int max_its = 8000; double objTol = 1e-8; 
-	double r = 100;    //cost 
+	int max_its = 20; double objTol = 1e-8; 
+	double r = 200;    //cost 
 
 	//init a gradient array
 	double* gH = new double[numInteractions];
@@ -2401,6 +2613,7 @@ double rateMaxPareto(double c, int initial, Database* db, int num_states, int* p
 	//optimization - steepest ascent w/ line search
 	for (int it = 0; it < max_its; it++) {
 		//compute the gradient of hitting prob and rate
+		std::cout << it << "\n";
 		eq = computeGradEQ(initial, numInteractions, kappaVals, db, particleTypes, 
 												targets, gH);
 		R = computeGradRate(initial, numInteractions, kappaVals, db, particleTypes, 
@@ -2435,6 +2648,8 @@ double rateMaxPareto(double c, int initial, Database* db, int num_states, int* p
 
 	//free memory
 	delete []gH; delete []gR; 
+
+	c = eq;
 
 	//return the rate
 	return R;
@@ -2489,7 +2704,7 @@ void computeParetoFrontGD(int N, Database* db, int initial, int target, bool use
 	readKappaFile(numInteractions, kappaVals);
 
 	//set the grid spacing (in pi space)
-	double h = 0.005;
+	double h = 0.01;
 
 	//declare outfile
 	std::ofstream ofile;
@@ -2500,11 +2715,13 @@ void computeParetoFrontGD(int N, Database* db, int initial, int target, bool use
 	double eq = getEqProb(initial, kappaVals, db, particleTypes, targets);
 	//ofile << eq << ' ' << r << ' ' << kappaVals[0] << ' ' << kappaVals[1] << 
 	//	' ' << kappaVals[2] <<  "\n";
-	eq = 0.25;
+	eq = 0.01; 
+	double eq_grid = eq;
 
 	//increment eq, maximize r
-	while (eq < 0.97) {
-		eq += h;
+	while (eq_grid < 0.3) {
+		eq_grid += h;
+		eq = eq_grid;
 	//while (eq > 0.35) {
 		//eq -= h;
 

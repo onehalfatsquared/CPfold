@@ -1,6 +1,7 @@
 set(SOURCES
 	design.cpp
 	designTPT.cpp
+	irreversibleDesign.cpp
 	)
 
 add_library(design ${SOURCES})

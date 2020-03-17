@@ -41,7 +41,7 @@ void sameRank(std::ofstream& out_str, std::vector<int> states) {
 void makeEdgeClean(std::ofstream& out_str, int source, int target, double edgeWidth) {
 	//draw an edge from source to target - no labels
 
-	out_str << "\"" + std::to_string(source) + "\" -- \"" + 
+	out_str << "\"" + std::to_string(source) + "\" -> \"" + 
 	std::to_string(target) + "\" [penwidth = " + std::to_string(edgeWidth) + "]\n";
 }
 
@@ -141,6 +141,7 @@ void printGraph(Graph* g, int source, int draw, int clean, int reduce) {
 	out_str << "}";	
 
 	//free memory
+	out_str.close();
 	delete []drawn;
 }
 
@@ -262,6 +263,7 @@ void printGraphEndDistribution(Graph* g, int source, int reduce) {
 	out_str << "}";	
 
 	//free memory
+	out_str.close();
 	delete []drawn;
 }
 
@@ -598,6 +600,7 @@ void printGraphRev(Graph* g, int source, double* F, double* flux, int draw, int 
 	out_str << "}";	
 
 	//free memory 
+	out_str.close();
 	delete []drawn;
 }
 
@@ -709,14 +712,16 @@ void printGraphEqHit(Graph* g, int source, double* eq, double* F, int reduce) {
 	out_str << "}";	
 
 	//free memory
+	out_str.close();
 	delete []drawn;
 }
 
 void printGraphPF(Graph* g, int source, double* Z, int draw, int clean, 
 									 int reduce) {
-	//construct a graphviz file to print the graph - irreversible with partition fn
+	//construct a graphviz file to print the graph - irreversible with free enenrgy
 
-	int scale = 150;
+	int scale = 3;
+	int ew_scale = 90;
 
 	//keep track of drawn nodes and ranks
 	std::vector<int> rankVec; std::deque<int> toVisit;
@@ -729,11 +734,11 @@ void printGraphPF(Graph* g, int source, double* Z, int draw, int clean,
 	std::ofstream out_str(out);
 
 	//write the graphviz header
-	out_str << "graph bd {\n nodesep = 1.5; ranksep = 4; \n";
+	out_str << "digraph bd {\n nodesep = 1.5; ranksep = 4; ratio = 0.56\n";
 	out_str << "edge [ fontcolor=red, fontsize=48];\n";
 
 	//print the source node
-	printClusterRev(out_str, source, scale*Z[source]);
+	printClusterRev(out_str, source, scale*getPW(Z[source]));
 	rankVec.push_back(source);
 	sameRank(out_str, rankVec);
 	rankVec.clear(); drawn[source] = 1;
@@ -747,10 +752,10 @@ void printGraphPF(Graph* g, int source, double* Z, int draw, int clean,
 		double prob = (*g)[source].getEdgeProb(edge);
 		if (reduce == 0 || prob > PTOL) {
 			if (!drawn[T]) {
-				printClusterRev(out_str, T, scale*Z[T]);
+				printClusterRev(out_str, T, scale*getPW(Z[T]));
 				drawn[T] = 1; rankVec.push_back(T);
 			}
-			double edgeWidth = 40*node_prob*prob;
+			double edgeWidth = ew_scale*node_prob*prob;
 			if (clean == 0) {
 				makeEdge(out_str, source, T, edgeWidth, rate);
 			}
@@ -776,11 +781,11 @@ void printGraphPF(Graph* g, int source, double* Z, int draw, int clean,
 			double prob = (*g)[node].getEdgeProb(edge);
 			if (rate > 0.01 && (reduce == 0 || prob > PTOL)) {
 				if (!drawn[T]) {
-					printClusterRev(out_str, T, scale*Z[T]);
+					printClusterRev(out_str, T, scale*getPW(Z[T]));
 					drawn[T] = 1; rankVec.push_back(T);
 					toVisit.push_back(T);
 				}
-				double edgeWidth = 40*node_prob*prob;
+				double edgeWidth = 3*ew_scale*node_prob*prob;
 				if (clean == 0) {
 					makeEdge(out_str, node, T, edgeWidth, rate);
 				}
@@ -800,8 +805,132 @@ void printGraphPF(Graph* g, int source, double* Z, int draw, int clean,
 	out_str << "}";	
 
 	//free memory
+	out_str.close();
 	delete []drawn;
 }
+
+void makeLegend(std::ofstream& out_str) {
+	//make legend for colors
+
+	out_str << "subgraph legend {\n";
+	out_str << "label = \"Legend\"; fontsize = 72;\n";
+	out_str << "\"AA\" [label=\"AA\", fontsize=72, shape=circle, width = 5, regular = 1, style = filled, fillcolor=blue];\n";
+	out_str << "\"AB\" [label=\"AB\", fontsize=72, shape=circle, width = 5, regular = 1, style = filled, fillcolor=yellow];\n";
+	out_str << "\"BB\" [label=\"BB\", fontsize=72, shape=circle, width = 5, regular = 1, style = filled, fillcolor=red];\n";
+	out_str << "{rank = same; \"AA\";}\n";
+	out_str << "\"AA\" -> \"AB\" [style=invis]\n";
+	out_str << "{rank = same; \"AB\";}\n";
+	out_str << "\"AB\" -> \"BB\" [style=invis]\n";
+	out_str << "{rank = same; \"BB\";}\n";
+	out_str << "}\n";
+
+}
+
+void printGraphQuenched(Graph* g, int source, int countQ, int layer, std::string color1, std::string color2,
+											  std::string types, int draw, int clean, int reduce) {
+	//construct a graphviz file to print the graph - for a quenching problem where 
+
+	int scale = 3;
+	int ew_scale = 50;
+
+	//keep track of drawn nodes and ranks
+	std::vector<int> rankVec; std::deque<int> toVisit;
+	int ns = g->getN();
+	bool* drawn = new bool[ns]; for (int i = 0; i < ns; i++) drawn[i] = 0; 
+
+	//declare a file to write output to
+	std::string out;
+	out = "graphvizQ" + std::to_string(countQ) + ".txt";
+	std::ofstream out_str(out);
+
+	//write the graphviz header
+	out_str << "digraph bd {\n nodesep = 1.5; ranksep = 4; ratio = 0.56\n";
+	out_str << "edge [ fontsize=48];\n";
+
+	//make the legend and label of the graph
+	makeLegend(out_str);
+	out_str << " label = \"" + types + " \"; fontsize = 72;\n";
+
+
+
+	//print the source node
+	printCluster(out_str, source, draw);
+	rankVec.push_back(source);
+	sameRank(out_str, rankVec);
+	rankVec.clear(); drawn[source] = 1;
+
+	//loop over edges of source
+	std::string color = color1;
+	int E = (*g)[source].getNumEdges();
+	double node_prob = (*g)[source].getProb();
+	for (int edge = 0; edge < E; edge++) {
+		int T = (*g)[source].getEdgeTarget(edge);
+		double rate = (*g)[source].getEdgeRate(edge);
+		double prob = (*g)[source].getEdgeProb(edge);
+		if (reduce == 0 || prob > PTOL) {
+			if (!drawn[T]) {
+				printCluster(out_str, T, draw);
+				drawn[T] = 1; rankVec.push_back(T);
+			}
+			double edgeWidth = ew_scale*node_prob*prob;
+			if (clean == 0) {
+				makeEdgeRev(out_str, source, T, edgeWidth, rate, color);
+			}
+			else if (clean == 1) {
+				makeEdgeCleanRev(out_str, source, T, edgeWidth, color);
+			}
+			toVisit.push_back(T);
+		}
+	}
+	sameRank(out_str, rankVec); int rankNum = rankVec.size();
+	rankVec.clear();
+
+	//loop over the rest of the nodes
+	int count = 0; int current_layer = 1;
+	while (!toVisit.empty()) {
+		int node = toVisit[0];
+		count++;
+		int E = (*g)[node].getNumEdges();
+		double node_prob = (*g)[node].getProb();
+		for (int edge = 0; edge < E; edge++) {
+			int T = (*g)[node].getEdgeTarget(edge);
+			double rate = (*g)[node].getEdgeRate(edge);
+			double prob = (*g)[node].getEdgeProb(edge);
+			if (rate > 0.01 && (reduce == 0 || prob > PTOL)) {
+				if (!drawn[T]) {
+					printCluster(out_str, T, draw);
+					drawn[T] = 1; rankVec.push_back(T);
+					toVisit.push_back(T);
+				}
+				double edgeWidth = ew_scale*node_prob*prob;
+				if (clean == 0) {
+					makeEdgeRev(out_str, node, T, edgeWidth, rate, color);
+				}
+				else if (clean == 1) {
+					makeEdgeCleanRev(out_str, node, T, edgeWidth, color);
+				}
+			}
+		}
+		toVisit.pop_front();
+		if (count == rankNum) {
+			count = 0; rankNum = rankVec.size();
+			current_layer++;
+			if (current_layer == layer) {
+				color = color2;
+			}
+			//std::cout << current_layer << "\n";
+			sameRank(out_str, rankVec); rankVec.clear();
+		}
+	}
+
+	//end reached - put a curly to end
+	out_str << "}";	
+
+	//free memory
+	out_str.close();
+	delete []drawn;
+}
+
 
 
 }

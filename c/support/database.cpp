@@ -506,7 +506,122 @@ void lumpPerms(Database* db) {
 
 	//free memory
 	delete []lumpMap;
+}
 
+void lumpEntries(Database* db, int state, std::vector<int> perms, bool quiet) {
+	//updates the entries of the lumped state //todo Z and Zerr
+
+	int N = db->getN(); int ns = db->getNumStates();
+
+	//basic quantities
+	double freq = (*db)[state].getFrequency();
+	int num = (*db)[state].getNumerator();
+	int denom = (*db)[state].getDenominator();
+	double mfpt = (*db)[state].getMFPT();
+	double sigma = (*db)[state].getSigma();
+	double dt = mfpt * denom / num;
+
+	//state dependent quantities
+	std::vector<Pair> P = (*db)[state].getP();
+	std::vector<Pair> Z = (*db)[state].getZ();
+	std::vector<Pair> Zerr = (*db)[state].getZerr();
+
+	//isomorphism vectors
+	std::vector<int> iso;
+	std::vector<Pair> isoPair;
+
+	//make new P that contains min isomorphism indexes
+	std::vector<Pair> Pnew, isoPnew; 
+	getMinIndex(N, ns, P, db, iso, isoPnew);
+	combinePairs(Pnew, isoPnew);
+
+	for (int i = 1; i < perms.size(); i++) {
+
+		if (!quiet)
+			printf("%d, ", perms[i]);
+		//update basic quantities
+		freq += (*db)[perms[i]].getFrequency();
+		num += (*db)[perms[i]].getNumerator();
+		denom += (*db)[perms[i]].getDenominator();
+		double nextMFPT = (*db)[perms[i]].getMFPT();
+		double nextSQ = nextMFPT*nextMFPT;
+		double nextSigma = (*db)[perms[i]].getSigma();
+		//progogate error in mfpt reciprocals
+		if (mfpt > 0 && nextMFPT > 0) {
+			mfpt = 1 / (1/mfpt + 1/nextMFPT); 
+			sigma = sqrt(sigma*sigma + nextSigma*nextSigma/(nextSQ*nextSQ));
+		}
+
+		//update state dependent quantities
+		//get quantities for states getting lumped
+		std::vector<Pair> P2 = (*db)[perms[i]].getP();
+		std::vector<Pair> Z2 = (*db)[perms[i]].getZ();
+		std::vector<Pair> Zerr2 = (*db)[perms[i]].getZerr();
+
+		//compute the minimum index of this states isomorphisms
+		getMinIndex(N, ns, P2, db, iso, isoPair);
+
+		//have the pair vector to update P with. call function to update
+		combinePairs(Pnew, isoPair);
+
+
+	}
+
+	//write the updates back to the DB
+	(*db)[state].freq = freq;
+	(*db)[state].num = num;
+	(*db)[state].denom = denom;
+	(*db)[state].mfpt = mfpt;
+	(*db)[state].sigma = sigma*mfpt*mfpt;
+	(*db)[state].num_neighbors = Pnew.size();
+	(*db)[state].P = Pnew;
+	(*db)[state].Z = Z; // todo
+	(*db)[state].Zerr = Zerr;// todo
+		
+
+}
+
+void lumpPerms(Database* db, bool quiet) {
+	//loop over states, lump perms, get vector of repeated states
+
+	int N = db->getN(); int ns = db->getNumStates();
+	std::vector<int> repeated; repeated.clear();
+	std::vector<int> perms; perms.clear();
+	int* lumpMap = new int[ns]; 
+
+	int count = 0;
+
+	for (int i = 0; i < ns; i++) {
+		//check that i is not in repeated list
+		if (std::find(repeated.begin(), repeated.end(), i) == repeated.end()) {
+			//find iso states, lump them together
+			findIsomorphic(N, ns, i, db, perms);
+			if (!quiet)
+				printf("State %d is a permutation of state ", i);
+			lumpEntries(db, i, perms, quiet);
+			if (!quiet)
+				printf("\n");
+			//add to repeated vector, so they are not called twice
+			repeated.insert(repeated.end(), perms.begin()+1, perms.end());
+			//update lumpMap
+			for (int j = 0; j < perms.size(); j++) {
+				lumpMap[perms[j]] = count;
+			}
+			count += 1;
+			//clear perms vector
+			perms.clear();
+		}
+	}
+	//store the purge vector
+	db->toPurge = repeated;
+	
+	//store lumpMap in DB
+	for (int i = 0; i < ns; i++) {
+		db->lumpMap[i] = lumpMap[i];
+	}
+
+	//free memory
+	delete []lumpMap;
 }
 
 void combineMFPTdata(Database* db1, Database* db2) {
@@ -799,14 +914,52 @@ void updateHyperstatic(Database* db, double beta, double E) {
 				(*db)[i].freq /= totalProb;
 			}
 		}
-
-
-
-
-
-
-
 	}
+}
+
+void findState(Database* db, int num_bonds, std::string* bonds, int bond_cons) {
+	//find states in the database consistent with given constraints
+
+	//get db info
+	int N = db->getN();
+	int num_states = db->getNumStates();
+
+	//make arrays with bonds
+	int* b1 = new int[num_bonds];
+	int* b2 = new int[num_bonds];
+	for (int i = 0; i < num_bonds; i++) {
+		b1[i] = stoi(bonds[2*i]); b2[i] = stoi(bonds[2*i+1]);
+	}
+	
+	//loop over all states
+	for (int state = 0; state < num_states; state++) {
+		bool consistent = true;
+		int B = (*db)[state].getBonds();
+		for (int bond = 0; bond < num_bonds; bond++) {
+			int i = b1[bond]; int j = b2[bond];
+			if (!(*db)[state].isInteracting(i,j,N)) {
+				consistent = false;
+			}
+		}
+
+		//if consistent is true, print out info about the state
+		if (consistent && (bond_cons == 0 || B == bond_cons)) {
+			printf("State: %d\n", state);
+			printf("Bonds: %d\n", (*db)[state].getBonds());
+			const Cluster& cl = (*db)[state].getRandomIC();
+			for (int i = 0; i < N; i++) {
+				std::cout << cl[i].x << ' ' << cl[i].y << ' ';
+			}
+			std::cout << "\n\n";
+
+		}
+	}
+	
+
+
+	//free memory
+	delete []b1; delete []b2; delete []b1;
+
 
 }
 

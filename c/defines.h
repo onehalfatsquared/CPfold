@@ -23,4 +23,4 @@
 #define MAX_ITS SAMPLES*300    // max number of mcmc steps before sim is cut off
 
 //visual parameters
-#define PTOL        0.07       // exclude nodes from plot with less than this probability
+#define PTOL        0.1       // exclude nodes from plot with less than this probability

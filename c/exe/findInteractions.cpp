@@ -42,6 +42,7 @@ int main(int argc, char* argv[]) {
 	//make surface of hitting probs w/ fixed AB interactions
 	//bd::constructSurfaceTOY(N, db, initial, target, useFile);
 	//bd::constructScatterTOY(N, db, initial, target, useFile);
+	//bd::constructScatterTOY1(N, db, initial, target);
 
 	//do a maximization using the particle labels in file
 	//bd::hittingProbMaxTOY(N, db, initial, target, useFile);
@@ -64,10 +65,16 @@ int main(int argc, char* argv[]) {
 	//evaluate the eq prob and rate at kappa in file
 	//bd::evalStats(N, db, initial, target, useFile);
 	//bd::computeParetoFront(N, db, initial, target, useFile);
-	bd::computeParetoFrontGD(N, db, initial, target, useFile);
+	//bd::computeParetoFrontGD(N, db, initial, target, useFile);
 
 	//tpt stuff
 	//performTPT(N, db, initial, target, useFile);
+
+	//irreversible stuff
+	//irreversibleGraph(N, db, initial, target, useFile); //graphs for aleks 
+	//generateAllGraphs(N, db, initial);
+	//findQuenches(N, db);
+	graphQuenches(N, db, initial);
 
 
 

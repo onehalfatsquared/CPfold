@@ -6,18 +6,28 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fopenmp ")
 
 add_subdirectory(nauty)
 include_directories(nauty)
+
 add_subdirectory(support)
 include_directories(support)
+
 add_subdirectory(physics)
 include_directories(physics)
+
 add_subdirectory(visual)
 include_directories(visual)
+
 add_subdirectory(tpt)
 include_directories(tpt)
+
 add_subdirectory(design)
 include_directories(design)
+
+add_subdirectory(lattice)
+include_directories(lattice)
+
 add_subdirectory(hydro)
 include_directories(hydro)
+
 add_subdirectory(exe)
 
 file(COPY input DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/exe)

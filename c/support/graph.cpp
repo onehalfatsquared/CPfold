@@ -452,6 +452,157 @@ void findConditionalEnd(Graph* g, int source) {
 
 
 
+/********************************************************************/
+/********* Constructing Graphs from transition matrices *************/
+/********************************************************************/
+
+double getRowDistribution(double* T, int row, int num_states, std::vector<Pair>& P) {
+	//put the transition probabilities in a vector
+
+	double S = 0; //normalizing constant
+	for (int i = 0; i < num_states; i++) {
+		double rate = T[toIndex(row, i, num_states)];
+		if (rate > 0) {
+			S += rate;
+			P.push_back(Pair(i, rate));
+		}
+	}
+
+	return S;
+
+}
+double updateGraphTM(int node, double* T, int num_states, Graph* g, bool* present, int& count,
+									 std::vector<int>& nextNode) {
+	/*takes a node, makes all its edges, checks if targets exist already,
+	creates or updates target nodes
+	returns the probability of the target*/
+
+	//probability tolerance on including node
+	double tol = 1e-5;
+
+	//get the interactions of the current node
+	std::vector<Pair> P;
+	double S = getRowDistribution(T, node, num_states, P);
+
+	double target_prob;
+	
+	
+
+	//loop over P - make edges, add nodes
+	for (int i = 0; i < P.size(); i++) {
+		//make edge
+		int target = P[i].index; double prob = P[i].value/S;
+		if (S > tol) {
+			(*g)[node].edges.push_back(Edge(target, S, prob));
+			(*g)[target].back_edges.push_back(node);
+
+			//add/update nodes
+			if (!present[target]) {//node does not exist, add
+				//std::cout << target << "\n";
+				present[target] = 1; //update present arrays
+				Vertex& v = (*g)[target]; //set reference v 
+				v.index = target;
+				v.prob = v.prob + (*g)[node].prob * prob;
+				count++;
+				nextNode.push_back(target);
+			}
+			else {//node already exists, just update
+				(*g)[target].prob = (*g)[target].prob + (*g)[node].prob * prob;
+			}
+
+			target_prob = (*g)[target].prob;
+			//std::cout << target_prob << "\n";
+		}
+	}
+
+	return target_prob;
+}
+
+
+Graph* makeGraphTM(double* T, int initial, int particles, int N, int& nodeM, double& probM) {
+	//using the values in the transition matrix, make a graph structure
+
+	//make an array of node indices already in the graph. 0 ->no, 1->yes.
+	bool* present = new bool[N]; for (int i = 0; i < N; i++) present[i] = 0;
+
+	//call graph constructor
+	Graph* graph = new Graph(N);
+
+	//set the minimum number of bonds - particles-1
+	int min_bond = particles-1; int first = initial; 
+
+	//set counters for number of end states
+  int countUpdates = 1;
+
+  //create a vector of next states to focus
+  std::vector<int> nextNode;
+
+  double max_node_prob = 0;
+  int max_node = initial;
+
+
+  //create the first node of the graph
+	int count = 1; //count the number of nodes made - 1 so far
+	Vertex& v = (*graph)[first]; //set reference v to first vertex in graph
+	v.index = first; //set the index of worm state, just found
+	v.prob = 1; //guaranteed starting configuration, prob = 1
+	max_node_prob = updateGraphTM(first, T, N, graph, present, count, nextNode);
+
+	//loop over the vector of new nodes
+	while (nextNode.size() > 0) {
+		/*
+		for (int i = 0; i < nextNode.size(); i++) {
+			std::cout << nextNode[i] << ' ';
+		}
+		*/
+
+		//get the first entry and remove it
+		int node = nextNode.front();
+		if (nextNode.size() > 0) {
+			nextNode.erase(nextNode.begin());
+		}
+
+		//std::cout << "\n" << node << "\n";
+
+		//update graph stats and keep track of the largest node probability
+		double node_prob = updateGraphTM(node, T, N, graph, present, count, nextNode);
+		if (node_prob == max_node_prob) {
+			max_node = node;
+		}
+		if (node_prob > max_node_prob) {
+			max_node_prob = node_prob;
+			max_node = (*graph)[node].getEdgeTarget(0);
+		}
+
+		//std::cout << node << "\n";
+
+		countUpdates+=1;
+	}
+
+	//set the maxima to output
+	nodeM = max_node;
+	probM = max_node_prob;
+
+	
+
+	//set number of end states - TODO make this work?
+	graph->end = N - countUpdates;
+	//printf("End states: %d.\n", graph->end);
+	//printf("Max node probability: %f\n", max_node_prob);
+	//printf("Max node index %d\n", max_node);
+
+	//free memory
+	delete []present; 
+
+	//return the graph
+	return graph;
+}
+
+
+
+
+
+
 
 
 

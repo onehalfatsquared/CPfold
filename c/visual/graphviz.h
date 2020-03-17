@@ -45,4 +45,9 @@ double getMax(int num_states, double* array);
 void printGraphPF(Graph* g, int source, double* Z, int draw, int clean, 
 									 int reduce); 
 
+//for quenching problems
+void printGraphQuenched(Graph* g, int source, int count, int layer, std::string color1, std::string color2,
+											  std::string types, int draw, int clean, int reduce);
+void makeLegend(std::ofstream& out_str);
+
 }

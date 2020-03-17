@@ -116,6 +116,9 @@ class Database {
 Database* readData(std::string& filename);
 std::ostream& operator<<(std::ostream&, const Database&);
 
+//searching db
+void findState(Database* db, int num_bonds, std::string* bonds, int bond_cons);
+
 //functions to remove unphysical states from the database
 bool checkPhysicalState(int N, int state, Database* db);
 void makeNM(int N, int state, int b, Database* db, Eigen::VectorXd , Eigen::MatrixXd& , 
@@ -126,7 +129,9 @@ void purgeUnphysical(Database* db);
 //functions to lump permutations together in the database
 void combinePairs(std::vector<Pair>& p1, std::vector<Pair> p2);
 void lumpEntries(Database* db, int state, std::vector<int> perms);
+void lumpEntries(Database* db, int state, std::vector<int> perms, bool quiet);
 void lumpPerms(Database* db);
+void lumpPerms(Database* db, bool quiet);
 void getMinIndex(int N, int ns, std::vector<Pair> P, Database* db, 
 									std::vector<int>& iso, std::vector<Pair>& isoPair );
 

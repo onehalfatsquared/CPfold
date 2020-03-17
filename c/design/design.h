@@ -1,4 +1,5 @@
 #pragma once
+#include "point.h"
 #include <vector>
 #include <map>
 #include <deque>
@@ -8,6 +9,7 @@ class Database;
 //general functions
 void getBondTypes(int N, int* particleTypes, Database* db, std::vector<int> targets);
 int setTypes(int N, int* particleTypes, int IC);
+void setTypes(int N, int* particleTypes, std::deque<std::string> perms, int perm);
 double getStickyProduct(int N, int state,  Database* db, int* particleTypes, 
 												std::map<std::pair<int,int>,double> kappa);
 void reweight(int N, int num_states, Database* db, int* particleTypes, double* eq,
@@ -29,11 +31,15 @@ void applyMax(int numInteractions, double* kappaVals, double M);
 //generic plots
 void constructSurfaceTOY(int N, Database* db, int initial, int target, bool useFile);
 void constructScatterTOY(int N, Database* db, int initial, int target, bool useFile);
+void constructScatterTOY1(int N, Database* db, int initial, int target);
 
 //hitting probability optimization
+void printHitProbability(int num_states, int initial, std::vector<int> targets, double* U);
 double getHitProbability(int num_states, int initial, std::vector<int> targets, double* U);
 double solveAbsorbProblem(int initial, double* kappaVals, Database* db, int* particleTypes, 
 								 					double* Tconst, std::vector<int> ground, std::vector<int> targets);
+void solveAbsorbProblem(int initial, double* kappaVals, Database* db, int* particleTypes, 
+								 					double* Tconst, std::vector<int> targets);
 
 double computeGradHP(int initial, int numInteractions, double* kappaVals, Database* db, 
 								 int* particleTypes, double* Tconst, std::vector<int> ground, 
@@ -87,7 +93,7 @@ void estimateHittingProbability(int N, Database* db, int target);
 //testing
 void evalStats(int N, Database* db, int initial, int target, bool useFile);
 void computeParetoFront(int N, Database* db, int initial, int target, bool useFile);
-double rateMaxPareto(double c, int initial, Database* db, int num_states, int* particleTypes, 
+double rateMaxPareto(double& c, int initial, Database* db, int num_states, int* particleTypes, 
 										 int numInteractions, double* kappaVals, double* Tconst, 
 										 std::vector<int> ground, std::vector<int> targets);
 void computeParetoFrontGD(int N, Database* db, int initial, int target, bool useFile);
@@ -97,6 +103,37 @@ void computeParetoFrontGD(int N, Database* db, int initial, int target, bool use
   These functions will call TPT functions with the proper re-weighting. */
 
 void performTPT(int N, Database* db, int initial, int target, bool useFile);
+void lumpArrays(int old_states, int new_states, int* lumpMap, Database* db, double* F, 
+								double* Fnew, double* flux, double* fluxNew, double* r, double* rNew, 
+								double* eq, double* eqNew, double* q, double* qNew, double* Tnew, 
+								int initial, int target);
+
+/* irreversibleDesign functions. */
+bool hasInvalidInteraction(int state, Database* db, int* particleTypes,
+													 std::map<std::pair<int,int>,double> kappa);
+void getKappaQuench(double* kappaVals, std::vector<Point>& kappaQuench);
+void getColor(double* kappaVals, std::string& color);
+void getPstring(int N, int* particleTypes, std::string& pString);
+
+void killTransitions(double* Tnew, int new_states, double* T, int* lumpMap, Database* db, 
+										 int* particleTypes, std::map<std::pair<int,int>,double> kappa);
+void killTransitionsQuench(double* Tnew, int new_states, double* T, int* lumpMap, Database* db, 
+										 int* particleTypes, std::map<std::pair<int,int>,double> kappa1, 
+										 std::map<std::pair<int,int>,double> kappa2, int c1);
+
+void irreversibleGraph(int N, Database* db, int initial, int target, bool useFile);
+void generateAllGraphs(int N, Database* db, int initial);
+bool generateGraph(int N, Database* db, int initial, int numTypes, int num_interactions, 
+									 std::vector<int> ground, int* particleTypes, Point interaction, 
+									 double* Tconst, double* kappaVals, int& max_node);
+void generateQuenchedGraph(int N, Database* db, int initial, int numTypes, int numInteractions, 
+									 std::vector<int> ground, int* particleTypes, double* Tconst, 
+									 double* kappaVals1, double* kappaVals2, int c1, int count);
+void testQuench(int N, Database* db, int initial, int numTypes, int numInteractions, 
+								std::vector<int> ground, int* particleTypes, std::ofstream& ofile, 
+								double* Tconst, double* kappaVals);
+void findQuenches(int N, Database* db);
+void graphQuenches(int N, Database* db, int initial);
 
 
 

@@ -87,6 +87,12 @@ void performTPT(int N, Database* db, int initial, int target, bool useFile) {
 	//get bonds -> bonds+1 entries from mfpt estimates
 	createTransitionMatrix(T, num_states, db, groundStates);
 
+	/*
+	for (int i = 0; i < groundStates.size(); i++) {
+		std::cout << groundStates[i] << "\n\n";
+	}
+	*/
+
 	//set up particle identity
 	int* particleTypes = new int[N];
 	int numTypes;
@@ -179,7 +185,7 @@ void performTPT(int N, Database* db, int initial, int target, bool useFile) {
 	//std::cout << "graph made";
 
 	//print out graphviz file with tpt data
-	printGraphRev(g, initial, Fnew, fluxNew, 1, 1, 0);
+	printGraphRev(g, initial, Fnew, fluxNew, 1, 1, 1);
 
 	//free the memory
 	delete Z;
@@ -189,37 +195,7 @@ void performTPT(int N, Database* db, int initial, int target, bool useFile) {
 	delete []particleTypes; delete []kappaVals;
 	delete []lumpMap;
 	delete db2; delete g;
-
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 }

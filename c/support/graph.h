@@ -40,6 +40,8 @@ class Vertex {
 		~Vertex();
 		friend Graph* makeGraph(Database* db);
 		friend void updateGraph(int node, Database* db, Graph* g, bool* present, int& count);
+		friend Graph* makeGraphTM(double* T, int initial, int particles, int N, int&, double&);
+		friend double updateGraphTM(int node, double* T, int num_states, Graph* g, bool* present, int& count, std::vector<int>&);
 		friend Graph* targetSubgraph(Graph* g, int source, int target);
 		friend Graph* sourceSubgraph(Graph* g, int source);
 		friend void findConditionalEnd(Graph* g, int source);
@@ -82,6 +84,8 @@ class Graph {
 		const Vertex& operator[](int index) const {return vertices[index];}
 		friend void updateGraph(int node, Database* db, Graph* g, bool* present, int& count);
 		friend Graph* makeGraph(Database* db);
+		friend double updateGraphTM(int node, double* T, int num_states, Graph* g, bool* present, int& count, std::vector<int>&);
+		friend Graph* makeGraphTM(double* T, int initial, int particles, int N, int& node, double& prob);
 
 		//accessor functions
 		int getN() const {return N;}
@@ -119,6 +123,8 @@ void fillRates(Graph* g, std::vector<int> path, std::vector<double>& rates);
 
 void getEndDistribution(Graph* g, int source, double* probs, int possible, std::map<int,int> toIndex, int* indices);
 void findConditionalEnd(Graph* g, int source);
+
+Graph* makeGraphTM(double* T, int initial, int particles, int N, int& node, double& prob);
 
 
 
