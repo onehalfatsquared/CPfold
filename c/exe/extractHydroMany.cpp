@@ -30,12 +30,12 @@ int main(int argc, char* argv[]) {
 	if (hydro == 0) { //hydro is off
 		dt = 0.01;
 		n_save = 40;
-	  base += "noHD";
+	  base += "noHD/noHD";
 	}
 	else { //hydro is on
 		dt = 0.1;
 		n_save = 40;
-		base += "HD";
+		base += "HD/HD";
 	}
 
 	//get timestep info

@@ -6,6 +6,8 @@
 #include <utility>
 #include <random>
 #include <chrono>
+#include <iostream>
+#include "../defines.h"
 
 
 struct pair_hash
@@ -58,6 +60,7 @@ typedef std::unordered_map<std::pair<int,int>,Particle*,pair_hash> particleMap;
 void getTypes(int N, int* types, bool useFile);
 void initChain(int N, Particle* chain, particleMap& cMap, 
 							 bool useFile);
+int toIndex(int r, int c, int m);
 
 
 
@@ -70,6 +73,9 @@ void checkRotation(int x, int y, int particle, Particle* chain, std::vector<std:
 void getRotations(int particle, int neighbor, Particle* chain, std::vector<std::pair<int,int>>& moves,
 						  particleMap& cMap);
 
+void checkCorner(int x, int y, std::vector<std::pair<int,int>>& moves,
+									 particleMap& cMap);
+
 void getCorners(int particle, Particle* chain, std::vector<std::pair<int,int>>& moves,
 						  particleMap& cMap);
 
@@ -78,7 +84,7 @@ void getMoves(int N, int particle, Particle* chain, std::vector<std::pair<int,in
 
 
 //energy functions
-void getBonds(int N, Particle* chain, std::vector<std::pair<int,int>> bonds);
+void getBonds(int N, Particle* chain, std::vector<std::pair<int,int>>& bonds);
 
 //mcmc functions
 int randomInteger(int N, RandomNo* rngee);
@@ -88,6 +94,7 @@ void acceptMove(int particle, int x_old, int y_old, Particle* chain,
 void rejectMove(int particle, int x_old, int y_old, Particle* chain);
 void takeStep(int N, Particle* chain, particleMap& cMap,
 							RandomNo* rngee, double& energy);
+void runMCMC(int N, bool useFile);
 
 
 
