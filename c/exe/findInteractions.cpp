@@ -74,7 +74,10 @@ int main(int argc, char* argv[]) {
 	//irreversibleGraph(N, db, initial, target, useFile); //graphs for aleks 
 	//generateAllGraphs(N, db, initial);
 	//findQuenches(N, db);
-	graphQuenches(N, db, initial);
+	//graphQuenches(N, db, initial);
+
+	bd::evolveProbability(N, db, initial, useFile);
+	bd::testTransitionTimes(N, db, initial, target);
 
 
 

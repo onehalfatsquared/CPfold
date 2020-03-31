@@ -48,6 +48,9 @@ double sampleSTD(double* X, int n);
 bool findMatrix(int* M, int* old, int old_bonds, int N, Database* db, int& timer, 
 	int& reset, int& reflect, int& new_state);
 
+void sampleFirstExit(int N, int state, Database* db);
+double gyrationRadius(int N, double* X);
+
 
 
 }

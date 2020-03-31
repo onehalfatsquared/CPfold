@@ -70,6 +70,11 @@ void checkState(int N, double* X, int state, Database* db,
 							  bool& reset, int& new_state);
 void determineTransitions(HCC* hc, Database* db, double tps);
 
+//functions to compute statistics
+void distributionFHT(HCC* hc, Database* db, std::vector<double>& q, int which);
+void timeAverageFHT(HCC* hc, Database* db, std::vector<double>& q, int which);
+void sampleStats(std::vector<double> X, double& M, double& V);
+
 //test functions
 void testExtract(HCC* hc);
 

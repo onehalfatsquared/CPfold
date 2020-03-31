@@ -68,6 +68,7 @@ int main(int argc, char* argv[]) {
 	else if (rType == 1) {
 		//just perform test on linear chain with resets
 
+		/*
 		bd::estimateChain(N, source, db);
 
 		//output the mfpt results to file
@@ -75,6 +76,10 @@ int main(int argc, char* argv[]) {
 		out = out + "mfptChain.txt";
 		std::ofstream out_str(out);
 		out_str << *db; 
+		*/
+
+		//estimate a quantity at the first hitting time
+		bd::sampleFirstExit(N, source, db);
 	}
 
 	//free memory - delete database

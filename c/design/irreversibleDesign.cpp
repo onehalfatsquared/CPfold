@@ -8,6 +8,7 @@
 #include <map>
 #include <deque>
 #include <eigen3/Eigen/Dense>
+#include <eigen3/unsupported/Eigen/MatrixFunctions>
 #include "point.h"
 #include "pair.h"
 #include "adjacency.h"
@@ -25,7 +26,7 @@ bool hasInvalidInteraction(int state, Database* db, int* particleTypes,
 													 std::map<std::pair<int,int>,double> kappa) {
 	//check if any bonds are of a disallowed type
 
-	double btol = 1;
+	double btol = 0.9;
 	int N = db->getN();
 
 	for (int i = 0; i < N; i++) {
@@ -770,7 +771,304 @@ void graphQuenches(int N, Database* db, int initial) {
 	delete []particleTypes; delete []kappaVals1; delete []kappaVals2; delete []Tconst;
 }
 
+void matrixExp(int num_states, double t, Eigen::MatrixXd G, Eigen::VectorXd P, 
+							 Eigen::VectorXd& Pnew) {
+	//computes the matrix exponential and product, Pnew = exp(tG)*P
 
+	G *= t;
+	Pnew =  (G.exp()).transpose() * P;
+
+}
+
+void evolveProbability(int N, Database* db, int initial, bool useFile) {
+	//get the probability distribution until a time t for given transition rate matrix
+
+	//parameters
+	int t_max = 10;
+	int M = 100;
+	double dt = double(t_max) / double(M);
+
+	//get database info
+	int num_states = db->getNumStates(); 
+
+	//set up particle identity
+	int* particleTypes = new int[N];
+	int numTypes;
+	if (useFile) { //use the fle to set identities
+		numTypes = readDesignFile(N, particleTypes);
+	}
+	else { //uses the function to set identities
+		int IC = 1; 
+		numTypes = setTypes(N, particleTypes, IC);
+	}
+	int numInteractions = numTypes*(numTypes+1)/2;
+
+	//set up sticky parameter values
+	double* kappaVals = new double[numInteractions];
+	readKappaFile(numInteractions, kappaVals);
+
+	//declare rate matrix
+	double* Tconst = new double[num_states*num_states]; //rate matrix - only forward entries
+
+	//init the rate matrix with zeros
+	for (int i = 0; i < num_states*num_states; i++) {
+		Tconst[i] = 0;
+	}
+
+	//get bonds->bonds+1 entries from mfpt estimates
+	std::vector<int> ground; //vector to hold all ground states - also target states here
+	createTransitionMatrix(Tconst, num_states, db, ground); 
+
+	//declare the kappa map
+	std::map<std::pair<int,int>,double> kappa;
+
+	//compute the eq probability at the current kappa vals
+	//make the map
+	makeKappaMap(numTypes, kappaVals, kappa);
+
+	//DO LUMPING - db does not change, just gets assigned a lumpMap
+	//upon being output, the new database reflects the lumping
+	lumpPerms(db, true);
+	std::string out = "temp.txt";
+	std::ofstream out_str(out);
+	out_str << *db; 
+	Database* db2 = readData(out);
+	int* lumpMap = new int[num_states];
+	for (int i = 0; i < num_states; i++) lumpMap[i] = db->lumpMap[i];
+
+	//make the new arrays
+	int new_states = db2->getNumStates();
+	double* Tnew = new double[new_states*new_states];
+
+	//zero out new transition matrix
+	for (int i = 0; i < new_states*new_states; i++) {
+		Tnew[i] = 0;
+	}
+	//make the Tnew matrix - zero out any rates to inaccesible state
+	killTransitions(Tnew, new_states, Tconst, lumpMap, db, particleTypes, kappa);
+	fillDiag(Tnew, new_states);
+
+	//open a file to write the data to
+	std::ofstream ofile;
+	ofile.open("probEvo.txt");
+
+	//make an eigen matrix out of Tnew and a vector for probabilities
+	Eigen::MatrixXd G(new_states,new_states); //generator
+	Eigen::VectorXd P(new_states);            //initial probability distribution
+	Eigen::VectorXd Pnew(new_states);            //initial probability distribution
+
+	//copy Tnew into G
+	for (int i = 0; i < new_states*new_states; i++) {
+		G(i) = Tnew[i]; 
+	}
+
+	//make P a delta function at initial state
+	Pnew.fill(0.0);
+	P.fill(0.0); P(initial) = 1.0;
+
+	//print the initial data to file
+	ofile << 0 << ' ';
+	for (int i = 0; i < new_states; i++) {
+		ofile << P(i) << ' ';
+	}
+	ofile << "\n";
+
+	//loop over time increments to construct P(t)
+	double t = 0;
+	for (int i = 0; i < M; i++) {
+		t += dt;
+		matrixExp(new_states, t, G, P, Pnew);
+		ofile << t << ' ';
+		for (int i = 0; i < new_states; i++) {
+			ofile << Pnew(i) << ' ';
+		}
+		ofile << "\n";
+	}
+	
+
+	//close the outfile
+	ofile.close();
+
+	//free the memory
+	delete []particleTypes; delete []Tconst; delete []kappaVals;
+	delete []lumpMap; delete []Tnew;
+	delete db2;
+}
+
+
+void evaluatePtc(int N, Database* db, int initial, int numTypes, int numInteractions, 
+									 std::vector<int> ground, int* particleTypes, double* Tconst, 
+									 double* kappaVals1, double* kappaVals2, int c1, int c2) {
+	//compute the transition matrices pre and post quench and compute 
+	//steady state probabilities for various values of tc
+
+	//get number of states
+	int num_states = db->getNumStates();
+
+	//store transition matrix in new array
+	double* T = new double[num_states*num_states];
+	for (int i = 0; i < num_states*num_states; i++) {
+		T[i] = Tconst[i];
+	} 
+
+	//declare the kappa map
+	std::map<std::pair<int,int>,double> kappa1;
+	std::map<std::pair<int,int>,double> kappa2;
+
+	//compute the eq probability at the current kappa vals
+	//make the map
+	makeKappaMap(numTypes, kappaVals1, kappa1);
+	makeKappaMap(numTypes, kappaVals2, kappa2);
+
+	//DO LUMPING - db does not change, just gets assigned a lumpMap
+	//upon being output, the new database reflects the lumping
+	lumpPerms(db, true);
+	std::string out = "temp.txt";
+	std::ofstream out_str(out);
+	out_str << *db; 
+	Database* db2 = readData(out);
+	int* lumpMap = new int[num_states];
+	for (int i = 0; i < num_states; i++) lumpMap[i] = db->lumpMap[i];
+
+	//make the new arrays
+	int new_states = db2->getNumStates();
+	double* TlumpPre = new double[new_states*new_states];
+	double* TlumpPost = new double[new_states*new_states];
+
+	//zero out new transition matrix
+	for (int i = 0; i < new_states*new_states; i++) {
+		TlumpPre[i] = 0;
+		TlumpPost[i] = 0;
+	}
+	//make the Tnew matrix - zero out any rates to inaccesible state
+	killTransitions(TlumpPre, new_states, T, lumpMap, db, particleTypes, kappa1);
+	fillDiag(TlumpPre, new_states);
+	for (int i = 0; i < num_states*num_states; i++) {
+		T[i] = Tconst[i];
+	} 
+	killTransitions(TlumpPost, new_states, T, lumpMap, db, particleTypes, kappa2);
+	fillDiag(TlumpPost, new_states);
+
+	//open a file to write the data to
+	std::ofstream ofile;
+	ofile.open("probSwitchingTime.txt");
+
+	//make an eigen matrix out of Tnew and a vector for probabilities
+	Eigen::MatrixXd Gpre(new_states,new_states); //generator pre quench
+	Eigen::MatrixXd Gpost(new_states,new_states); //generator post quench
+	Eigen::VectorXd P(new_states);            //initial probability distribution
+	Eigen::VectorXd Pnew(new_states);            //prob after tc
+	Eigen::VectorXd Pnew2(new_states);            //prob after t_ss
+
+	//copy Tnew into G
+	for (int i = 0; i < new_states*new_states; i++) {
+		Gpre(i) = TlumpPre[i]; Gpost(i) = TlumpPost[i]; 
+	}
+
+	//make P a delta function at initial state
+	Pnew.fill(0.0); Pnew2.fill(0.0);
+	P.fill(0.0); P(initial) = 1.0;
+
+	//set parameters for data collection
+	int t_max = 20;
+	int M = 100;
+	double dt = double(t_max) / double(M);
+	double t_ss = 100.0;
+
+	double tc = 0; 
+	for (int i = 0; i < M; i++) {
+		matrixExp(new_states, tc, Gpre, P, Pnew);
+		matrixExp(new_states, t_ss-tc, Gpost, Pnew, Pnew2);
+		ofile << tc << ' ' << Pnew2(c2) << "\n";
+		tc += dt;
+	}
+
+	//close file
+	ofile.close();
+
+
+	//free memory
+	delete []T; delete []lumpMap; delete []TlumpPre; delete []TlumpPost;
+	delete db2;
+}
+
+void testTransitionTimes(int N, Database* db, int initial, int scheme) {
+	//for a given quench scheme, study how the probability to end up in 
+	//a given ground state depends on the parameter switching time
+
+	//get database info
+	int num_states = db->getNumStates(); 
+
+	//set up particle identity
+	int* particleTypes = new int[N];
+	int numTypes = 2;
+	int numInteractions = numTypes*(numTypes+1)/2;
+
+	//set up sticky parameter values
+	double* kappaVals1 = new double[numInteractions];
+	double* kappaVals2 = new double[numInteractions];
+
+	//declare rate matrix
+	double* Tconst = new double[num_states*num_states]; //rate matrix - only forward entries
+
+	//init the rate matrix with zeros
+	for (int i = 0; i < num_states*num_states; i++) {
+		Tconst[i] = 0;
+	}
+
+	//get bonds->bonds+1 entries from mfpt estimates
+	std::vector<int> ground; //vector to hold all ground states - also target states here
+	createTransitionMatrix(Tconst, num_states, db, ground);
+
+	//open the input file with all the starting points
+	std::string filename = "quenches.txt";
+	std::ifstream in_str(filename);
+
+	//read in the input and loop over all possibilities
+	int temp; in_str >> temp; //get rid of N at beginning
+	int clusterMID; int clusterEND;
+
+	//loop stores cluster id
+	int count = 0;
+	while (in_str >> particleTypes[0]) {
+		//store particle types
+		for (int i = 1; i < N; i++) {
+			in_str >> particleTypes[i];
+		}
+		//store first cluster hit
+		in_str >> clusterMID;
+
+		//store initial kappa vals
+		for (int i = 0; i < numInteractions; i++) {
+			in_str >> kappaVals1[i];
+		}
+
+		//store final cluster hit
+		in_str >> clusterEND;
+
+		//store final kappa vals
+		for (int i = 0; i < numInteractions; i++) {
+			in_str >> kappaVals2[i];
+		}
+
+
+		count++;
+
+		if (count == scheme) {
+			evaluatePtc(N, db, initial, numTypes, numInteractions, ground, particleTypes, 
+									Tconst, kappaVals1, kappaVals2, clusterMID, clusterEND);
+		}
+		
+		
+	}
+
+
+	//close files
+	in_str.close();
+
+	//free memory
+	delete []particleTypes; delete []kappaVals1; delete []kappaVals2; delete []Tconst;
+}
 
 
 

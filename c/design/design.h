@@ -135,6 +135,9 @@ void testQuench(int N, Database* db, int initial, int numTypes, int numInteracti
 void findQuenches(int N, Database* db);
 void graphQuenches(int N, Database* db, int initial);
 
+void evolveProbability(int N, Database* db, int initial, bool useFile);
+void testTransitionTimes(int N, Database* db, int initial, int scheme);
+
 
 
 

@@ -490,6 +490,116 @@ void estimateChain(int N, int state, Database* db) {
 	//delete []PM; delete []pm; 
 }
 
+double gyrationRadius(int N, double* X) {
+	//compute the radius of gyration
+
+	double* x = new double[N];
+	double* y = new double[N];
+	double* r2 = new double[N];
+
+	double xCM = 0; double yCM = 0;
+
+	for (int i = 0; i < N; i++) {
+		x[i] = X[DIMENSION*i]; xCM += x[i];
+		y[i] = X[DIMENSION*i+1]; yCM += y[i];
+	}
+
+	double rg = 0;
+	for (int i = 0; i < N; i++) {
+		r2[i] = (x[i]-xCM/N)*(x[i]-xCM/N) + (y[i]-yCM/N)*(y[i]-yCM/N);
+		rg += r2[i];
+	}
+
+	rg /= N;
+
+	//free memory
+	delete []x; delete []y; delete []r2;
+
+	return sqrt(rg);
+}
+
+void sampleFirstExit(int N, int state, Database* db) {
+	/*get samples of some quantity at the firste exit time, starting from a linear chain */
+
+	//set parameters
+	int rho = 40; double beta = 1; double DT = 0.01; int Kh = 1850;
+	int pot = 0;  //set potential. 0 = morse, 1 = LJ
+	int method = 1; //solve SDEs with EM
+	int samples = 3000; //number of samples to get
+
+	//cutoff for qsd
+	int t_cut = 150;
+
+	//setup simulation
+	double Eh = stickyNewton(8, rho, Kh, beta); //get energy corresponding to kappa
+	//initialize interaction matrices
+	int* P = new int[N*N]; double* E = new double[N*N];
+	setupSimMFPT(N, Eh, P, E);
+	printf("E = %f\n", Eh);
+
+	//setup position storage
+	double* X = new double[DIMENSION*N];
+	double* temp = new double[DIMENSION*N];
+
+	//make a vector to store samples
+	std::vector<double> q_samples;
+
+	//run BD
+	for (int times = 0; times < samples; times++) {
+
+		printf("Running estimate %d\n", times+1);
+		setupChain(X,N); 
+
+		//intiailize temp storage and set parameters
+	  memcpy(temp, X, N*DIMENSION*sizeof(double));
+		int reset; int reflect; int new_state = state; int max_it = 10*samples;
+		int timer = 0; 
+
+		//solve sde and update
+		for (int i = 0; i < max_it; i++) {
+			reset = 0; reflect = 0;
+			//solve SDE
+			solveSDE(X, N, DT, rho, beta, E, P, method, pot);
+
+			//check if state changed
+			checkState(X, N, state, new_state, db, timer, reset, reflect);
+
+			if (reflect == 0 && reset == 0) { //no hit, proceed
+				memcpy(temp, X, DIMENSION*N*sizeof(double)); // copy x to temp
+
+			}
+			else if (reflect == 1) {//hit new state, get sample of quantity
+				if (i > t_cut) {
+					double q = gyrationRadius(N, X);
+					q_samples.push_back(q);
+					std::cout << i << "\n";
+					break;
+				}
+				else {
+					memcpy(X, temp, DIMENSION*N*sizeof(double));//copy temp to x -> reset step
+				}
+
+			}
+			else {//chain broke, reset previous config
+				memcpy(X, temp, DIMENSION*N*sizeof(double));//copy temp to x -> reset step
+
+			}
+		}
+
+	}
+
+	//output the samples to a file
+	std::ofstream ofile;
+	ofile.open("fhtBD.txt");
+	for (int i = 0; i < q_samples.size(); i++) {
+		ofile << q_samples[i] << "\n";
+	}
+	ofile.close();
+	
+	//free memory
+	delete []E; delete []P; delete []X; delete []temp;
+}
+
 
 
 

@@ -6,7 +6,10 @@
 #include <utility>
 #include <random>
 #include <chrono>
+#include <fstream>
+#include <cstdlib>
 #include <iostream>
+#include "pair.h"
 #include "../defines.h"
 
 
@@ -53,7 +56,94 @@ struct Particle{
 	Particle(int x_, int y_) :  x(x_), y(y_), type(0) {}
 };
 
+/* Database and state classes for proteins */
+class Database;
+
+class State{
+	public:
+		State();
+		~State();
+		//copy constructors - restricts compiling when user tries to copy state
+		State(const State& old) {
+			copy(old);
+		}
+		State& operator=(const State& old) {
+			if (this != &old) {
+				destroy();
+				copy(old);
+			}
+			return *this;
+		}
+
+		friend Database;
+		friend Database* readData(std::string& filename);
+		friend void buildPDB(int N);
+		friend void addState(int N, Particle* chain, int* AM, std::vector<State>& new_states);
+
+		//accessor functions
+		double getFrequency() const {return freq;}
+		int getBonds() const {return bond;}
+		const std::vector<int> getCoordinates() const;
+		bool isInteracting(int i, int j) const {return am[j*N+i];}
+		double getMFPT() const {return mfpt;}
+		double getSigma() const {return sigma;}
+		int sumP() const;
+		std::vector<bd::Pair> getP() const {return P;}
+
+		//quantities to update
+		int num_neighbors;
+		double freq, mfpt, sigma;
+		//Pair* P; Pair* Z; Pair* Zerr;
+		std::vector<bd::Pair> P;
+
+		//print function
+		std::ostream& print(std::ostream&, int) const;
+
+
+
+	private:
+		int N;
+		int bond;
+		bool* am; 
+		int* coordinates; 
+
+		void destroy();
+		void copy(const State& old);
+};
+
+class Database {
+	public:
+		Database(int N_, int num_states_); 
+		~Database();
+		State& operator[](int index) {return states[index];}
+		const State& operator[](int index) const {return states[index];}
+		friend std::ostream& operator<<(std::ostream&, const Database&);
+		friend void buildPDB(int N);
+
+		//accessor functions
+		int getN() const {return N;}
+		int getNumStates() const {return num_states;}
+
+	private:	
+		int N; int num_states; State* states; 
+
+		//copy constructors - restricts compiling when user tries to copy a database
+		Database(const Database&) {
+			throw 1;
+		}
+		Database& operator=(const Database&) {
+			throw 1;
+		}
+
+};
+
+Database* readData(std::string& filename);
+
+
+
+//allow unordered map to exist between pair and Particle*
 typedef std::unordered_map<std::pair<int,int>,Particle*,pair_hash> particleMap; 
+
 
 
 //functions to set up a chain
@@ -92,10 +182,13 @@ void acceptMove(int particle, int x_old, int y_old, Particle* chain,
 								particleMap& cMap);
 
 void rejectMove(int particle, int x_old, int y_old, Particle* chain);
-void takeStep(int N, Particle* chain, particleMap& cMap,
+bool takeStep(int N, Particle* chain, particleMap& cMap,
 							RandomNo* rngee, double& energy);
 void runMCMC(int N, bool useFile);
 
-
+//sampling functions
+void buildPDB(int N);
+void addState(int N, Particle* chain, int* AM, std::vector<State>& new_states);
+void updatePDB(int N, Database* db);
 
 }
