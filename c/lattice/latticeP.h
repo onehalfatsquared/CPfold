@@ -191,4 +191,6 @@ void buildPDB(int N);
 void addState(int N, Particle* chain, int* AM, std::vector<State>& new_states);
 void updatePDB(int N, Database* db);
 
+void estimateMFPT(int N, int state, Database* db);
+
 }

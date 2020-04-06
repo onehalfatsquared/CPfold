@@ -517,6 +517,12 @@ void distributionFHT(HCC* hc, Database* db, std::vector<double>& q, int which) {
 				if (which == 0) {
 					quantity = gyrationRadius(N, X);
 				}
+				else if (which == 1) {
+					quantity = boop2d(N, X);
+				}
+				else if (which == 2) {
+					quantity = end2end(N, X);
+				}
 				q.push_back(quantity);
 				break;
 			}

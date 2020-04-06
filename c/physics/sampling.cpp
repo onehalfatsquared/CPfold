@@ -2,11 +2,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <iostream>
+#include <complex>
+#include <cmath>
 #include "bDynamics.h"
 #include "sampling.h"
 #include "database.h"
 #include "../defines.h"
 #include <omp.h>
+
 namespace bd{
 
 
@@ -518,6 +521,70 @@ double gyrationRadius(int N, double* X) {
 	return sqrt(rg);
 }
 
+double boop2d(int N, double* X) {
+	//evaluate the 2-d bond orientational order parameter. (Nelson & Halperin)
+	// phi_6 = 1/N sum_m 1/(NN_m) sum_NN_m e^(6i theta)
+	//returns |phi_6|^2
+
+	//construct the adjacency matrix
+	int* M = new int[N*N]; for (int i = 0; i < N*N; i++) M[i]=0;
+	getAdj(X, N, M);
+
+	//init the boop - zero-d complex number
+	std::complex<double> boop(0.0,0.0);
+
+	//define i
+	const std::complex<double> i(0.0,1.0);
+
+	//loop over each particle
+	for (int p1 = 0; p1 < N; p1++) {
+		std::complex<double> summand = 0.0 + 0.0*i;
+		int num_bonds = 0;
+		//loop over each other particle, check for bonds, compute contribution
+		for (int p2 = 0; p2 < N; p2++) {
+			if (M[toIndex(p1,p2,N)] == 1) {
+				//increment number of bonds
+				num_bonds++;
+				//compute vector lengths and dot product
+				double x1 = X[DIMENSION*p1]; double y1 = X[DIMENSION*p1+1];
+				double x2 = X[DIMENSION*p2]-x1; double y2 = X[DIMENSION*p2+1]-y1;;
+				//double m1 = sqrt(x1*x1 + y1*y1); double m2 = sqrt(x2*x2 + y2*y2);
+				//double dp = (x1*x2 + y1*y2) / (m1*m2);
+				//double theta = acos(dp);
+				double theta = atan(y2/x2);
+				summand += std::exp(6.0 * i * theta);
+			}
+		}
+		//divide by the number of bonds, add to boop
+		summand /= num_bonds;
+		boop += summand;
+	}
+
+	//divide boop by number of particles
+	boop /= N;
+
+	//compute the squared magnitude of the complex number boop
+	double boop_norm2 = std::norm(boop);
+
+	//free memory
+	delete []M;
+
+	//return the boop squared magnitude
+	return boop_norm2;
+}
+
+double end2end(int N, double* X) {
+	//end to end distance of a chain
+
+	int p1 = 0; int p2 = N-1;
+	double x1 = X[DIMENSION*p1]; double y1 = X[DIMENSION*p1+1];
+	double x2 = X[DIMENSION*p2]; double y2 = X[DIMENSION*p2+1];
+	double xD = x2-x1; double yD = y2-y1;
+
+	return sqrt(xD*xD + yD*yD);
+
+}
+
 void sampleFirstExit(int N, int state, Database* db) {
 	/*get samples of some quantity at the firste exit time, starting from a linear chain */
 
@@ -528,7 +595,7 @@ void sampleFirstExit(int N, int state, Database* db) {
 	int samples = 3000; //number of samples to get
 
 	//cutoff for qsd
-	int t_cut = 150;
+	int t_cut = 0;
 
 	//setup simulation
 	double Eh = stickyNewton(8, rho, Kh, beta); //get energy corresponding to kappa
@@ -570,7 +637,9 @@ void sampleFirstExit(int N, int state, Database* db) {
 			}
 			else if (reflect == 1) {//hit new state, get sample of quantity
 				if (i > t_cut) {
-					double q = gyrationRadius(N, X);
+					//double q = gyrationRadius(N, X);
+					//double q = boop2d(N, X);
+					double q = end2end(N, X);
 					q_samples.push_back(q);
 					std::cout << i << "\n";
 					break;

@@ -21,10 +21,25 @@ int main(int argc, char* argv[]) {
 	//get the database here
 	lattice::Database* db = lattice::readData(dbFile);
 
+	//test the MCMC functions
 	//lattice::runMCMC(N, useFile);
-	//lattice::buildPDB(N);
 
-	lattice::updatePDB(N, db);
+	//build initial database, and update database to get all states
+	//lattice::buildPDB(N);
+	//lattice::updatePDB(N, db);
+
+
+
+	//do mfpt estimation for each state
+	int num_states = db->getNumStates();
+	for (int i = 0; i < num_states; i++) {
+		printf("Beginning estimation for state %d of %d\n", i+1, num_states);
+		lattice::estimateMFPT(N, i, db);
+	}
+	//print the new db
+	std::string out = "N" + std::to_string(N) + "mfpt.txt";
+	std::ofstream out_str(out);
+	out_str << *db;
 
 
 
