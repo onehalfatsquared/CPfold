@@ -466,13 +466,12 @@ double getEnergy(int N, Particle* chain, double eps) {
 }
 
 bool takeStep(int N, Particle* chain, particleMap& cMap,
-							RandomNo* rngee, double& energy) {
+							RandomNo* rngee, double eps, double& energy) {
 	//perform an MCMC step - return the energy of the returned state
 
 	//std::cout << "hello\n";
 	//set the initial energy
 	double e0 = energy;
-	double eps = 1000.0;
 
 	//first we pick a random particle and get its coordinates
 	int particle = randomInteger(N, rngee);
@@ -510,9 +509,6 @@ bool takeStep(int N, Particle* chain, particleMap& cMap,
 	if (U <= a) {
 		acceptMove(particle, x_old, y_old, chain, cMap);
 		energy = e1;
-		if (e1 > e0) {
-			abort();
-		}
 		//printf("Move accept %f\n", e1);
 		//printChain(N, chain);
 		return true;
@@ -538,6 +534,7 @@ void runMCMC(int N, bool useFile) {
 
 	//set parameters
 	double energy = 0;
+	double eps = 2.0;
 	double max_it = 1000;
 
 	//initialize rng
@@ -545,7 +542,7 @@ void runMCMC(int N, bool useFile) {
 
 	//do the monte carlo steps
 	for (int i = 0; i < max_it; i++) {
-		takeStep(N, chain, cMap, rngee, energy);
+		takeStep(N, chain, cMap, rngee, eps, energy);
 		//printf("Iteration: %d, energy %f\n", i, energy);
 		std::cout << "Iteration " << i << "\n"; 
 	}
@@ -712,6 +709,7 @@ void updatePDB(int N, Database* db) {
 	//set parameters
 	double energy = 0;
 	int max_it = 1e6;
+	double eps = 1.0;
 
 	//initialize rng
 	RandomNo* rngee = new RandomNo();
@@ -729,7 +727,7 @@ void updatePDB(int N, Database* db) {
 	//do the monte carlo steps
 	for (int i = 0; i < max_it; i++) {
 		//take a step
-		bool accept = takeStep(N, chain, cMap, rngee, energy);
+		bool accept = takeStep(N, chain, cMap, rngee, eps, energy);
 		//std::cout << accept << "\n";
 
 		//check if the state changed from previous step
@@ -914,7 +912,7 @@ void equilibrate(Particle* chain, particleMap& cMap, Database* db, int state, in
 	for (int i = 0; i < max_it; i++) {
 		//get the sample
 		energy = energy0;
-		accepted = takeStep(N, chain, cMap, rngee, energy);
+		accepted = takeStep(N, chain, cMap, rngee, eps, energy);
 
 		//if the position has changed, update timer and check for bond formation
 		if (accepted) {
@@ -999,7 +997,7 @@ void getSamplesMFPT(Particle* chain, particleMap& cMap, Database* db, int state,
 	for (int i = 0; i < max_it; i++) {
 		//get the sample
 		energy = energy0;
-		accepted = takeStep(N, chain, cMap, rngee, energy);
+		accepted = takeStep(N, chain, cMap, rngee, eps, energy);
 		//increment the timer
 		timer += 1;
 
@@ -1197,135 +1195,126 @@ void estimateMFPT(int N, int state, Database* db) {
 }
 
 
-void estimateEqProbs(int N, int state, Database* db) { //todo
+void estimateEqProbs(int N, Database* db) { 
 	//estimate the equilibrium probabilities for each state
 	//use MCMC estimator, use every c moves
 	//seperate across threads to get better estimate
 
 	//set parameters
 	int num_states = db->getNumStates(); //total number of states
-	int max_its = 1e5;                   //max number of MCMC steps to take
+	int max_its = 5e6;                   //max number of MCMC steps to take
+	int eq_its = 500;                    //number of steps to equilibrate for
 	int cut = 5;                         //keep a sample every cut iterations
+	double eps = EPS;
 
-
-	//check if this state has max number of bonds
-	int maxB = 0;
+	//store freq estimates on each thread to get standard deviation
+	double* eqShared = new double[num_states];
+	double* eqVar = new double[num_states];
 	for (int i = 0; i < num_states; i++) {
-		int b = (*db)[i].getBonds();
-		if (b > maxB) {
-			maxB = b;
-		}
-	}
-	if ((*db)[state].getBonds() == maxB) {
-		printf("This state is a ground state. No MPFT estimation necessary.\n");
-		return;
+		eqShared[i] = eqVar[i] = 0;
 	}
 
-	//quantities to estimate
-	std::vector<bd::Pair> PM; std::vector<bd::Pair> PMshare;
-	double mfpt = 0;
-	double sigma2 = 0;
-
-	//store mfpt estimates on each thread to get standard deviation
-	double* mfptSamples; double* mfptVar; int num_threads;
-
-	//debug line
-	for (int i = 0; i < PM.size(); i++) printf("0 thread has:\n %d, %f\n", PM[i].index, PM[i].value);
+	int num_threads;
+	double* X;                          //store estimates from each thread
 
 	//open parallel region
-	#pragma omp parallel private(PM) shared(PMshare) 
+	#pragma omp parallel shared(eqShared, eqVar, X) 
 	{
-		//initialize final samples storage - only on one processor - then barrier
-		num_threads = omp_get_num_threads();
-		#pragma omp single
-		{
-			mfptSamples = new double[num_threads];
-			mfptVar     = new double[num_threads];
-			for (int i = 0; i < num_threads; i++) {
-				mfptSamples[i] = 0; mfptVar[i] = 0;
-			}
+		//init the private freq storage
+		int* freqPrivate = new int[num_states]; 
+		double* eqPrivate = new double[num_states];
+		for (int i = 0; i < num_states; i++) {
+			freqPrivate[i] = 0; eqPrivate[i] = 0.0;
 		}
-		#pragma omp barrier
 
-		//init the private mfpt sample storage
-		std::vector<double> mfptVec;
+		//get number of threads - init estimate storage
+		num_threads = omp_get_num_threads();
+		X = new double[num_threads];
 
 		//init the random number generator 
 		RandomNo* rngee = new RandomNo(); 
-		//printf("Thread: %d, number %f\n", omp_get_thread_num(), rngee->getU());
 
-		//get starting coordinates randomly from the database
-		const std::vector<int> c = (*db)[state].getCoordinates();
-
-		//make array with IC
-		int* X = new int[DIMENSION*N];
-		for (int i = 0; i < DIMENSION*N; i++) {
-			X[i] = c[i];
-		}
+		//init the adjacency matrix
+		int* AM = new int[N*N]; for (int i = 0; i < N*N; i++) AM[i] = 0;
 
 		//construct the chain of particles and the lattice mapping
 		Particle* chain = new Particle[N];
 		particleMap cMap;
 
 		//initialize as linear chain
-		initChain(N, X, chain, cMap, false);
+		initChain(N, chain, cMap, false);
+		double energy = 0;
 
 		//equilibrate the trajectories
-		equilibrate(chain, cMap, db, state, N, rngee);
-
-		//get samples - has to update PM
-		getSamplesMFPT(chain, cMap, db, state, N, PM, mfptVec, rngee);
-
-		//get sample means and variances
-		double M; double V;
-		sampleStats(mfptVec, M, V);
-		mfptSamples[omp_get_thread_num()] = M;
-		mfptVar[omp_get_thread_num()] = V;
-
-		//do update on PM vectors - need barrier - one at a time
-		if (omp_get_thread_num() == 0) {
-			PMshare = PM;
+		for (int i = 0; i < eq_its; i++) {
+			takeStep(N, chain, cMap, rngee, eps, energy);
 		}
 		#pragma omp barrier
-		#pragma omp critical
-		{
-			if (omp_get_thread_num() != 0) {
-				combinePairs(PMshare, PM);
+
+		//do MCMC, store every cut iterations
+		for (int i = 0; i < max_its; i++) {
+			//do mcmc step
+			takeStep(N, chain, cMap, rngee, eps, energy);
+
+			//check if we store samples this iteration
+			if (i % cut == 0) {
+				//check which state we are in
+				getAM(N, chain, AM);
+
+				//search database for current state
+				std::vector<State> useless;
+				int new_state = searchDB(N, db, useless, AM);
+				//printf("New state is %d of %d\n", new_state, num_states);
+				freqPrivate[new_state] += 1;
+			}
+		}
+		#pragma omp barrier
+	
+		//normalize each of the freq arrays into the private eq array
+		int Z = 1 + ((max_its-1) / cut);
+		for (int i = 0; i < num_states; i++) {
+			int count = freqPrivate[i];
+			eqPrivate[i] = double(count) / double(Z);
+		}
+
+		//barrier so all threads finish constructing eqPrivate
+		#pragma omp barrier
+		
+		double M, V;
+		//for each state, do a critical step to get mean and variance over threads
+		for (int i = 0; i < num_states; i++) {
+			X[omp_get_thread_num()] = eqPrivate[i];
+			#pragma omp barrier
+			#pragma omp single
+			{
+				sampleStats(X, num_threads, M, V);
+				eqShared[i] = M;
+				eqVar[i] = V;
 			}
 		}
 
 		//free memory
-		delete []X; delete rngee; delete []chain;
+		delete rngee; delete []chain; delete []AM; delete []X; 
+		delete []freqPrivate; delete []eqPrivate;
 
 		//end parallel region
 	}
 
-	//update estimates
-	//combine the mfptSamples entries to get min variance estimator
-	minVarEstimate(num_threads, mfptSamples, mfptVar,  mfpt, sigma2);
-	double sigma = sqrt(sigma2);
-
-	//update database
-	(*db)[state].mfpt = mfpt;
-	(*db)[state].num_neighbors = PMshare.size();
-	(*db)[state].P = PMshare;
-	(*db)[state].sigma = sigma;
-
-	//print out final estimates - debug
-	///*
-	double sum = 0;
-	for (int i = 0; i < PMshare.size(); i++) {
-		printf("State = %d, visits = %f\n", PMshare[i].index, PMshare[i].value);
-		sum +=PMshare[i].value;
+	//update estimates in db
+	for (int i = 0; i < num_states; i++) {
+		double freqU = eqShared[i];
+		(*db)[i].freq = freqU;
 	}
-	printf("sum of hits = %f\n", sum);
-	printf("Total Estimate = %f +- %f\n", mfpt, sigma);
-	for (int i = 0; i < num_threads; i++) printf("MFPT estimate %d = %f +- %f\n", i, mfptSamples[i], sqrt(mfptVar[i]));
-	//*/
+	
 
-
+	//print out final estimates - test & debug
+	for (int i = 0; i < num_states; i++) {
+		printf("State %d: Eq = %f, Std = %f\n", i, eqShared[i], eqVar[i]);
+	}
+	
+	
 	//free memory
-	delete []mfptSamples; delete []mfptVar;
+	delete []eqShared; delete []eqVar;
 }
 
 

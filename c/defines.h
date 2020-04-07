@@ -18,7 +18,8 @@
 
 //mcmc parameters
 #define SIG          0.15       // std for isotropic gaussian proposal
-#define KAP          2       // sticky parameter for particles
+#define KAP          2         // sticky parameter for particles
+#define EPS          1         // base energy for lattice proteins
 #define MAX_TRY     1000       // if this many MCMC samples dont transition, ignore
 #define MAX_ITS SAMPLES*300    // max number of mcmc steps before sim is cut off
 

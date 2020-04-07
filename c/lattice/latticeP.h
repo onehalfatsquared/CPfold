@@ -183,7 +183,7 @@ void acceptMove(int particle, int x_old, int y_old, Particle* chain,
 
 void rejectMove(int particle, int x_old, int y_old, Particle* chain);
 bool takeStep(int N, Particle* chain, particleMap& cMap,
-							RandomNo* rngee, double& energy);
+							RandomNo* rngee, double eps, double& energy);
 void runMCMC(int N, bool useFile);
 
 //sampling functions
@@ -192,5 +192,6 @@ void addState(int N, Particle* chain, int* AM, std::vector<State>& new_states);
 void updatePDB(int N, Database* db);
 
 void estimateMFPT(int N, int state, Database* db);
+void estimateEqProbs(int N, Database* db);
 
 }

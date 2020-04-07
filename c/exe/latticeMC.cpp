@@ -10,13 +10,14 @@
 int main(int argc, char* argv[]) {
 
 	//handle input
-	if (argc != 4) {
-		fprintf(stderr, "Usage: <Num particles> <db file> <useFile>  %s\n", argv[0]);
+	if (argc != 5) {
+		fprintf(stderr, "Usage: <Num particles> <db file> <useFile> <runType> %s\n", argv[0]);
 		return 1;
 	}
 	int N = atoi(argv[1]);
 	std::string dbFile (argv[2]);
 	bool useFile = atoi(argv[3]);
+	int runType = atoi(argv[4]);
 
 	//get the database here
 	lattice::Database* db = lattice::readData(dbFile);
@@ -31,15 +32,20 @@ int main(int argc, char* argv[]) {
 
 
 	//do mfpt estimation for each state
-	int num_states = db->getNumStates();
-	for (int i = 0; i < num_states; i++) {
-		printf("Beginning estimation for state %d of %d\n", i+1, num_states);
-		lattice::estimateMFPT(N, i, db);
+	if (runType == 0) { //mfpt estimator
+		int num_states = db->getNumStates();
+		for (int i = 0; i < num_states; i++) {
+			printf("Beginning estimation for state %d of %d\n", i+1, num_states);
+			lattice::estimateMFPT(N, i, db);
+		}
+		//print the new db
+		std::string out = "N" + std::to_string(N) + "mfpt.txt";
+		std::ofstream out_str(out);
+		out_str << *db;
 	}
-	//print the new db
-	std::string out = "N" + std::to_string(N) + "mfpt.txt";
-	std::ofstream out_str(out);
-	out_str << *db;
+	else if (runType == 1) { //equilibrium probability estimator
+		lattice::estimateEqProbs(N, db);
+	}
 
 
 
