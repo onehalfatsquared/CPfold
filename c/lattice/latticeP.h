@@ -10,6 +10,8 @@
 #include <cstdlib>
 #include <iostream>
 #include "pair.h"
+#include "design.h"
+#include "nauty.h"
 #include "../defines.h"
 
 
@@ -84,7 +86,7 @@ class State{
 		double getFrequency() const {return freq;}
 		int getBonds() const {return bond;}
 		const std::vector<int> getCoordinates() const;
-		bool isInteracting(int i, int j) const {return am[j*N+i];}
+		bool isInteracting(int i, int j) const;
 		double getMFPT() const {return mfpt;}
 		double getSigma() const {return sigma;}
 		int sumP() const;
@@ -151,6 +153,7 @@ void getTypes(int N, int* types, bool useFile);
 void initChain(int N, Particle* chain, particleMap& cMap, 
 							 bool useFile);
 int toIndex(int r, int c, int m);
+void index2ij(int index, int N, int& i, int& j);
 
 
 
@@ -193,5 +196,8 @@ void updatePDB(int N, Database* db);
 
 void estimateMFPT(int N, int state, Database* db);
 void estimateEqProbs(int N, Database* db);
+
+//design functions
+void constructScatterTOYL(int N, Database* db, int initial, int target, bool useFile);
 
 }

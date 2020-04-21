@@ -28,6 +28,9 @@ include_directories(lattice)
 add_subdirectory(hydro)
 include_directories(hydro)
 
+add_subdirectory(genetic)
+include_directories(genetic)
+
 add_subdirectory(exe)
 
 file(COPY input DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/exe)

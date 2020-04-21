@@ -12,8 +12,6 @@
 #include "pair.h"
 #include "adjacency.h"
 #include "database.h"
-#include "bDynamics.h"
-#include "tpt.h"
 #include "nauty.h"
 #include "graph.h"
 #include "graphviz.h"

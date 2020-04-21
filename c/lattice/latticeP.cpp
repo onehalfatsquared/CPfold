@@ -6,7 +6,7 @@
 namespace lattice {
 
 /******************************************************************************/
-/***************** Class functions for proteins *******************************/
+/***************** Class functions for L proteins *****************************/
 /******************************************************************************/
 
 
@@ -71,6 +71,19 @@ int State::sumP() const{
 	}
 	return S;
 }
+
+bool State::isInteracting(int i, int j) const {
+	if (abs(i-j) >= 2) {
+		return am[j*N+i];
+	}
+	else if (abs(i-j) == 1) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
 
 //pull a random set of coordinates from the available
 const std::vector<int> State::getCoordinates() const {
@@ -255,6 +268,12 @@ void initChain(int N, int* X, Particle* chain, particleMap& cMap,
 int toIndex(int r, int c, int m) {
   //map row and column number into index in 1d array. column indexed
   return m*c+r;
+}
+
+void index2ij(int index, int N, int& i, int& j) {
+  // map a row index 1-d array into (i,j) 
+  i = index % N;
+  j = index / N;
 }
 
 void printChain(int N, Particle* chain) {
@@ -835,6 +854,7 @@ void minVarEstimate(int sampleSize, double* means, double* variances, double& M,
 	V /= S*S;
 }
 
+
 void updatePM(int new_state, std::vector<bd::Pair>& PM) {
 	//find pair with index = state and increment value by 1
 
@@ -851,29 +871,6 @@ void updatePM(int new_state, std::vector<bd::Pair>& PM) {
 		PM.push_back(bd::Pair(new_state,1));
 	}
 
-}
-
-void combinePairs(std::vector<bd::Pair>& p1, std::vector<bd::Pair> p2) {
-	//combines two vectors of pairs into one vector of pairs, p1.
-	//if index is duplicated, the values are summed. 
-
-	int i,j;
-
-	bool flag;
-
-	for ( i = 0; i < p2.size(); i++) {
-		int index = p2[i].index; 
-		flag = false;
-		for ( j = 0; j < p1.size(); j++) {
-			if (index == p1[j].index) {//both vectors have this state
-				p1[j].value += p2[i].value;
-				flag = true;
-			}
-		}
-		if (!flag) {//only vector 2 has this, add to vector 1
-			p1.push_back(p2[i]);
-		}
-	}
 }
 
 void equilibrate(Particle* chain, particleMap& cMap, Database* db, int state, int N,
@@ -964,7 +961,7 @@ void getSamplesMFPT(Particle* chain, particleMap& cMap, Database* db, int state,
 	//get a sample of the mean first passage time, record the state that gets visited
 
 	//parameters for the estimator and bond checking
-	int max_it = MAX_ITS;             //cut off if not done after max_it samples
+	int max_it = 1e6;             //cut off if not done after max_it samples
 	int new_state = state;            //new state id
 	bool accepted;                    //flag to check if MCMC accepted proposal
 	int b = (*db)[state].getBonds();  //num bonds in starting cluster
@@ -974,7 +971,7 @@ void getSamplesMFPT(Particle* chain, particleMap& cMap, Database* db, int state,
 	double eps = 1000;               //energy per bond, so chain does not break
 	double energy0 = getEnergy(N, chain, eps);  //energy for initial state
 	double energy;                   //dummy energy
-	int samples = 4000;              //number of samples per walker
+	int samples = 50000;              //number of samples per walker
 
 	//make another chain and cMap for reversions
 	Particle* prev_chain = new Particle[N];
@@ -1167,8 +1164,8 @@ void estimateMFPT(int N, int state, Database* db) {
 	}
 
 	//update estimates
-	//combine the mfptSamples entries to get min variance estimator
-	minVarEstimate(num_threads, mfptSamples, mfptVar,  mfpt, sigma2);
+	//combine the mfptSamples to get mean and variance
+	sampleStats(mfptSamples, num_threads, mfpt, sigma2);
 	double sigma = sqrt(sigma2);
 
 	//update database
@@ -1202,7 +1199,7 @@ void estimateEqProbs(int N, Database* db) {
 
 	//set parameters
 	int num_states = db->getNumStates(); //total number of states
-	int max_its = 5e6;                   //max number of MCMC steps to take
+	int max_its = 5e7;                   //max number of MCMC steps to take
 	int eq_its = 500;                    //number of steps to equilibrate for
 	int cut = 5;                         //keep a sample every cut iterations
 	double eps = EPS;
@@ -1316,6 +1313,350 @@ void estimateEqProbs(int N, Database* db) {
 	//free memory
 	delete []eqShared; delete []eqVar;
 }
+
+
+/******************************************************************************/
+/***************** Design Functions  ******************************************/
+/******************************************************************************/
+
+double getStickyProductL(int N, int state,  Database* db, int* particleTypes, 
+												std::map<std::pair<int,int>,double> kappa) {
+	//return the product of sticky param ^ num bonds for each type
+
+	double stickyProd = 1.0;
+
+	//loop over the adjacency matrix, determine bond types, get factors
+	//todo - the isInteracting might fail here b/c AM is only upper triangular?
+	for (int i = 0; i < N; i++) {
+		for (int j = i+2; j < N; j++) {
+			if ((*db)[state].isInteracting(i,j)) {
+				int p1 = particleTypes[i]; int p2 = particleTypes[j];
+				stickyProd *= kappa[{p1,p2}];
+			}
+		}
+	}
+
+	return stickyProd;
+}
+
+void reweightL(int N, int num_states, Database* db, int* particleTypes, double* eq,
+						  std::map<std::pair<int,int>,double> kappa) {
+	//perform the re-weighting of the eq measure for new sticky params
+
+	double kap0 = exp(EPS);            //sticky parameter for initial measurement
+
+	double Z = 0;                     //normalizing constant for eq
+
+	//loop over states, get the equilibrium measure entry
+	for (int i = 0; i < num_states; i++) {
+		//get initial eq prob and number of bonds
+		int b = (*db)[i].getBonds();
+		int ntBonds = b - (N-1);               //number of non-trivial bonds
+		double prob = (*db)[i].getFrequency();
+
+		//get the denominator of reweight factor - KAP^b_i
+		double denom = pow(KAP, ntBonds);
+
+		//get the numerator of the re-weight factor
+		double num = getStickyProductL(N, i, db, particleTypes, kappa); 
+
+		//compute the new probability
+		double new_prob = prob * num / denom;
+
+		//debug line for corect reweight
+		//printf("Test: Old %f, New %f\n", prob, new_prob);
+
+		//increment Z and add to array
+		Z += new_prob;
+		eq[i] = new_prob;
+	}
+
+	//re-normalize
+	for (int i = 0; i < num_states; i++) eq[i] /= Z;
+}
+	
+void checkPositiveL(int numInteractions, double* kappaVals) {
+	//check if each kappa is positive, if not set to 0.01
+
+	for (int i = 0; i < numInteractions; i++) {
+		if (kappaVals[i] < 1.0) {
+			kappaVals[i] = 1.001;
+		}
+	}
+}
+
+void createTransitionMatrix(double* T, int num_states, Database* db, 
+														std::vector<int>& endStates) {
+	//create rate matrix from data in DB - forward rates
+
+	//declare storage for each state
+	double mfpt; int S;
+
+	//loop over all states information
+	for (int state = 0; state < num_states; state++) {
+		//get all relevant data
+		mfpt = (*db)[state].getMFPT();
+		S = (*db)[state].sumP(); //get normalizing constant for this row
+
+		//if S = 0, this is end state, add it to vector
+		if (S == 0) {
+			endStates.push_back(state);
+		}
+
+		//fill in value in transition matrix
+		std::vector<bd::Pair> P = (*db)[state].getP();
+		for (int i = 0; i < P.size(); i++) {
+			T[toIndex(state, P[i].index, num_states)] = (P[i].value / S) / mfpt;
+		}
+	}
+}
+
+void buildNautyGraph(int N, int M, int state, Database* db, graph* g) {
+	//build nauty graph of given state
+
+	//zero out any pre-existing graph
+	EMPTYGRAPH(g, M, N);
+
+	//add edges for every non-zero entry in adjacnecy matrix
+	for (int i = 0; i < N; i++) {
+		for (int j = i+1; j < N; j++) {
+			//std::cout << i << ' ' << j << "\n";
+			if ((*db)[state].isInteracting(i,j)) {
+				ADDONEEDGE(g, i, j, M);
+			}
+		}
+	} 
+}
+
+void findIsomorphic(int N, int num_states, int state, Database* db, std::vector<int>& iso) {
+	//finds all states isomorphic to given state in database. stored to iso.
+
+	//set keywords for nauty
+	int M = SETWORDSNEEDED(N);
+
+	//initialize the nauty graphs and parameters
+	graph g1[N*M]; graph g2[N*M];   //the starting graphs
+	graph cg1[N*M]; graph cg2[N*M]; //graphs with canonical labeling
+	int lab1[N], lab2[N];           //label arrays
+	int ptn[N], orbits[N];          //needed to call functions
+	static DEFAULTOPTIONS_GRAPH(options); //defualt options
+	statsblk stats;                 //nauty statistics of graph
+	options.getcanon = TRUE;        //get canonical labeling
+	options.defaultptn = TRUE;      //ignore any coloring of graph
+
+	//build nauty graph of the state, get canonical labeling
+	EMPTYGRAPH(cg1, M, N);
+	buildNautyGraph(N, M, state, db, g1);
+	densenauty(g1, lab1, ptn, orbits, &options, &stats, M, N, cg1);
+
+	//loop over all states, check if isomorphic
+	for (int i = 0; i < num_states; i++) {
+		//create graph
+		EMPTYGRAPH(cg2, M, N);
+		buildNautyGraph(N, M, i, db, g2);
+		densenauty(g2, lab2, ptn, orbits, &options, &stats, M, N, cg2);
+
+		/* Compare canonically labelled graphs */
+		if (bd::checkIsomorphic(N, M, cg1, cg2) == 1) { //graphs are isomorphic, add to iso
+			iso.push_back(i);
+		}
+	} 
+}
+
+double getEqProb(int initial, double* kappaVals, Database* db, 
+								 int* particleTypes, std::vector<int> targets) {
+	//do re-weighting and get the eqiulibrium probability sum of all target states
+
+	//get parameters from database
+	int N = db->getN();
+	int num_states = db->getNumStates();
+
+	//declare rate matrix, probability transition matrix, equilibrium measure
+	double* eq = new double[num_states];           //equilibrium measure
+
+	//declare the kappa map
+	std::map<std::pair<int,int>,double> kappa;
+
+	//compute the eq probability at the current kappa vals
+	//make the map
+	bd::makeKappaMap(2, kappaVals, kappa);
+	//do rewieght
+	reweightL(N, num_states, db, particleTypes, eq, kappa);
+
+	//get the new equilibrium probability of target state
+	double prob = 0;
+	for (int i = 0;  i< targets.size(); i++) {
+		prob += eq[targets[i]];
+	}
+
+	//free memory
+	delete []eq;
+
+	return prob;
+}
+
+void satisfyDB(double* T, int num_states, Database* db, double* eq) {
+	//make T satisfy detailed balance
+
+	int row = 0; int column = 0; //row and column indices in matrix
+
+	//if an entry is non-zero, use DB to fill its transpose
+	for (int entry = 0; entry < num_states*num_states; entry++) {
+		index2ij(entry, num_states, row, column);
+		if (T[entry] > 0) {
+			T[toIndex(column, row, num_states)] = T[entry] * eq[row] / eq[column];
+		}
+	}
+}
+
+void constructScatterTOYL(int N, Database* db, int initial, int target, bool useFile) {
+	/*Construct a scatter plot of avg rate vs equilibrium probability using 
+	  a 3d grid of kappa values. 
+	  Keep track of the kappa values that lead to both the highest eq prob 
+	  and the highest rate.                                         */
+
+
+	//get database info
+	int num_states = db->getNumStates(); 
+
+	//set up particle identity
+	int* particleTypes = new int[N];
+	int numTypes;
+	if (useFile) { //use the fle to set identities
+		numTypes = bd::readDesignFile(N, particleTypes);
+	}
+	else { //uses the function to set identities
+		int IC = 1; 
+		numTypes = bd::setTypes(N, particleTypes, IC);
+	}
+	int numInteractions = numTypes*(numTypes+1)/2;
+
+	//set up sticky parameter values
+	double* kappaVals = new double[numInteractions];
+	bd::initKappaVals(numInteractions, kappaVals);
+
+	//declare rate matrix, probability transition matrix, equilibrium measure
+	double* T = new double[num_states*num_states]; //rate matrix
+	double* Tconst = new double[num_states*num_states]; //rate matrix - only forward entries
+	double* eq = new double[num_states];           //equilibrium measure
+	double* m = new double[num_states];            //mfpts 
+
+	//init the rate matrix with zeros
+	for (int i = 0; i < num_states*num_states; i++) {
+		Tconst[i] = 0;
+	}
+
+	//get bonds->bonds+1 entries from mfpt estimates
+	std::vector<int> ground; //vector to hold all ground states
+	createTransitionMatrix(Tconst, num_states, db, ground);
+	for (int i = 0; i < ground.size(); i++) {
+		std::cout << ground[i] << "\n";
+	}
+
+	//find all target states consistent with input target
+	std::vector<int> targets; targets.push_back(target);
+
+	//the following doesnt work for distinguishing lattice ground states
+	/*
+	findIsomorphic(N, num_states, target, db, targets);
+	for (int i = 0; i < targets.size(); i++) {
+		std::cout << targets[i] << "\n";
+	}
+	*/
+
+	//declare the kappa mapping
+	std::map<std::pair<int,int>,double> kappa;
+
+	//declare outfile
+	std::ofstream ofile;
+	ofile.open("rateEqScatter.txt");
+
+	//construct an array of kappa vals to use
+	int M;
+	//multiples of some base value
+	if (N == 6) {
+		M = 33; //num points in each dimension
+	}
+	if (N == 7) {
+		M = 25;
+	}
+	double base = 1.0; //smallest kappa to use - 1
+	double mult = 1.6; //multiplies base to get next value - 1.3
+	double* Ks = new double[M]; Ks[0] = base;
+	for (int i = 1; i < M; i++) {
+		Ks[i] = Ks[i-1] * mult;
+	}
+
+	//store max values
+	double eqM = 0; double rM = 0;
+	double eRate;   double rateE;
+	double* ek = new double[numInteractions];
+	double* rk = new double[numInteractions];
+
+	//do hitting probability calculation
+	for (int x = 0; x < M; x++) {
+		for (int y = 0; y < M; y++) {
+			for (int z = 0; z < M; z++) {
+				//set kappa
+				kappaVals[0] = Ks[x];
+				kappaVals[1] = Ks[y];
+				kappaVals[2] = Ks[z];
+
+				//std::cout << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << "\n";
+
+				//make the map
+				bd::makeKappaMap(2, kappaVals, kappa);
+				//std::cout << kappa[{0,0}] << ' ' << kappa[{1,0}] << ' ' << kappa[{1,1}] << "\n";
+				//do rewieght
+				reweightL(N, num_states, db, particleTypes, eq, kappa);
+				//get eq prob
+				double eqProb = getEqProb(initial, kappaVals, db, particleTypes, targets);
+				//copy Tconst into T
+				std::copy(Tconst, Tconst+num_states*num_states, T);
+				//fill in transposed entries such that T satisfies detailed balance
+				satisfyDB(T, num_states, db, eq);
+				//fill in diagonal with negative sum of row entries
+				bd::fillDiag(T, num_states);
+				//get the transition rate
+				bd::computeMFPTs(num_states, T, targets, m);
+				double rate = 1/m[initial];
+
+				//update maxima
+				if (eqProb > eqM) {
+					eqM = eqProb; eRate = rate;
+					ek[0] = kappaVals[0]; ek[1] = kappaVals[1]; ek[2] = kappaVals[2]; 
+				}
+				if (rate > rM) {
+					rM = rate; rateE = eqProb;
+					rk[0] = kappaVals[0]; rk[1] = kappaVals[1]; rk[2] = kappaVals[2]; 
+				}
+				if (eqProb > 0.43 && eqProb < 0.51 && rate > 0.64) {
+					//std::cout  << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << "\n";
+				}
+
+
+				//output to file
+				ofile << eqProb << ' ' << rate << "\n";
+
+			}
+		}
+		std::cout << x << "\n";
+	}
+
+	//print out the maxima and argmax
+	printf("Max EQ is %f with %f, %f, %f. The rate is %f\n", eqM, ek[0], ek[1], ek[2], eRate);
+	printf("Max rate is %f with %f, %f, %f. The EQ is %f\n", rM, rk[0], rk[1], rk[2], rateE);
+
+	//close file
+	ofile.close();
+
+	//free memory
+	delete []particleTypes; delete []kappaVals; delete []eq;
+	delete []T; delete []Tconst; delete []m; delete []Ks;
+	delete []ek; delete []rk;
+}
+
+
 
 
 

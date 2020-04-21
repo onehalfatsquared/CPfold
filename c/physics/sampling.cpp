@@ -595,7 +595,7 @@ void sampleFirstExit(int N, int state, Database* db) {
 	int samples = 3000; //number of samples to get
 
 	//cutoff for qsd
-	int t_cut = 0;
+	int t_cut = 1000;
 
 	//setup simulation
 	double Eh = stickyNewton(8, rho, Kh, beta); //get energy corresponding to kappa

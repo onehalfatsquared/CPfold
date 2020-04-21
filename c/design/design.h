@@ -1,5 +1,7 @@
 #pragma once
 #include "point.h"
+#include "bDynamics.h"
+#include "tpt.h"
 #include <vector>
 #include <map>
 #include <deque>

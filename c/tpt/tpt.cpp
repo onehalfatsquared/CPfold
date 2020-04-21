@@ -300,6 +300,7 @@ void createTransitionMatrix(double* T, int num_states, Database* db,
 	}
 }
 
+
 void writeHittingProbabilityGS(double* kappa, double* data, std::vector<int> endStates, int M) {
 	//output the results to a file
 

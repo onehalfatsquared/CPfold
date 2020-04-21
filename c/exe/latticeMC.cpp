@@ -10,14 +10,21 @@
 int main(int argc, char* argv[]) {
 
 	//handle input
-	if (argc != 5) {
-		fprintf(stderr, "Usage: <Num particles> <db file> <useFile> <runType> %s\n", argv[0]);
+	if (argc <= 5) {
+		fprintf(stderr, "Usage: <Num particles> <db file> <useFile> <runType> <targetstate> %s\n", argv[0]);
 		return 1;
 	}
 	int N = atoi(argv[1]);
 	std::string dbFile (argv[2]);
 	bool useFile = atoi(argv[3]);
 	int runType = atoi(argv[4]);
+	int target;
+	if (argc == 6){
+		target = atoi(argv[5]);
+	}
+	else {
+		target = 0;
+	}
 
 	//get the database here
 	lattice::Database* db = lattice::readData(dbFile);
@@ -45,6 +52,12 @@ int main(int argc, char* argv[]) {
 	}
 	else if (runType == 1) { //equilibrium probability estimator
 		lattice::estimateEqProbs(N, db);
+		std::string out = "N" + std::to_string(N) + "eq.txt";
+		std::ofstream out_str(out);
+		out_str << *db;
+	}
+	else if (runType == 2) { //perform reweighting to get scatter plot data
+		lattice::constructScatterTOYL(N, db, 0, target, useFile);
 	}
 
 
