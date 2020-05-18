@@ -337,7 +337,7 @@ void reweight7(int N, int num_states, Database* db, int* particleTypes, double* 
 		}
 
 		//debug line for corect reweight
-		//printf("Test: Old %f, New %f\n", prob, new_prob);
+		//printf("State %d, Old prob %f, New prob %f\n", i, prob, new_prob);
 
 		//increment Z and add to array
 		Z += new_prob;
@@ -642,9 +642,18 @@ void constructScatterTOY(int N, Database* db, int initial, int target, bool useF
 					//std::cout  << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << "\n";
 				}
 
+				//get the max index from eq
+				int maxEqIndex; double maxEq = 0;
+				for (int i = 0; i < num_states; i++) {
+					if (eq[i] > maxEq) {
+						maxEq = eq[i]; maxEqIndex = i;
+					}
+				}
+
+
 
 				//output to file
-				ofile << eqProb << ' ' << rate << "\n";
+				ofile << eqProb << ' ' << rate << ' ' << maxEqIndex << "\n";
 
 			}
 		}
@@ -776,6 +785,224 @@ void constructScatterTOY1(int N, Database* db, int initial, int target) {
 
 		//output to file
 		ofile << eqProb << ' ' << rate << "\n";
+		std::cout << x << "\n";
+	}
+
+	//print out the maxima and argmax
+	printf("Max EQ is %f with %f, %f, %f. The rate is %f\n", eqM, ek[0], ek[1], ek[2], eRate);
+	printf("Max rate is %f with %f, %f, %f. The EQ is %f\n", rM, rk[0], rk[1], rk[2], rateE);
+
+	//close file
+	ofile.close();
+
+	//free memory
+	delete []particleTypes; delete []kappaVals; delete []eq;
+	delete []T; delete []Tconst; delete []m; delete []Ks;
+	delete []ek; delete []rk;
+}
+
+void perturbDB(Database* db, double freq_perturb_frac, double rate_perturb_frac) {
+	//perturb each estimate in the database
+
+	int num_states = db->getNumStates();
+	double Z = 0; //new normalizer
+
+	for (int i = 0; i < num_states; i++) {
+		//get the original values
+		double original_rate = (*db)[i].mfpt;
+		double original_eq   = (*db)[i].freq;
+
+		//get some noise terms
+		double noise1 = 2.0 * (double(rand()) / RAND_MAX) - 1.0;
+		double noise2 = 2.0 * (double(rand()) / RAND_MAX) - 1.0;
+
+		std::cout << noise1 << ' ' << noise2 << "\n";
+
+		//perturb the estimates
+		double new_rate = original_rate * (1+noise1*rate_perturb_frac);
+		double new_eq   = original_eq   * (1+noise2*freq_perturb_frac);
+		double rate_diff = 100.0 * (original_rate-new_rate)/original_rate;
+		double eq_diff   = 100.0 * (original_eq-new_eq)/original_eq;
+
+		printf("Old mfpt: %f, new mfpt %f, diff %f %% \n", original_rate, new_rate, rate_diff);
+		printf("Old freq: %f, new freq %f, diff %f %% \n", original_eq, new_eq, eq_diff);
+		if (new_rate > 0) {
+			(*db)[i].mfpt = new_rate;
+		}
+		if (new_eq > 0) {
+			(*db)[i].freq = new_eq;
+			Z += new_eq;
+		}
+
+	}
+
+	for (int i = 0; i < num_states; i++) {
+		(*db)[i].freq /= Z;
+	}
+}
+
+void perturbDBconstP(Database* db) {
+	//perturb the database by making all transitions uniformly likely among possibilities
+
+	int num_states = db->getNumStates();
+
+	for (int i = 0; i < num_states; i++) {
+		std::vector<Pair> P = (*db)[i].getP();
+		for (int j = 0; j < P.size(); j++) {
+			P[j].value = 1.0; 
+		}
+		(*db)[i].P = P;
+	}
+}
+
+void constructScatterTOYsensitivity(int N, Database* db, int initial, int target, bool useFile) {
+	/*Construct a scatter plot of avg rate vs equilibrium probability using 
+	  a 3d grid of kappa values. 
+
+	  Keep track of the kappa values that lead to both the highest eq prob 
+	  and the highest rate.      
+
+	  This function perturbs the rates or eq probs to determine stability to 
+	  sampling error.                            
+	*/
+
+
+	//get database info
+	int num_states = db->getNumStates(); 
+
+	//begin by perturbing the data in the database
+	double freq_perturb_frac = 0.25; //perturb the eq prob data by up to this fraction
+	double rate_perturb_frac = 0.25; //perturb the rate data by up to this fraction
+	perturbDB(db, freq_perturb_frac, rate_perturb_frac);
+	//perturbDBconstP(db);
+
+
+	//set up particle identity
+	int* particleTypes = new int[N];
+	int numTypes;
+	if (useFile) { //use the fle to set identities
+		numTypes = readDesignFile(N, particleTypes);
+	}
+	else { //uses the function to set identities
+		int IC = 1; 
+		numTypes = setTypes(N, particleTypes, IC);
+	}
+	int numInteractions = numTypes*(numTypes+1)/2;
+
+	//set up sticky parameter values
+	double* kappaVals = new double[numInteractions];
+	initKappaVals(numInteractions, kappaVals);
+
+	//declare rate matrix, probability transition matrix, equilibrium measure
+	double* T = new double[num_states*num_states]; //rate matrix
+	double* Tconst = new double[num_states*num_states]; //rate matrix - only forward entries
+	double* eq = new double[num_states];           //equilibrium measure
+	double* m = new double[num_states];            //mfpts 
+
+	//init the rate matrix with zeros
+	for (int i = 0; i < num_states*num_states; i++) {
+		Tconst[i] = 0;
+	}
+
+	//get bonds->bonds+1 entries from mfpt estimates
+	std::vector<int> ground; //vector to hold all ground states
+	createTransitionMatrix(Tconst, num_states, db, ground);
+	for (int i = 0; i < ground.size(); i++) {
+		std::cout << ground[i] << "\n";
+	}
+
+	//find all target states consistent with input target
+	std::vector<int> targets; 
+	findIsomorphic(N, num_states, target, db, targets);
+	for (int i = 0; i < targets.size(); i++) {
+		std::cout << targets[i] << "\n";
+	}
+
+	//declare the kappa mapping
+	std::map<std::pair<int,int>,double> kappa;
+
+	//declare outfile
+	std::ofstream ofile;
+	ofile.open("rateEqScatter.txt");
+
+	//construct an array of kappa vals to use
+	int M;
+	//multiples of some base value
+	if (N == 6) {
+		M = 33; //num points in each dimension
+	}
+	if (N == 7) {
+		M = 25;
+	}
+	double base = 0.05; //smallest kappa to use - 0.05
+	double mult = 1.6; //multiplies base to get next value - 1.3
+	double* Ks = new double[M]; Ks[0] = base;
+	for (int i = 1; i < M; i++) {
+		Ks[i] = Ks[i-1] * mult;
+	}
+
+	//store max values
+	double eqM = 0; double rM = 0;
+	double eRate;   double rateE;
+	double* ek = new double[numInteractions];
+	double* rk = new double[numInteractions];
+
+	//do hitting probability calculation
+	for (int x = 0; x < M; x++) {
+		for (int y = 0; y < M; y++) {
+			for (int z = 0; z < M; z++) {
+				//set kappa
+				kappaVals[0] = Ks[x];
+				kappaVals[1] = Ks[y];
+				kappaVals[2] = Ks[z];
+
+				//std::cout << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << "\n";
+
+				//make the map
+				makeKappaMap(2, kappaVals, kappa);
+				//std::cout << kappa[{0,0}] << ' ' << kappa[{1,0}] << ' ' << kappa[{1,1}] << "\n";
+				//do rewieght
+				reweight(N, num_states, db, particleTypes, eq, kappa);
+				//get eq prob
+				double eqProb = getEqProb(initial, kappaVals, db, particleTypes, targets);
+				//copy Tconst into T
+				std::copy(Tconst, Tconst+num_states*num_states, T);
+				//fill in transposed entries such that T satisfies detailed balance
+				satisfyDB(T, num_states, db, eq);
+				//fill in diagonal with negative sum of row entries
+				fillDiag(T, num_states);
+				//get the transition rate
+				computeMFPTs(num_states, T, targets, m);
+				double rate = 1/m[initial];
+
+				//update maxima
+				if (eqProb > eqM) {
+					eqM = eqProb; eRate = rate;
+					ek[0] = kappaVals[0]; ek[1] = kappaVals[1]; ek[2] = kappaVals[2]; 
+				}
+				if (rate > rM) {
+					rM = rate; rateE = eqProb;
+					rk[0] = kappaVals[0]; rk[1] = kappaVals[1]; rk[2] = kappaVals[2]; 
+				}
+				if (eqProb > 0.43 && eqProb < 0.51 && rate > 0.64) {
+					//std::cout  << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << "\n";
+				}
+
+				//get the max index from eq
+				int maxEqIndex; double maxEq = 0;
+				for (int i = 0; i < num_states; i++) {
+					if (eq[i] > maxEq) {
+						maxEq = eq[i]; maxEqIndex = i;
+					}
+				}
+
+
+
+				//output to file
+				ofile << eqProb << ' ' << rate << ' ' << maxEqIndex << "\n";
+
+			}
+		}
 		std::cout << x << "\n";
 	}
 
@@ -1373,7 +1600,7 @@ double getRate(int initial, double* kappaVals, Database* db, int* particleTypes,
 	//construct array of mfpts and caluclate it
 	double* m = new double[num_states];
 	computeMFPTs(num_states, T, targets, m);
-	double mfpt = m[1];
+	double mfpt = m[initial];
 
 	//free memory
 	delete []T; delete []eq; delete []m;

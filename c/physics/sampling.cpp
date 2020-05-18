@@ -585,17 +585,63 @@ double end2end(int N, double* X) {
 
 }
 
-void sampleFirstExit(int N, int state, Database* db) {
+double rsa(int N, double* X) {
+	//evaluate the relative shape anisotropy.
+	//compute the gyration tensor, get eigenvalues, compute k^2
+
+	double Sxx = 0; double Syy = 0; double Sxy = 0; 
+	for (int p1 = 0; p1 < N; p1++) {
+		for (int p2 = 0; p2 < N; p2++) {
+			Sxx += (X[DIMENSION*p1] - X[DIMENSION*p2]) * (X[DIMENSION*p1] - X[DIMENSION*p2]);
+			Syy += (X[DIMENSION*p1+1] - X[DIMENSION*p2+1]) * (X[DIMENSION*p1+1] - X[DIMENSION*p2+1]);
+			Sxy += (X[DIMENSION*p1] - X[DIMENSION*p2]) * (X[DIMENSION*p1+1] - X[DIMENSION*p2+1]);
+		}
+	}
+
+	Sxx /= (2.0*N); Sxy /= (2.0*N); Syy /= (2.0*N); 
+
+	//compute the eigenvalues of the 2x2 symmetric matrix
+	double D = (Sxx-Syy)*(Sxx-Syy) + 4*Sxy*Sxy;
+	double l12 = 0.5 * (Sxx + Syy - sqrt(D));
+	double l22 = 0.5 * (Sxx + Syy + sqrt(D));
+
+	//compute the shape parameters
+	double b = -0.5 * (l12 + l22);
+	double c = l22 - l12;
+	double Rg2 = l12 + l22;
+
+	//compute the ksa
+	double k2 = (b*b + 0.75*c*c) / (Rg2*Rg2);
+	return k2;
+}
+
+void setupChain(double* X, int N, int which) {
+	//initialize coordinates of a chain via some choice
+
+	if (which == 0) {
+		for (int i = 0; i < N; i++) {
+			X[2*i] = i; X[2*i+1] = 0;
+		}
+	}
+	else if (which == 1) { //1 bond
+		for (int i = 0; i < N; i++) {
+			X[2*i] = i; X[2*i+1] = 0;
+		}
+		X[10] = 3.5; X[11] = sqrt(3.0) / 2.0;
+	}
+}
+
+void sampleFirstExit(int N, int initial, Database* db) {
 	/*get samples of some quantity at the firste exit time, starting from a linear chain */
 
 	//set parameters
 	int rho = 40; double beta = 1; double DT = 0.01; int Kh = 1850;
 	int pot = 0;  //set potential. 0 = morse, 1 = LJ
 	int method = 1; //solve SDEs with EM
-	int samples = 3000; //number of samples to get
+	int samples = 500; //number of samples to get
 
 	//cutoff for qsd
-	int t_cut = 1000;
+	int t_cut = 30;
 
 	//setup simulation
 	double Eh = stickyNewton(8, rho, Kh, beta); //get energy corresponding to kappa
@@ -604,23 +650,31 @@ void sampleFirstExit(int N, int state, Database* db) {
 	setupSimMFPT(N, Eh, P, E);
 	printf("E = %f\n", Eh);
 
-	//setup position storage
-	double* X = new double[DIMENSION*N];
-	double* temp = new double[DIMENSION*N];
-
 	//make a vector to store samples
 	std::vector<double> q_samples;
 
 	//run BD
+	#pragma omp parallel 
+	{
+	//setup position storage
+	double* X = new double[DIMENSION*N];
+	double* temp = new double[DIMENSION*N];
+	#pragma omp parallel for
 	for (int times = 0; times < samples; times++) {
 
 		printf("Running estimate %d\n", times+1);
-		setupChain(X,N); 
+		setupChain(X,N,0); 
+		int state = initial;
 
 		//intiailize temp storage and set parameters
 	  memcpy(temp, X, N*DIMENSION*sizeof(double));
 		int reset; int reflect; int new_state = state; int max_it = 10*samples;
 		int timer = 0; 
+
+		//these lines are debug to find the index of a state defined by coordinates
+		//checkState(X, N, state, new_state, db, timer, reset, reflect);
+		//printf("First state is %d\n", new_state);
+		//abort();
 
 		//solve sde and update
 		for (int i = 0; i < max_it; i++) {
@@ -654,7 +708,8 @@ void sampleFirstExit(int N, int state, Database* db) {
 
 			}
 		}
-
+	}
+	delete []X; delete []temp;
 	}
 
 	//output the samples to a file
@@ -666,7 +721,239 @@ void sampleFirstExit(int N, int state, Database* db) {
 	ofile.close();
 	
 	//free memory
-	delete []E; delete []P; delete []X; delete []temp;
+	delete []E; delete []P; 
+}
+
+void sampleSecondExit(int N, int initial, Database* db) {
+	/*get samples of some quantity at the firste exit time, starting from a linear chain */
+
+	//set parameters
+	int rho = 40; double beta = 1; double DT = 0.01; int Kh = 1850;
+	int pot = 0;  //set potential. 0 = morse, 1 = LJ
+	int method = 1; //solve SDEs with EM
+	int samples = 300; //number of samples to get
+
+	//cutoff for qsd
+	int t_cut = 500;
+
+	//setup simulation
+	double Eh = stickyNewton(8, rho, Kh, beta); //get energy corresponding to kappa
+	//initialize interaction matrices
+	int* P = new int[N*N]; double* E = new double[N*N];
+	setupSimMFPT(N, Eh, P, E);
+	printf("E = %f\n", Eh);
+
+	//make a vector to store samples
+	std::vector<double> q_samples;
+
+	//run BD
+	#pragma omp parallel
+	{
+	//setup position storage
+	double* X = new double[DIMENSION*N];
+	double* temp = new double[DIMENSION*N];
+	for (int times = 0; times < samples; times++) {
+
+		printf("Running estimate %d\n", times+1);
+		setupChain(X,N); 
+		int state = initial;
+
+		//intiailize temp storage and set parameters
+	  memcpy(temp, X, N*DIMENSION*sizeof(double));
+		int reset; int reflect; int new_state = state; int max_it = 2000;
+		int timer = 0; 
+
+		//solve sde and update
+		for (int i = 0; i < max_it; i++) {
+			reset = 0; reflect = 0;
+			//solve SDE
+			solveSDE(X, N, DT, rho, beta, E, P, method, pot);
+
+			//check if state changed
+			checkState(X, N, state, new_state, db, timer, reset, reflect);
+			int new_bonds = (*db)[new_state].getBonds();
+
+			if (new_bonds < 7 && reset == 0) { //no hit, proceed
+				memcpy(temp, X, DIMENSION*N*sizeof(double)); // copy x to temp
+				state = new_state;
+			}
+			else if (new_bonds == 7 && reflect == 1) {//hit new state, get sample of quantity
+				if (i > t_cut) {
+					//double q = gyrationRadius(N, X);
+					//double q = boop2d(N, X);
+					double q = end2end(N, X);
+					q_samples.push_back(q);
+					std::cout << i << "\n";
+					break;
+				}
+				else {
+					memcpy(X, temp, DIMENSION*N*sizeof(double));//copy temp to x -> reset step
+				}
+
+			}
+			else {//chain broke, reset previous config
+				memcpy(X, temp, DIMENSION*N*sizeof(double));//copy temp to x -> reset step
+
+			}
+		}
+	}
+	delete []X; delete []temp;
+	}
+
+	//output the samples to a file
+	std::ofstream ofile;
+	ofile.open("fhtBD.txt");
+	for (int i = 0; i < q_samples.size(); i++) {
+		ofile << q_samples[i] << "\n";
+	}
+	ofile.close();
+	
+	//free memory
+	delete []E; delete []P; 
+}
+
+void fillHydroData(int N, std::string filename, std::vector<std::vector<double>>& ics) {
+	//take hydro data from file and put in vector
+
+	std::ifstream in_str(filename);
+
+	//check if the file can be opened
+	if (!in_str) {
+		fprintf(stderr, "Cannot open file %s\n", filename.c_str());
+		return;
+	}
+
+	double x0; //check if there is another line
+	double x;
+	std::vector<double> cluster;
+
+	//fill the vector
+	while (in_str >> x0) {
+		cluster.clear();
+		cluster.push_back(x0);
+		for (int i = 0; i < N*DIMENSION-1; i++) {
+			in_str >> x; cluster.push_back(x);
+		}
+		ics.push_back(cluster);
+	}
+
+}
+
+void sampleSecondExit(int N, Database* db) {
+	/*get samples of some quantity at the second exit time. Uses the hydrodynamics 
+	  data at the first exit time as the initial condition.  */
+
+	//set parameters
+	int rho = 40; double beta = 1; double DT = 0.01; int Kh = 1850;
+	int pot = 0;  //set potential. 0 = morse, 1 = LJ
+	int method = 1; //solve SDEs with EM
+
+	//get HD data
+	int hydro = 0;   //set to 0 or 1 for ex/including short range hydrodynamics
+	std::string base = "input/hydro/"; 
+	//check if hydrodynamics were on or off, set parameters accordingly
+	if (hydro == 0) { //hydro is off
+	  base += "noHD/noHD1bond.txt";
+	}
+	else { //hydro is on
+		base += "HD/HD1bond.txt";
+	}
+	std::vector<std::vector<double>> ics;
+	fillHydroData(N, base, ics);
+	int num_samples = ics.size();
+
+
+	//cutoff for qsd
+	int t_cut = 50;
+
+	//setup simulation
+	double Eh = stickyNewton(8, rho, Kh, beta); //get energy corresponding to kappa
+	//initialize interaction matrices
+	int* P = new int[N*N]; double* E = new double[N*N];
+	setupSimMFPT(N, Eh, P, E);
+	printf("E = %f\n", Eh);
+
+	//make a vector to store samples
+	//std::vector<double> q_samples;
+	double* q_samples = new double[num_samples];
+	for (int i = 0; i < num_samples; i++) {
+		q_samples[i] = 0.0;
+	}
+
+	//run BD
+	#pragma omp parallel
+	{
+	//setup position storage
+	double* X = new double[DIMENSION*N];
+	double* temp = new double[DIMENSION*N];
+	#pragma omp for schedule(auto)
+	for (int sample = 0; sample < num_samples; sample++) {
+
+		std::vector<double> coordinates = ics[sample];
+		for (int c = 0; c < N*DIMENSION; c++) {
+			X[c] = coordinates[c];
+		}
+		int dummy = 0; int state;
+		checkState(X, N, 1, state, db, dummy, dummy, dummy);
+		printf("Sample %d on thread %d is starting in state %d\n", sample, omp_get_thread_num(), state);
+		
+
+		//intiailize temp storage and set parameters
+	  memcpy(temp, X, N*DIMENSION*sizeof(double));
+		int reset; int reflect; int new_state = state; int max_it = 2000;
+		int timer = 0; 
+
+		//solve sde and update
+		for (int i = 0; i < max_it; i++) {
+			reset = 0; reflect = 0;
+			//solve SDE
+			solveSDE(X, N, DT, rho, beta, E, P, method, pot);
+
+			//check if state changed
+			checkState(X, N, state, new_state, db, timer, reset, reflect);
+			int new_bonds = (*db)[new_state].getBonds();
+
+			if (new_bonds < 7 && reset == 0) { //no hit, proceed
+				memcpy(temp, X, DIMENSION*N*sizeof(double)); // copy x to temp
+				state = new_state;
+			}
+			else if (new_bonds == 7 && reflect == 1) {//hit new state, get sample of quantity
+				if (i > t_cut) {
+					//double q = gyrationRadius(N, X);
+					//double q = boop2d(N, X);
+					double q = end2end(N, X);
+					//q_samples.push_back(q);
+					q_samples[sample] = q;
+					std::cout << i << "\n";
+					break;
+				}
+				else {
+					memcpy(X, temp, DIMENSION*N*sizeof(double));//copy temp to x -> reset step
+				}
+
+			}
+			else {//chain broke, reset previous config
+				memcpy(X, temp, DIMENSION*N*sizeof(double));//copy temp to x -> reset step
+
+			}
+		}
+	}
+	delete []X; delete []temp;
+	}
+
+	//output the samples to a file
+	std::ofstream ofile;
+	ofile.open("fhtBD.txt");
+	for (int i = 0; i < num_samples; i++) {
+		if (q_samples[i] != 0) {
+			ofile << q_samples[i] << "\n";
+		}
+	}
+	ofile.close();
+	
+	//free memory
+	delete []E; delete []P; 
+	delete []q_samples;
 }
 
 

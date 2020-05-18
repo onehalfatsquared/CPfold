@@ -72,8 +72,10 @@ void determineTransitions(HCC* hc, Database* db, double tps);
 
 //functions to compute statistics
 void distributionFHT(HCC* hc, Database* db, std::vector<double>& q, int which);
+void distributionFHT2(HCC* hc, Database* db, std::vector<double>& q, int which);
 void timeAverageFHT(HCC* hc, Database* db, std::vector<double>& q, int which);
 void sampleStats(std::vector<double> X, double& M, double& V);
+void clustersFHT(HCC* hc, Database* db, std::ostream& ofile);
 
 //test functions
 void testExtract(HCC* hc);

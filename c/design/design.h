@@ -5,6 +5,7 @@
 #include <vector>
 #include <map>
 #include <deque>
+#include <random>
 namespace bd { 
 class Database; 
 
@@ -34,6 +35,9 @@ void applyMax(int numInteractions, double* kappaVals, double M);
 void constructSurfaceTOY(int N, Database* db, int initial, int target, bool useFile);
 void constructScatterTOY(int N, Database* db, int initial, int target, bool useFile);
 void constructScatterTOY1(int N, Database* db, int initial, int target);
+void constructScatterTOYsensitivity(int N, Database* db, int initial, int target, bool useFile);
+void perturbDB(Database* db, double freq_perturb_frac, double rate_perturb_frac);
+void perturbDBconstP(Database* db);
 
 //hitting probability optimization
 void printHitProbability(int num_states, int initial, std::vector<int> targets, double* U);

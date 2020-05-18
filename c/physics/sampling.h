@@ -49,9 +49,14 @@ bool findMatrix(int* M, int* old, int old_bonds, int N, Database* db, int& timer
 	int& reset, int& reflect, int& new_state);
 
 void sampleFirstExit(int N, int state, Database* db);
+void sampleSecondExit(int N, int state, Database* db);
+void sampleSecondExit(int N, Database* db);
+
+//order parameters
 double gyrationRadius(int N, double* X);
 double boop2d(int N, double* X);
 double end2end(int N, double* X);
+double rsa(int N, double* X);
 
 
 

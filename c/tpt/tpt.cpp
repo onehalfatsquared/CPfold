@@ -21,6 +21,11 @@ void computeMFPTs(int num_states, double* T, std::vector<int> targets, double* m
 	//solves A*tau = -1, where is A is rate matrix with rows/cols of the targets
 	//zero'd out (removed)
 
+	//Eigen::setNbThreads(0);
+	//omp_set_num_threads(0);
+
+	//printf("Solving with %d threads\n", Eigen::nbThreads());
+
 	//find number of non-zero'd entries
 	int num_targets = targets.size();
 	int M = num_states - num_targets;

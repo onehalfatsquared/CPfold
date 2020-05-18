@@ -80,6 +80,8 @@ int main(int argc, char* argv[]) {
 
 		//estimate a quantity at the first hitting time
 		bd::sampleFirstExit(N, source, db);
+		//bd::sampleSecondExit(N, source, db);
+		//bd::sampleSecondExit(N, db);
 	}
 
 	//free memory - delete database

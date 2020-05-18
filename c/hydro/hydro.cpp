@@ -511,7 +511,7 @@ void distributionFHT(HCC* hc, Database* db, std::vector<double>& q, int which) {
 				break;
 			}
 
-			if (new_state != old_state) { //new state reached, update data
+			if (new_state != old_state && old_state == 13) { //new state reached, update data
 				printf("Transition %d to %d in time %d\n", old_state, new_state, timer);
 				double quantity;
 				if (which == 0) {
@@ -530,6 +530,166 @@ void distributionFHT(HCC* hc, Database* db, std::vector<double>& q, int which) {
 			//copy new state to old state
 			if (!reset) {
 				memcpy(Xold, X, DIMENSION*N*sizeof(double)); // copy X to Xold
+			}
+			old_state = new_state;
+		}
+	}
+
+
+	//free the memory
+	delete []X; delete []Xold; 
+}
+
+void clustersFHT(HCC* hc, Database* db, std::ostream& ofile) {
+	//write all clusters at first hitting time to file
+
+	//get info from the db and HCC
+	int N = db->getN();             //number of particles
+	int ns = db->getNumStates();    //number of states
+	int nc = hc->getNumClusters();  //number of clusters
+	int maxT = hc->getMaxT();       //max timestep for clusters evo
+
+	//declare all the things we need
+	double* X = new double[N*DIMENSION];    //store a configuration
+	double* Xold = new double[N*DIMENSION]; //store previous config
+
+	
+	//variables for state change check
+	int old_state;
+	int new_state;
+	bool reset;
+	int bonds;
+
+
+	//loop over each cluster in HHC
+	for (int i = 0; i < nc; i++) {
+		//create a reference to the i-th collection of clusters
+		HydroCluster& currentCluster = (*hc)[i];
+		printf("Now analyzing cluster %d of %d\n", i+1, nc);
+		int timer = 0;      //store time since last bond
+
+		//put the 0-th cluster in temp - get details
+		getCoordinates(currentCluster, Xold, N, 0);
+		old_state = currentCluster.cNum; 
+		new_state = currentCluster.cNum; 
+
+		//loop over all the timesteps - detect transitions
+		for (int time = 1; time < maxT; time++) {
+
+			//get the next set of coordinates - increment timer
+			getCoordinates(currentCluster, X, N, time);
+			if (X[0] == 0) { //check if we reached the end of the time series
+				//std::cout << time << "\n";
+				break;
+			}
+			timer++;
+
+			
+			//check if state changed
+			checkState(N, X, old_state, db, reset, new_state);
+
+
+			if (reset) { //either a bond broke, or two bonds formed at once - ignore rest of traj.
+				break;
+			}
+
+			if (new_state != old_state) { //new state reached, update data
+				printf("Transition %d to %d in time %d\n", old_state, new_state, timer);
+				
+				for (int p = 0; p < DIMENSION*N; p++) {
+					ofile << X[p] << ' ';
+				}
+				ofile << "\n";
+				break;
+			}
+			
+			//copy new state to old state
+			if (!reset) {
+				memcpy(Xold, X, DIMENSION*N*sizeof(double)); // copy X to Xold
+			}
+			old_state = new_state;
+		}
+	}
+
+
+	//free the memory
+	delete []X; delete []Xold; 
+}
+
+void distributionFHT2(HCC* hc, Database* db, std::vector<double>& q, int which) {
+	//compute the quantity q at the second hitting time
+
+	//get info from the db and HCC
+	int N = db->getN();             //number of particles
+	int ns = db->getNumStates();    //number of states
+	int nc = hc->getNumClusters();  //number of clusters
+	int maxT = hc->getMaxT();       //max timestep for clusters evo
+
+	//declare all the things we need
+	double* X = new double[N*DIMENSION];    //store a configuration
+	double* Xold = new double[N*DIMENSION]; //store previous config
+
+	
+	//variables for state change check
+	int old_state;
+	int new_state;
+	bool reset;
+	int bonds;
+
+
+	//loop over each cluster in HHC
+	for (int i = 0; i < nc; i++) {
+		//create a reference to the i-th collection of clusters
+		HydroCluster& currentCluster = (*hc)[i];
+		printf("Now analyzing cluster %d of %d\n", i+1, nc);
+		int timer = 0;      //store time since last bond
+
+		//put the 0-th cluster in temp - get details
+		getCoordinates(currentCluster, Xold, N, 0);
+		old_state = currentCluster.cNum; 
+		new_state = currentCluster.cNum; 
+
+		//loop over all the timesteps - detect transitions
+		for (int time = 1; time < maxT; time++) {
+
+			//get the next set of coordinates - increment timer
+			getCoordinates(currentCluster, X, N, time);
+			if (X[0] == 0) { //check if we reached the end of the time series
+				//std::cout << time << "\n";
+				break;
+			}
+			timer++;
+
+			
+			//check if state changed
+			checkState(N, X, old_state, db, reset, new_state);
+			int new_bonds = (*db)[new_state].getBonds();
+
+
+			if (reset) { //either a bond broke, or two bonds formed at once - ignore rest of traj.
+				break;
+			}
+
+			if (new_state != old_state && new_bonds == 7) { //new state reached, update data
+				printf("Transition %d to %d in time %d\n", old_state, new_state, timer);
+				double quantity;
+				if (which == 0) {
+					quantity = gyrationRadius(N, X);
+				}
+				else if (which == 1) {
+					quantity = boop2d(N, X);
+				}
+				else if (which == 2) {
+					quantity = end2end(N, X);
+				}
+				q.push_back(quantity);
+				break;
+			}
+			
+			//copy new state to old state
+			if (!reset) {
+				memcpy(Xold, X, DIMENSION*N*sizeof(double)); // copy X to Xold
+				old_state = new_state;
 			}
 		}
 	}

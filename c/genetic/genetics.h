@@ -14,6 +14,25 @@
 #include "nauty.h"
 #include "../defines.h"
 
+
+class RandomNo{
+	std::mt19937 generator; 
+	std::uniform_real_distribution<double> uDist;
+	std::normal_distribution<double> gDist;
+
+	public:
+		RandomNo(unsigned int seed = std::random_device{}())
+        : generator{seed},uDist{0,1},gDist{0,1} {}
+
+    double getU() {
+    	return uDist(generator);
+    }
+    double getG() {
+    	return gDist(generator);
+    }
+};
+
+
 namespace ga {
 
 
@@ -25,7 +44,7 @@ public:
 	Person();
 	~Person();
 
-	Person(int num_interactions, double* kappaVals);
+	Person(int N, int num_interactions, int* types, double* kappaVals);
 
 	void copy(const Person& old);
 	Person(const Person& old) {
@@ -44,31 +63,32 @@ public:
 
 	//parameters
 	int num_interactions;
+	int N;
 	double Rate;
 	double Eq;
 	double fitness;
+	int* types;
 	double* kappaVals;
 	std::map<std::pair<int,int>,double> kappa;
 
 	//functions 
 	void setKappa(int num_interactions, double* kappaVals);
-	Person mate(Person partner);
+	Person mate(Person partner, bool, RandomNo*);
 	void evalStats(int N, bd::Database* db, int initial, std::vector<int> targets, 
-								 int* particleTypes, double* eq, double* Tconst, double* T, double* m);
+								 double* eq, double* Tconst, double* T, double* m);
 	void evalFitness(double eq, double rate);
 
 private:
 
 
-
-
-
-
-
-
 };
 
 
+
+double sampleKappa(int N, RandomNo* rngee);
+int sampleType(int N, int numInteractions, RandomNo* rngee);
+void sampleParameters(int N, int numInteractions, double* kappaVals, int* particleTypes, 
+											bool useFile, RandomNo* rngee);
 
 
 
