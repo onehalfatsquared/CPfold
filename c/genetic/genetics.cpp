@@ -188,7 +188,12 @@ void Person::evalStats(int N, bd::Database* db, int initial, std::vector<int> ta
 	bd::fillDiag(T, num_states);
 	//get the transition rate
 	//printf("%f, %f, %f\n", kappaVals[0], kappaVals[1], kappaVals[2]);
-	bd::computeMFPTs(num_states, T, targets, m);
+	if (num_states > 300) { //do a sparse solve
+		bd::computeMFPTsSP(num_states, T, targets, m);
+	}
+	else { //do a dense solve
+		bd::computeMFPTs(num_states, T, targets, m);
+	}
 	double rate = 1/m[initial];
 
 	Rate = rate; Eq = eqProb;
@@ -450,7 +455,7 @@ void perform_evolution(int N, bd::Database* db, int initial, int target, bool us
 		
 		//double f = population[p[0]].fitness;
 		//std::cout << "max f " << f << "\n";
-		
+
 		//determine the non-dominated points
 		std::vector<int> nonDom;
 		non_dominated_set(pop_size, popEq, popRate, nonDom);
