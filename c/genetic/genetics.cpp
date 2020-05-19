@@ -390,7 +390,6 @@ void perform_evolution(int N, bd::Database* db, int initial, int target, bool us
 		p.evalStats(N, db, initial, targets, eq, Tconst, T, m);
 		p.evalFitness(eqMax, rateMax);
 		pop_array[i] = p;
-		printf("Fitness init %f\n", pop_array[i].fitness);
 		printf("Finsihing sample %d on thread %d\n", i, omp_get_thread_num());
 	}
 	//free memory
@@ -427,7 +426,6 @@ void perform_evolution(int N, bd::Database* db, int initial, int target, bool us
 			popEq[i] = population[i].Eq; 
 			popRate[i] = population[i].Rate; 
 			popFitness[i] = population[i].fitness;
-			printf("eq %f, Fitness %f\n", popEq[i], popFitness[i]);
 
 			//printf("Person %d, eq %f, rate %f\n", i, population[i].Eq, population[i].Rate);
 			//printf("%f, %f, %f\n", population[i].kappaVals[0],population[i].kappaVals[1],population[i].kappaVals[2]);
@@ -443,14 +441,16 @@ void perform_evolution(int N, bd::Database* db, int initial, int target, bool us
 			rateMax = rM;
 		}
 
-		printf("Gen %d, em %f, rm %f\n", gen, eqMax, rateMax);
+		//printf("Gen %d, em %f, rm %f\n", gen, eqMax, rateMax);
+
 		//next, we sort the population by fitness, high to low
 		std::vector<int> p(pop_size);
 		std::iota(p.begin(), p.end(), 0);
 		std::sort(p.begin(), p.end(), [&](int i1, int i2) { return popFitness[i1] > popFitness[i2]; });
 		
-		double f = population[p[0]].fitness;
-		std::cout << "max f " << f << "\n";
+		//double f = population[p[0]].fitness;
+		//std::cout << "max f " << f << "\n";
+		
 		//determine the non-dominated points
 		std::vector<int> nonDom;
 		non_dominated_set(pop_size, popEq, popRate, nonDom);
