@@ -6,7 +6,7 @@ namespace ga {
 
 
 Person::Person() {
-	Rate = Eq = 0;
+	Rate = Eq = 0; fitness = 0;
 	N = 0;
 	num_interactions = 0;
 	kappaVals = NULL;
@@ -22,6 +22,7 @@ void Person::copy(const Person& old) {
 	Rate = old.Rate;
 	Eq = old.Eq;
 	num_interactions = old.num_interactions;
+	fitness = old.fitness;
 
 	kappaVals = new double[num_interactions];
 	for (int i = 0; i < num_interactions; i++) {
@@ -42,7 +43,7 @@ void Person::destroy() {
 }
 
 Person::Person(int N_, int num_interactions_, int* t, double* kV) {
-	Rate = Eq = 0;
+	Rate = Eq = 0; fitness = 0;
 	N = N_;
 	num_interactions = num_interactions_;
 	kappaVals = new double[num_interactions];
@@ -98,7 +99,7 @@ Person Person::mate(Person partner, bool useFile, RandomNo* rngee) {
 		//try setting a large parameter to a maximum value
 		if (kV[i] > 1e3) {
 			if (N == 7) {
-				kV[i] = 2500;
+				kV[i] = 1500;
 			}
 			else {
 				kV[i] = 1e5;
@@ -186,6 +187,7 @@ void Person::evalStats(int N, bd::Database* db, int initial, std::vector<int> ta
 	//fill in diagonal with negative sum of row entries
 	bd::fillDiag(T, num_states);
 	//get the transition rate
+	//printf("%f, %f, %f\n", kappaVals[0], kappaVals[1], kappaVals[2]);
 	bd::computeMFPTs(num_states, T, targets, m);
 	double rate = 1/m[initial];
 
@@ -309,9 +311,9 @@ void perform_evolution(int N, bd::Database* db, int initial, int target, bool us
 	Eigen::setNbThreads(0);
 
 	//parameters to the genetic algorithm
-	int generations = 10;
-	int pop_size    = 500;
-	double elite_p  = 0.08;
+	int generations = 50;
+	int pop_size    = 1000;
+	double elite_p  = 0.1;
 	double mates_p  = 0.5;
 	bool printAll   = false;         //set true to make movie of output
 	bool perturb    = false;          //set true for sensitivity testing
@@ -388,6 +390,7 @@ void perform_evolution(int N, bd::Database* db, int initial, int target, bool us
 		p.evalStats(N, db, initial, targets, eq, Tconst, T, m);
 		p.evalFitness(eqMax, rateMax);
 		pop_array[i] = p;
+		printf("Fitness init %f\n", pop_array[i].fitness);
 		printf("Finsihing sample %d on thread %d\n", i, omp_get_thread_num());
 	}
 	//free memory
@@ -424,6 +427,7 @@ void perform_evolution(int N, bd::Database* db, int initial, int target, bool us
 			popEq[i] = population[i].Eq; 
 			popRate[i] = population[i].Rate; 
 			popFitness[i] = population[i].fitness;
+			printf("eq %f, Fitness %f\n", popEq[i], popFitness[i]);
 
 			//printf("Person %d, eq %f, rate %f\n", i, population[i].Eq, population[i].Rate);
 			//printf("%f, %f, %f\n", population[i].kappaVals[0],population[i].kappaVals[1],population[i].kappaVals[2]);
@@ -439,11 +443,14 @@ void perform_evolution(int N, bd::Database* db, int initial, int target, bool us
 			rateMax = rM;
 		}
 
+		printf("Gen %d, em %f, rm %f\n", gen, eqMax, rateMax);
 		//next, we sort the population by fitness, high to low
 		std::vector<int> p(pop_size);
 		std::iota(p.begin(), p.end(), 0);
 		std::sort(p.begin(), p.end(), [&](int i1, int i2) { return popFitness[i1] > popFitness[i2]; });
 		
+		double f = population[p[0]].fitness;
+		std::cout << "max f " << f << "\n";
 		//determine the non-dominated points
 		std::vector<int> nonDom;
 		non_dominated_set(pop_size, popEq, popRate, nonDom);
@@ -451,6 +458,7 @@ void perform_evolution(int N, bd::Database* db, int initial, int target, bool us
 		//create the new generation, perform elitism step
 		std::vector<Person> new_generation;
 		int elites = nonDom.size(); 
+		printf("Gen %d, num elites %d\n", gen, elites);
 		for (int i = 0; i < elites; i++) {
 			new_generation.push_back(population[nonDom[i]]);
 		}
@@ -469,8 +477,8 @@ void perform_evolution(int N, bd::Database* db, int initial, int target, bool us
 		//loop over population
 		#pragma omp for
 		for (int i = 0; i < rest; i++) {
-			int r1 = rand() % top;
-			int r2 = rand() % top;
+			int r1 = p[floor(rngee->getU()*top)];
+			int r2 = p[floor(rngee->getU()*top)];
 			Person p1 = population[r1];
 			Person p2 = population[r2];
 			Person kid = p1.mate(p2, useFile, rngee);

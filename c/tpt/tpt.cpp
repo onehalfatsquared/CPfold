@@ -5,6 +5,7 @@
 #include <string.h>
 #include <vector>
 #include <eigen3/Eigen/Dense>
+#include <eigen3/Eigen/SparseLU>
 //#include <eigen3/Eigen/QR>
 #include "point.h"
 #include "database.h"
@@ -15,6 +16,88 @@
 #include "graphviz.h"
 #include "../defines.h"
 namespace bd{
+
+void computeMFPTsSP(int num_states, double* T, std::vector<int> targets, double* m) {
+	//compute the mean first passage time of every state to targets
+	//solves A*tau = -1, where is A is rate matrix with rows/cols of the targets
+	//zero'd out (removed)
+
+	//uses sparse solver
+
+	//Eigen::setNbThreads(0);
+	//omp_set_num_threads(0);
+
+	//printf("Solving with %d threads\n", Eigen::nbThreads());
+
+	double tol = 1e-7;
+
+	//find number of non-zero'd entries
+	int num_targets = targets.size();
+	int M = num_states - num_targets;
+	Eigen::SparseMatrix<double> QMs(M,M);
+	Eigen::SparseLU<Eigen::SparseMatrix<double>>   solver;
+	Eigen::VectorXd b(M); 
+	Eigen::VectorXd tau(M);  
+
+	//construct a boolean array to check if a row should be skipped
+	bool* skip = new bool[num_states]; for (int i = 0; i < num_states; i++) skip[i] = false;
+	for (int i = 0; i < num_targets; i++) skip[targets[i]] = true;
+
+	//fill in transition matrix for all non-skipped rows/cols
+	typedef Eigen::Triplet<double> Tr;
+	std::vector<Tr> tripletList;
+	tripletList.reserve(num_states*10);
+
+	int i_index = 0;
+	for (int i = 0; i < num_states; i++) {
+		if (!skip[i]) {
+			int j_index = 0;
+			for (int j = 0; j < num_states; j++) {
+				if (!skip[j]) {
+					double value = T[toIndex(i,j,num_states)];
+					if (abs(value) > tol) {
+						tripletList.push_back(Tr(i_index,j_index,value));
+					}
+					j_index++;
+				}
+			}
+			i_index++;
+		}
+	}
+	QMs.setFromTriplets(tripletList.begin(), tripletList.end());
+	//QMs.makeCompressed();
+
+	//fill b with -1
+	b.fill(-1.0);
+
+	//solve for tau
+	solver.analyzePattern(QMs);
+	solver.factorize(QMs);
+	//std::cout << solver.info() << "\n";
+	if (solver.info() != Eigen::Success) {
+		for (int i = 0; i < M; i++) {
+			std::cout << i << ' ' << QMs.coeffRef(i,i) << "\n";
+		}
+	}
+	tau = solver.solve(b);
+
+
+
+	//store solution in m - re-add lost zeros
+	int lostIndex = 0;
+	for (int i = 0; i < num_states; i++) {
+		if (!skip[i]) {
+			m[i] = abs(tau(lostIndex));
+			lostIndex++;
+		}
+		else {
+			m[i] = 0;
+		}
+	}
+
+	//free memory
+	delete []skip;
+}
 
 void computeMFPTs(int num_states, double* T, std::vector<int> targets, double* m) {
 	//compute the mean first passage time of every state to targets

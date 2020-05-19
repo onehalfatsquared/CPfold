@@ -1599,7 +1599,7 @@ double getRate(int initial, double* kappaVals, Database* db, int* particleTypes,
 
 	//construct array of mfpts and caluclate it
 	double* m = new double[num_states];
-	computeMFPTs(num_states, T, targets, m);
+	computeMFPTsSP(num_states, T, targets, m);
 	double mfpt = m[initial];
 
 	//free memory

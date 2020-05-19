@@ -44,6 +44,7 @@ void computeHittingProbability(double* P, int num_states, std::vector<int> endSt
 															 double* U);
 //compute the mfpt from worm to target states
 void computeMFPTs(int num_states, double* T, std::vector<int> targets, double* m);
+void computeMFPTsSP(int num_states, double* T, std::vector<int> targets, double* m);
 
 
 
