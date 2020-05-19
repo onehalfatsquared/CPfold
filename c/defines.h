@@ -25,6 +25,3 @@
 
 //visual parameters
 #define PTOL        0.1       // exclude nodes from plot with less than this probability
-
-//eigen settings
-#define EIGEN_DONT_PARALLELIZE
