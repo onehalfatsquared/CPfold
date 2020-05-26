@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
 		source = atoi(argv[3]); 
 	} 
 
-	bool created = true;
+	bool created = false;
 	//build a database if one does not exist
 	if (rType == -1) {
 		if (created) { //the database file has been created. fill it

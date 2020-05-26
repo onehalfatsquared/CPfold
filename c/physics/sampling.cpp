@@ -65,6 +65,8 @@ void buildEmptyDB(int N) {
 		}
 	}
 
+	printf("Test Val %f %f %f\n", s.coordinates[0][1].x,s.coordinates[0][2].x,s.coordinates[0][3].x);
+
 	s.num = s.denom = 0;
 	s.num_neighbors = 0;
 	s.freq = s.mfpt = s.sigma = 0.0;
@@ -92,6 +94,13 @@ bool checkSame(int N, int* AM, State& s) {
 
 int searchDB(int N, Database* db, std::vector<State> new_states, int* AM) {
 	//check if the current adj matrix is in db. if yes, return state #. if not, return -1.
+
+	//check if the result is connected
+	//check if state is connected
+	bool C = checkConnected(AM, N);
+	if (!C) {//not connected
+		return -2;
+	}
 
 	int num_states = db->getNumStates();
 
@@ -168,7 +177,7 @@ void addToDB(int N, Database* db) {
 	int rho = RANGE;
 	double beta = BETA;
 	int method = 1;       //solve sde with em
-	int steps = 200;      //number of time steps to take
+	int steps = 5000;      //number of time steps to take
 
 	//initialize interaction matrices
 	int* types = new int[N];
@@ -209,7 +218,10 @@ void addToDB(int N, Database* db) {
 
 		//check if this state has been seen before
 		int state = searchDB(N, db, new_states, AM);
-		std::cout << state << "\n";
+		//std::cout << state << "\n";
+		if (state == -2) {
+			printf("BROKEN \n");
+		}
 		if (state == -1) {
 			//add the new state to vector
 			addState(N, X, AM, new_states);

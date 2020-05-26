@@ -10,7 +10,12 @@
 #define RK_TS       1e-6       // time step for RK integrator
 #define SAMPLES      1000       // number of samples to obtain (per prcoessor)
 #define EQ           500       // number of samples to equilibrate for (change to time?) 
-#define BOND_CUTOFF  1.04       // if two particles are less than this distance, bonded
+
+#if (DIMENSION == 2)
+	#define BOND_CUTOFF  1.04       // if two particles are less than this distance, bonded
+#elif (DIMENSION == 3)
+	#define BOND_CUTOFF  1.02
+#endif
 
 //Newton's Method Parameters
 #define N_ITER        20       // Max iterations for NM

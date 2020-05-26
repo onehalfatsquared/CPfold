@@ -1,5 +1,6 @@
 #include "database.h"
 #include "nauty.h"
+#include "../defines.h"
 #include <algorithm>
 #include <eigen3/Eigen/Dense>
 #include <vector>
@@ -190,8 +191,7 @@ std::ostream& State::print(std::ostream& out_str, int N, int* lumpMap) const {
 #if (DIMENSION == 2)
 			out_str << coordinates[i][j].x << ' ' << coordinates[i][j].y << ' ';
 #elif (DIMENSION == 3)
-			out_str << coordinates[i][j].x << ' ' << coordinates[i][j].y << ' ' 
-			<< coordinates[i][j].z << ' ';
+			out_str << coordinates[i][j].x << ' ' << coordinates[i][j].y << ' ' << coordinates[i][j].z << ' ';
 #endif
 		}
 	}

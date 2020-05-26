@@ -84,14 +84,15 @@ void fillP(int N, int* particleTypes, int* P, double* E,
 	//fill interaction matrices with values
 
 	for (int i = 0; i < N-1; i++) {
-		P[toIndex(i,i+1,N)] = 1; E[toIndex(i,i+1,N)] = 10; 
-		P[toIndex(i+1,i,N)] = 1; E[toIndex(i+1,i,N)] = 10; 
+		P[toIndex(i,i+1,N)] = 1; E[toIndex(i,i+1,N)] = 11; 
+		P[toIndex(i+1,i,N)] = 1; E[toIndex(i+1,i,N)] = 11; 
 		for (int j = i+2; j < N; j++) {
 			int p1 = particleTypes[i]; 
 			int p2 = particleTypes[j];
 			double kval = kappa[{p1,p2}];
 			if (kval > 0.09) {
 				double energy = stickyNewton(8.0, RANGE, kval, BETA); 
+				printf("Energy is %f\n", energy);
 				P[toIndex(i,j,N)] = 1; E[toIndex(i,j,N)] = energy; 
 				P[toIndex(j,i,N)] = 1; E[toIndex(j,i,N)] = energy; 
 			}
