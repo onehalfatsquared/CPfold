@@ -83,7 +83,7 @@ void fillP(int N, int* particleTypes, int* P, double* E,
 					 std::map<std::pair<int,int>,double>& kappa) {
 	//fill interaction matrices with values
 
-	for (int i = 0; i < N; i++) {
+	for (int i = 0; i < N-1; i++) {
 		P[toIndex(i,i+1,N)] = 1; E[toIndex(i,i+1,N)] = 10; 
 		P[toIndex(i+1,i,N)] = 1; E[toIndex(i+1,i,N)] = 10; 
 		for (int j = i+2; j < N; j++) {

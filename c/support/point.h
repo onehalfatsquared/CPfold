@@ -19,12 +19,34 @@ struct Point {
 //create a cluster structure - stores N points
 struct Cluster {
 	//constructor and destructors
-	Cluster(int N) {points = new Point[N];}
+	Cluster(int N_) {N = N_; points = new Point[N];}
 	Cluster() {points = NULL;}
-	~Cluster() {delete []points;}
+	~Cluster() {destroy();}
 
-	void setNumPoints(int N) {points = new Point[N];}
+	Cluster(const Cluster& old) {
+		copy(old);
+	}
+	Cluster& operator=(const Cluster& old) {
+		if (this != &old) {
+			destroy();
+			copy(old);
+		}
+		return *this;
+	}
+
+	void copy(const Cluster& old) {
+		N = old.N;
+
+		points = new Point[N];
+		for (int i = 0; i < N; i++) {
+			points[i] = old.points[i];
+		}
+	}
+	void destroy() { delete []points;}
+
+	void setNumPoints(int N_) {N = N_; points = new Point[N];}
 	Point* points;
+	int N;
 
 	//define bracket operators - allows indexing of points
 	Point& operator[](int index) {return points[index];}

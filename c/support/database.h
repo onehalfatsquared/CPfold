@@ -39,7 +39,24 @@ class State{
 	public:
 		State();
 		~State();
+
+		//copy constructors
+		State(const State& old) {
+			copy(old);
+		}
+		State& operator=(const State& old) {
+			if (this != &old) {
+				destroy();
+				copy(old);
+			}
+			return *this;
+		}
+		
+		//friends
 		friend Database* readData(std::string& filename);
+		friend void buildEmptyDB(int N);
+		friend void addState(int N, double* X, int* AM, std::vector<State>& new_states);
+		friend void addToDB(int N, Database* db);
 
 		//accessor functions
 		double getFrequency() const {return freq;}
@@ -62,6 +79,7 @@ class State{
 		double freq, mfpt, sigma;
 		//Pair* P; Pair* Z; Pair* Zerr;
 		std::vector<Pair> P; std::vector<Pair> Z; std::vector<Pair> Zerr;
+		int N;
 
 		//print function
 		std::ostream& print(std::ostream&, int, int*) const;
@@ -72,15 +90,9 @@ class State{
 		int num_coords; 
 		Cluster* coordinates; 
 
-		//copy constructors - restricts compiling when user tries to copy state
-		State(const State&) {
-			throw 1;
-		}
-		State& operator=(const State&) {
-			throw 1;
-		}
-
-
+		//copy constructors
+		void destroy();
+		void copy(const State& old);
 };
 
 class Database {

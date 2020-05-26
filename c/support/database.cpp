@@ -16,12 +16,39 @@ State::State() {
 	freq = 0; bond = 0; num = 0; denom = 0;
 	num_coords = 0; mfpt = 0; 
 	sigma = 0; num_neighbors = 0;
+	N = 0;
 }
 
 //state deconstructor
 State::~State() {
-	delete []am; delete []coordinates; //delete []P;
-	//delete []Z; delete []Zerr;
+	destroy();
+}
+
+void State::destroy() {
+	delete []am; delete []coordinates; 
+}
+
+void State::copy(const State& old) {
+	freq = old.freq;
+	bond = old.bond;
+	mfpt = old.mfpt;
+	sigma = old.sigma;
+	num = old.num;
+	denom = old.denom;
+	num_neighbors = old.num_neighbors;
+	num_coords = old.num_coords;
+	N = old.N;
+
+	am = new bool[N*N];
+	for (int i = 0; i < N*N; ++i) {
+		am[i] = old.am[i];
+	}
+
+	coordinates = new Cluster[num_coords];
+	for (int i = 0; i < num_coords; ++i) {
+		coordinates[i] = old.coordinates[i];
+	}
+
 }
 
 //database constructor
@@ -31,6 +58,7 @@ Database::Database(int N_, int num_states_) {
 	lumpMap = new int[num_states];
 	for (int i = 0; i < num_states; i++) {
 		lumpMap[i] = i;
+		states[i].N = N;
 	}
 }
 

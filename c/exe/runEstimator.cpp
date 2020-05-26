@@ -7,8 +7,11 @@
 #include "sampling.h"
 
 //MAKE SURE TO RUN THIS ON A PURGED DATA SET EX input/N7Purge.txt
-// Run Type: 0 for full run
+
+// Run Type: -1 to build a database
+//					 0 for full run
 //					 1 for chain estimate, with resets
+
 // Chain State: index of the linear chain in the DB. 1 for 6, 0 for 7.
 
 int main(int argc, char* argv[]) {
@@ -29,6 +32,24 @@ int main(int argc, char* argv[]) {
 		source = atoi(argv[3]); 
 	} 
 
+	bool created = true;
+	//build a database if one does not exist
+	if (rType == -1) {
+		if (created) { //the database file has been created. fill it
+			//get the database here
+			bd::Database* db = bd::readData(infile);
+			//set database variables
+			int N = db->getN(); int num_states = db->getNumStates();
+			bd::addToDB(N, db);
+		}
+		else { //no file exists 
+			bd::buildEmptyDB(8); //this line will construct a new database file to fill
+		}
+	}
+
+
+
+	//otherwise, do estimation with the database
 	//get the database here
 	bd::Database* db = bd::readData(infile);
 

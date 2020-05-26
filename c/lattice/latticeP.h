@@ -65,7 +65,7 @@ class State{
 	public:
 		State();
 		~State();
-		//copy constructors - restricts compiling when user tries to copy state
+		//copy constructors
 		State(const State& old) {
 			copy(old);
 		}

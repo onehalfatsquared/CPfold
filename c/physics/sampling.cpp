@@ -17,7 +17,240 @@ namespace bd{
 /**************** Functions to build Database *********************/
 /******************************************************************/
 
+void buildEmptyDB(int N) {
+	//construct a new database file that only has the linear state in it
 
+	//make the db with only 1 state - linear chain
+	Database* db = new Database(N, 1);
+
+	//create reference to that state
+	State& s = (*db)[0];
+
+	//fill in the state info
+
+	//adjacency matrix
+	s.am = new bool[N*N];
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++) {
+			if (j == i+1 || j == i-1) {
+				s.am[toIndex(i,j,N)] = 1;
+				s.am[toIndex(j,i,N)] = 1;
+			}
+			else {
+				s.am[toIndex(i,j,N)] = 0;
+				s.am[toIndex(j,i,N)] = 0;
+			}
+		}
+	}
+
+	//bonds
+	s.bond = N-1;
+
+	//coordinates
+	s.num_coords = 1;
+	s.coordinates = new Cluster[s.num_coords];
+	for (int i = 0; i < s.num_coords; i++) {
+		s.coordinates[i].setNumPoints(N);
+		for (int j = 0; j < N; j++) {
+#if (DIMENSION == 2)
+			double x = j;
+			double y = 0.0;
+			s.coordinates[i][j] = Point(x,y);
+#elif (DIMENSION == 3)
+			double x = j;
+			double y = 0.0;
+			double z = 0.0;
+			s.coordinates[i][j] = Point(x,y,z);
+#endif
+		}
+	}
+
+	s.num = s.denom = 0;
+	s.num_neighbors = 0;
+	s.freq = s.mfpt = s.sigma = 0.0;
+
+	//print out the new database
+	std::string out = "N" + std::to_string(N) + "DB.txt";
+	std::ofstream out_str(out);
+	out_str << *db;
+	delete db;
+}
+
+bool checkSame(int N, int* AM, State& s) {
+	//check if states are same by adjacency matrix
+
+	for (int i = 0; i < N; i++) {
+		for (int j = i+2; j < N; j++) {
+			if (s.isInteracting(i,j,N) != AM[toIndex(i,j,N)]) {
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
+int searchDB(int N, Database* db, std::vector<State> new_states, int* AM) {
+	//check if the current adj matrix is in db. if yes, return state #. if not, return -1.
+
+	int num_states = db->getNumStates();
+
+	for (int state = 0; state < num_states; state++) {
+		State& s = (*db)[state];
+		bool same = checkSame(N, AM, s);
+		if (same)
+			return state;
+	}
+
+	//std::cout << new_states.size() << "\n\n\n\n\n";
+	for (int state = 0; state < new_states.size(); state++) {
+		State& s = new_states[state];
+		bool same = checkSame(N, AM, s);
+		if (same)
+			return state+num_states;
+	}
+
+	return -1;
+}
+
+void addState(int N, double* X, int* AM, std::vector<State>& new_states) {
+	//add a new state to a vector
+
+	State s = State();
+
+	int b = 0;
+	s.N = N;
+
+	s.am = new bool[N*N];
+	//construct AM
+	for (int i = 0; i < N*N; i++) {
+		s.am[i] = AM[i];
+		if (AM[i] == 1) {
+			b++;
+			//std::cout <<"hello" << s.isInteracting(i / N, i % N) << "\n";
+		}
+	}
+
+	//add num bonds
+	b /= 2;
+	s.bond = b;
+
+	//add configuration
+	int coord = 1;
+	s.num_coords = coord;
+	s.coordinates = new Cluster[coord];
+	for (int i = 0; i < coord; i++) {
+		s.coordinates[i].setNumPoints(N);
+		for (int j = 0; j < N; j++) {
+#if (DIMENSION == 2)
+			double x = X[DIMENSION*j];
+			double y = X[DIMENSION*j+1];
+			s.coordinates[i][j] = Point(x,y);
+#elif (DIMENSION == 3)
+			double x = X[DIMENSION*j];
+			double y = X[DIMENSION*j+1];
+			double z = X[DIMENSION*j+2];
+			s.coordinates[i][j] = Point(x,y,z);
+#endif
+		}
+	}
+
+	//push to vector
+	new_states.push_back(s);
+}
+
+void addToDB(int N, Database* db) {
+	//updates a database with new states
+
+	//set parameters
+  double DT = 0.01;     //discretize samples into time chunks DT
+	int pot = POTENTIAL; 
+	int rho = RANGE;
+	double beta = BETA;
+	int method = 1;       //solve sde with em
+	int steps = 200;      //number of time steps to take
+
+	//initialize interaction matrices
+	int* types = new int[N];
+	int numTypes = readDesignFile(N, types);
+	int numInteractions = numTypes*(numTypes+1)/2;
+	double* kappa = new double[numInteractions];
+	bd::readKappaFile(numInteractions, kappa);
+	std::map<std::pair<int,int>, double> kmap; 
+	bd::makeKappaMap(numTypes, kappa, kmap);
+	int* P = new int[N*N];
+	double* E = new double[N*N];
+	bd::fillP(N, types, P, E, kmap);
+
+	//set the initial and final state storage
+	double* X = new double[DIMENSION*N];
+	bd::setupChain(X, N);
+	for (int i = 0; i < DIMENSION*N; i++) printf("%f\n", X[i]);
+
+	//set up an adjacency matrix
+	int* AM = new int[N*N];
+	for (int i = 0; i < N*N; i++) {
+		AM[i] = 0;
+	}
+
+	//create vector of new states
+	std::vector<State> new_states;
+	int count = 1;
+
+	//do the time evolution
+	for (int i = 0; i < steps; i++) {
+		//solve sde
+		solveSDE(X, N, DT, rho, beta, E, P, method, pot);
+
+		//check if the state changed from previous step
+		//get adjacency matrix for current state
+		getAdj(X, N, AM);
+		//printAM(N, AM);
+
+		//check if this state has been seen before
+		int state = searchDB(N, db, new_states, AM);
+		std::cout << state << "\n";
+		if (state == -1) {
+			//add the new state to vector
+			addState(N, X, AM, new_states);
+			printf("Found new state. Total found this run: %d\n", count);
+			count++;
+		}
+
+		if (i % (steps / 100) == 0) {
+			printf("Finished step %d of %d\n", i, steps);
+		}
+	}
+
+	//construct a new database
+	int num_states_old = db->getNumStates();
+	int num_states_new = new_states.size();
+	int total = num_states_old + num_states_new;
+
+	Database* newDB = new Database(N, total);
+
+	//copy the first states from the old db
+	for (int i = 0; i < num_states_old; i++) {
+		(*newDB)[i] = (*db)[i];
+	}
+
+	//copy the rest from the vector
+	for (int i = 0; i < num_states_new; i++) {
+		(*newDB)[i+num_states_old] = new_states[i];
+	}
+
+	//print the new db
+	std::string out = "N" + std::to_string(N) + "DBupdate.txt";
+	std::ofstream out_str(out);
+	out_str << *newDB;
+
+	//delete memory
+	delete []X; delete []AM;
+	delete []types;
+	delete []P; delete []E; delete []kappa;
+	delete newDB;
+
+}
 
 
 

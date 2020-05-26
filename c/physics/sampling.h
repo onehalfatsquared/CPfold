@@ -28,10 +28,16 @@ class RandomNo{
 
 namespace bd { 
 class Database;
+class State;
 
 //brownian dynamics sampling section
 
 //building a database of all states by sampling
+void buildEmptyDB(int N);
+bool checkSame(int N, int* AM, State& s);
+int searchDB(int N, Database* db, std::vector<State> new_states, int* AM);
+void addState(int N, double* X, int* AM, std::vector<State>& new_states);
+void addToDB(int N, Database* db);
 
 
 //doing mfpt estimation with completed database
