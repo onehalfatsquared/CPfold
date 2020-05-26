@@ -30,6 +30,11 @@ namespace bd {
 class Database;
 
 //brownian dynamics sampling section
+
+//building a database of all states by sampling
+
+
+//doing mfpt estimation with completed database
 void estimateMFPT(int N, int state, Database* db);
 void estimateChain(int N, int state, Database* db);
 void setupSimMFPT(int N, double Eh, int*& P, double*& E);
@@ -48,6 +53,8 @@ double sampleSTD(double* X, int n);
 bool findMatrix(int* M, int* old, int old_bonds, int N, Database* db, int& timer, 
 	int& reset, int& reflect, int& new_state);
 
+
+//sampling quantities at exit times
 void sampleFirstExit(int N, int state, Database* db);
 void sampleSecondExit(int N, int state, Database* db);
 void sampleSecondExit(int N, Database* db);

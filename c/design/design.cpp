@@ -586,10 +586,13 @@ void constructScatterTOY(int N, Database* db, int initial, int target, bool useF
 		M = 33; //num points in each dimension
 	}
 	if (N == 7) {
-		M = 25;
+		M = 20;
 	}
 	double base = 0.05; //smallest kappa to use - 0.05
 	double mult = 1.6; //multiplies base to get next value - 1.3
+	if (N == 7) {
+		base = 0.1;
+	}
 	double* Ks = new double[M]; Ks[0] = base;
 	for (int i = 1; i < M; i++) {
 		Ks[i] = Ks[i-1] * mult;
@@ -626,7 +629,13 @@ void constructScatterTOY(int N, Database* db, int initial, int target, bool useF
 				//fill in diagonal with negative sum of row entries
 				fillDiag(T, num_states);
 				//get the transition rate
-				computeMFPTs(num_states, T, targets, m);
+				if (num_states > 400) { //sparse solve
+					computeMFPTsSP(num_states, T, targets, m);
+				}
+				else { //dense solve
+					computeMFPTs(num_states, T, targets, m);
+				}
+				
 				double rate = 1/m[initial];
 
 				//update maxima

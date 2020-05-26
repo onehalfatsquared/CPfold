@@ -77,7 +77,7 @@ Database* readData(std::string& filename) {
 	bool val; //check if there is another line
 	int coord; //number of sample coordinates for a state
 	int index = 0; //loop over states
-	double x, y; //coordinates in a point
+	double x, y, z; //coordinates in a point
 	char extra; //flag for whether mfpt estimates are in file
 	int v1; double v2; //storing index and info in a pair
 	double v3; double v4;
@@ -108,8 +108,13 @@ Database* readData(std::string& filename) {
 		for (int i = 0; i < coord; i++) {
 			s.coordinates[i].setNumPoints(N);
 			for (int j = 0; j < N; j++) {
+#if (DIMENSION == 2)
 				in_str >> x >> y;
 				s.coordinates[i][j] = Point(x,y);
+#elif (DIMENSION == 3)
+				in_str >> x >> y >> z;
+				s.coordinates[i][j] = Point(x,y,z);
+#endif
 			}
 		}
 
@@ -154,7 +159,12 @@ std::ostream& State::print(std::ostream& out_str, int N, int* lumpMap) const {
 	out_str << num_coords << ' ';
 	for (int i = 0; i < num_coords; i++) {
 		for (int j = 0; j < N; j++) {
+#if (DIMENSION == 2)
 			out_str << coordinates[i][j].x << ' ' << coordinates[i][j].y << ' ';
+#elif (DIMENSION == 3)
+			out_str << coordinates[i][j].x << ' ' << coordinates[i][j].y << ' ' 
+			<< coordinates[i][j].z << ' ';
+#endif
 		}
 	}
 	out_str << "Y" << ' ';

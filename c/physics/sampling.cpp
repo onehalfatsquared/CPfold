@@ -13,6 +13,33 @@
 namespace bd{
 
 
+/******************************************************************/
+/**************** Functions to build Database *********************/
+/******************************************************************/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/******************************************************************/
+/**************** Functions to sample MFPT    *********************/
+/******************************************************************/
+
+
 double sampleSTD(double* X, int n) {
 	//evaluate the sample standard deviation of data in X
 	double mean = 0; double std = 0;
@@ -492,6 +519,21 @@ void estimateChain(int N, int state, Database* db) {
 	delete []E; delete []P; delete []mfptSamples;
 	//delete []PM; delete []pm; 
 }
+
+
+
+
+
+
+/******************************************************************/
+/**************** Functions to sample exit times ******************/
+/******************************************************************/
+
+
+
+
+
+
 
 double gyrationRadius(int N, double* X) {
 	//compute the radius of gyration

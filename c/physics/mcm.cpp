@@ -686,8 +686,7 @@ double getSampleMFPT(double* X, bd::Database* db, int state, int N, int* M,
 
 void estimateMFPTreset(int N, int state, bd::Database* db, RandomNo* rngee) {
 	/*estimate mean first passage time starting in state and going to state with
-	one additional bond. Uses parallel implementations of a single walker with
-	long trajectory.*/
+	one additional bond. */
 
 	//set parameters
 	int samples = SAMPLES; //number of hits per walker for estimator
@@ -824,17 +823,6 @@ void estimateMFPTreset(int N, int state, bd::Database* db, RandomNo* rngee) {
 /****************************************************/
 /**** MFPT Estimator Functions - Reflect Method  ****/
 /****************************************************/
-
-
-
-
-
-
-
-
-
-
-
 
 
 void getSamplesMFPT(double* X, bd::Database* db, int state, int N, int* M,

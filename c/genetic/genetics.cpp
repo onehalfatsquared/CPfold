@@ -6,7 +6,7 @@ namespace ga {
 
 
 Person::Person() {
-	Rate = Eq = 0; fitness = 0;
+	Rate = Eq = 0.0; fitness = 0.0;
 	N = 0;
 	num_interactions = 0;
 	kappaVals = NULL;
@@ -43,7 +43,7 @@ void Person::destroy() {
 }
 
 Person::Person(int N_, int num_interactions_, int* t, double* kV) {
-	Rate = Eq = 0; fitness = 0;
+	Rate = Eq = 0.0; fitness = 0.0;
 	N = N_;
 	num_interactions = num_interactions_;
 	kappaVals = new double[num_interactions];
@@ -97,11 +97,13 @@ Person Person::mate(Person partner, bool useFile, RandomNo* rngee) {
 		}
 
 		//try setting a large parameter to a maximum value
-		if (kV[i] > 1e3) {
-			if (N == 7) {
+		if (N == 7) {
+			if (kV[i] > 1e2) {
 				kV[i] = 1500;
 			}
-			else {
+		}
+		else {
+			if (kV[i] > 1e3) {
 				kV[i] = 1e5;
 			}
 		}
@@ -316,8 +318,8 @@ void perform_evolution(int N, bd::Database* db, int initial, int target, bool us
 	Eigen::setNbThreads(0);
 
 	//parameters to the genetic algorithm
-	int generations = 50;
-	int pop_size    = 1000;
+	int generations = 500;
+	int pop_size    = 1200;
 	double elite_p  = 0.1;
 	double mates_p  = 0.5;
 	bool printAll   = false;         //set true to make movie of output
@@ -325,7 +327,7 @@ void perform_evolution(int N, bd::Database* db, int initial, int target, bool us
 
 	//if we have prior estimates of the max rate and eqProb, set here.
 	//otherwise, this will update, adaptively. 
-	double rateMax = 0.01; double eqMax = 0.01;
+	double rateMax = 0.5; double eqMax = 0.14;
 
 	//get database info - perturb if desired
 	int num_states = db->getNumStates(); 
@@ -395,6 +397,7 @@ void perform_evolution(int N, bd::Database* db, int initial, int target, bool us
 		p.evalStats(N, db, initial, targets, eq, Tconst, T, m);
 		p.evalFitness(eqMax, rateMax);
 		pop_array[i] = p;
+		//printf("e %f, r %f, f %f\n", pop_array[i].Eq, pop_array[i].Rate, pop_array[i].fitness);
 		printf("Finsihing sample %d on thread %d\n", i, omp_get_thread_num());
 	}
 	//free memory
@@ -451,10 +454,10 @@ void perform_evolution(int N, bd::Database* db, int initial, int target, bool us
 		//next, we sort the population by fitness, high to low
 		std::vector<int> p(pop_size);
 		std::iota(p.begin(), p.end(), 0);
-		std::sort(p.begin(), p.end(), [&](int i1, int i2) { return popFitness[i1] > popFitness[i2]; });
+		//std::sort(p.begin(), p.end(), [&](int i1, int i2) { return popFitness[i1] > popFitness[i2]; });
 		
-		//double f = population[p[0]].fitness;
-		//std::cout << "max f " << f << "\n";
+		double f = population[p[0]].fitness;
+		std::cout << "max f " << f << "\n";
 
 		//determine the non-dominated points
 		std::vector<int> nonDom;

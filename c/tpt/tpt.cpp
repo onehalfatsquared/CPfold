@@ -74,29 +74,38 @@ void computeMFPTsSP(int num_states, double* T, std::vector<int> targets, double*
 	solver.analyzePattern(QMs);
 	solver.factorize(QMs);
 	//std::cout << solver.info() << "\n";
-	if (solver.info() != Eigen::Success) {
-		for (int i = 0; i < M; i++) {
-			std::cout << i << ' ' << QMs.coeffRef(i,i) << "\n";
-		}
-	}
-	tau = solver.solve(b);
 
+	if (solver.info() != Eigen::Success) { //could not compute sparse lu, do dense solve
 
-
-	//store solution in m - re-add lost zeros
-	int lostIndex = 0;
-	for (int i = 0; i < num_states; i++) {
-		if (!skip[i]) {
-			m[i] = abs(tau(lostIndex));
-			lostIndex++;
-		}
-		else {
-			m[i] = 0;
-		}
+		//perform a dense solve
+		computeMFPTs(num_states, T, targets, m);
+		delete []skip;
+		return;
 	}
 
-	//free memory
-	delete []skip;
+	else {
+		//do the sparse solve
+		tau = solver.solve(b);
+
+		//store solution in m - re-add lost zeros
+		int lostIndex = 0;
+		for (int i = 0; i < num_states; i++) {
+			if (!skip[i]) {
+				m[i] = abs(tau(lostIndex));
+				lostIndex++;
+			}
+			else {
+				m[i] = 0;
+			}
+		}
+
+		//free memory
+		delete []skip;
+		return;
+	}
+
+
+
 }
 
 void computeMFPTs(int num_states, double* T, std::vector<int> targets, double* m) {
