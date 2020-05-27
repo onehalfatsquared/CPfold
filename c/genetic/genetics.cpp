@@ -9,6 +9,7 @@ Person::Person() {
 	Rate = Eq = 0.0; fitness = 0.0;
 	N = 0;
 	num_interactions = 0;
+	numTypes = 0;
 	kappaVals = NULL;
 	types = NULL;
 }
@@ -22,6 +23,7 @@ void Person::copy(const Person& old) {
 	Rate = old.Rate;
 	Eq = old.Eq;
 	num_interactions = old.num_interactions;
+	numTypes = old.numTypes;
 	fitness = old.fitness;
 
 	kappaVals = new double[num_interactions];
@@ -42,10 +44,11 @@ void Person::destroy() {
 	delete []types;
 }
 
-Person::Person(int N_, int num_interactions_, int* t, double* kV) {
+Person::Person(int N_, int num_interactions_, int numTypes_, int* t, double* kV) {
 	Rate = Eq = 0.0; fitness = 0.0;
 	N = N_;
 	num_interactions = num_interactions_;
+	numTypes = numTypes_;
 	kappaVals = new double[num_interactions];
 	types     = new int[N];
 	for (int i = 0; i < num_interactions; i++) {
@@ -54,7 +57,7 @@ Person::Person(int N_, int num_interactions_, int* t, double* kV) {
 	for (int i = 0; i < N; i++) {
 		types[i] = t[i];
 	}
-	bd::makeKappaMap(2, kappaVals, kappa);
+	bd::makeKappaMap(numTypes, kappaVals, kappa);
 }
 
 void Person::setKappa(int num_interactions_, double* kV) {
@@ -64,7 +67,7 @@ void Person::setKappa(int num_interactions_, double* kV) {
 	for (int i = 0; i < num_interactions; i++) {
 		kappaVals[i] = kV[i];
 	}
-	bd::makeKappaMap(2, kappaVals, kappa);
+	bd::makeKappaMap(numTypes, kappaVals, kappa);
 }
 
 Person Person::mate(Person partner, bool useFile, RandomNo* rngee) {
@@ -131,36 +134,13 @@ Person Person::mate(Person partner, bool useFile, RandomNo* rngee) {
 	}
 
 	//create the offspring
-	Person kid = Person(N, num_interactions, t, kV);
+	Person kid = Person(N, num_interactions, numTypes, t, kV);
 
 	//free memory
 	delete []kV; delete []t;
 
 	//birth the child
 	return kid;
-}
-
-Person createNew(int N, int num_interactions) {
-	//create a new person w/o mating
-
-	//create new trait array
-	double* kV = new double[num_interactions];
-	int* types = new int[N];
-	for (int j = 0; j < num_interactions; j++) {
-		kV[j] = tan(PI/2.0*rand()/RAND_MAX);
-	}
-	for (int i = 0; i < N; i++) {
-		types[i] = rand() % 2;
-	}
-
-	//create a person
-	Person immigrant = Person(N, num_interactions, types, kV);
-
-	//free memory
-	delete []kV; delete []types;
-
-	//return the person
-	return immigrant;
 }
 
 void Person::evalStats(int N, bd::Database* db, int initial, std::vector<int> targets, 
@@ -181,7 +161,7 @@ void Person::evalStats(int N, bd::Database* db, int initial, std::vector<int> ta
 	//do rewieght
 	bd::reweight(N, num_states, db, types, eq, kappa);
 	//get eq prob
-	double eqProb = bd::getEqProb(initial, kappaVals, db, types, targets);
+	double eqProb = bd::getEqProb(initial, kappaVals, db, types, numTypes, targets);
 	//copy Tconst into T
 	std::copy(Tconst, Tconst+num_states*num_states, T);
 	//fill in transposed entries such that T satisfies detailed balance
@@ -229,7 +209,7 @@ int sampleType(int N, int numTypes, RandomNo* rngee) {
 }
 
 void sampleParameters(int N, int numInteractions, double* kappaVals, int* particleTypes, 
-											bool useFile, RandomNo* rngee) {
+											int numTypes, bool useFile, RandomNo* rngee) {
 	//sample the parameters from some distribution
 
 	//sample the kappas as tan(uniformly random)
@@ -240,7 +220,7 @@ void sampleParameters(int N, int numInteractions, double* kappaVals, int* partic
 	//sample the types as bernoulli 50/50 - if not constant
 	if (!useFile) {
 		for (int j = 0; j < N; j++) {
-			particleTypes[j] = sampleType(N, 2, rngee);
+			particleTypes[j] = sampleType(N, numTypes, rngee);
 		}
 	}
 
@@ -343,8 +323,9 @@ void perform_evolution(int N, bd::Database* db, int initial, int target, bool us
 		numTypes = bd::readDesignFile(N, particleTypes);
 	}
 	else { //uses the function to set identities
-		int IC = 1; 
-		numTypes = bd::setTypes(N, particleTypes, IC);
+		//int IC = 1; 
+		//numTypes = bd::setTypes(N, particleTypes, IC);
+		numTypes = 3;
 	}
 	int numInteractions = numTypes*(numTypes+1)/2;
 
@@ -390,10 +371,10 @@ void perform_evolution(int N, bd::Database* db, int initial, int target, bool us
 	#pragma omp for
 	for (int i = 0; i < pop_size; i++) {
 		//draw parameters from a distribution
-		sampleParameters(N, numInteractions, kappaVals, particleTypes, useFile, rngee);
+		sampleParameters(N, numInteractions, kappaVals, particleTypes, numTypes, useFile, rngee);
 		
 		//create a person, evaluate their stats
-		Person p = Person(N, numInteractions, particleTypes, kappaVals);
+		Person p = Person(N, numInteractions, numTypes, particleTypes, kappaVals);
 		p.evalStats(N, db, initial, targets, eq, Tconst, T, m);
 		p.evalFitness(eqMax, rateMax);
 		pop_array[i] = p;

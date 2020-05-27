@@ -161,7 +161,7 @@ double getStickyProduct(int N, int state,  Database* db, int* particleTypes,
 												std::map<std::pair<int,int>,double> kappa) {
 	//return the product of sticky param ^ num bonds for each type
 
-	double stickyProd = 1;
+	double stickyProd = 1.0;
 
 	//loop over the adjacency matrix, determine bond types, get factors
 	for (int i = 0; i < N; i++) {
@@ -370,6 +370,7 @@ void reweight(int N, int num_states, Database* db, int* particleTypes, double* e
 
 			//get the numerator of the re-weight factor
 			double num = getStickyProduct(N, i, db, particleTypes, kappa); 
+			//std::cout << num << "\n";
 
 			//compute the new probability
 			double new_prob = prob * num / denom;
@@ -485,7 +486,7 @@ void constructSurfaceTOY(int N, Database* db, int initial, int target, bool useF
 			kappaVals[2] = 0.5+ (double)x / 4; 
 
 			//make the map
-			makeKappaMap(2, kappaVals, kappa);
+			makeKappaMap(numTypes, kappaVals, kappa);
 			//std::cout << kappa[{0,0}] << ' ' << kappa[{1,0}] << ' ' << kappa[{1,1}] << "\n";
 			//do rewieght
 			reweight(N, num_states, db, particleTypes, eq, kappa);
@@ -616,12 +617,12 @@ void constructScatterTOY(int N, Database* db, int initial, int target, bool useF
 				//std::cout << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << "\n";
 
 				//make the map
-				makeKappaMap(2, kappaVals, kappa);
+				makeKappaMap(numTypes, kappaVals, kappa);
 				//std::cout << kappa[{0,0}] << ' ' << kappa[{1,0}] << ' ' << kappa[{1,1}] << "\n";
 				//do rewieght
 				reweight(N, num_states, db, particleTypes, eq, kappa);
 				//get eq prob
-				double eqProb = getEqProb(initial, kappaVals, db, particleTypes, targets);
+				double eqProb = getEqProb(initial, kappaVals, db, particleTypes, numTypes, targets);
 				//copy Tconst into T
 				std::copy(Tconst, Tconst+num_states*num_states, T);
 				//fill in transposed entries such that T satisfies detailed balance
@@ -762,12 +763,13 @@ void constructScatterTOY1(int N, Database* db, int initial, int target) {
 		kappaVals[0] = Ks[x];
 
 		//make the map
-		makeKappaMap(1, kappaVals, kappa);
+		assert(numTypes == 1);
+		makeKappaMap(numTypes, kappaVals, kappa);
 		//std::cout << kappa[{0,0}] << ' ' << kappa[{1,0}] << ' ' << kappa[{1,1}] << "\n";
 		//do rewieght
 		reweight(N, num_states, db, particleTypes, eq, kappa);
 		//get eq prob
-		double eqProb = getEqProb(initial, kappaVals, db, particleTypes, targets);
+		double eqProb = getEqProb(initial, kappaVals, db, particleTypes, numTypes, targets);
 		//copy Tconst into T
 		std::copy(Tconst, Tconst+num_states*num_states, T);
 		//fill in transposed entries such that T satisfies detailed balance
@@ -968,12 +970,12 @@ void constructScatterTOYsensitivity(int N, Database* db, int initial, int target
 				//std::cout << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << "\n";
 
 				//make the map
-				makeKappaMap(2, kappaVals, kappa);
+				makeKappaMap(numTypes, kappaVals, kappa);
 				//std::cout << kappa[{0,0}] << ' ' << kappa[{1,0}] << ' ' << kappa[{1,1}] << "\n";
 				//do rewieght
 				reweight(N, num_states, db, particleTypes, eq, kappa);
 				//get eq prob
-				double eqProb = getEqProb(initial, kappaVals, db, particleTypes, targets);
+				double eqProb = getEqProb(initial, kappaVals, db, particleTypes, numTypes, targets);
 				//copy Tconst into T
 				std::copy(Tconst, Tconst+num_states*num_states, T);
 				//fill in transposed entries such that T satisfies detailed balance
@@ -1045,7 +1047,8 @@ double getHitProbability(int num_states, int initial, std::vector<int> targets, 
 }
 
 double solveAbsorbProblem(int initial, double* kappaVals, Database* db, int* particleTypes, 
-								 					double* Tconst, std::vector<int> ground, std::vector<int> targets) {
+													int numTypes, double* Tconst, std::vector<int> ground, 
+													std::vector<int> targets) {
 	//set up and solve the absorbtion probability problem
 
 	//get parameters from database
@@ -1063,7 +1066,7 @@ double solveAbsorbProblem(int initial, double* kappaVals, Database* db, int* par
 
 	//compute the hitting probability at the current kappa vals
 	//make the map
-	makeKappaMap(2, kappaVals, kappa);
+	makeKappaMap(numTypes, kappaVals, kappa);
 	//do rewieght
 	reweight(N, num_states, db, particleTypes, eq, kappa);
 	//reset transition matrices
@@ -1091,7 +1094,7 @@ double solveAbsorbProblem(int initial, double* kappaVals, Database* db, int* par
 
 
 double computeGradHP(int initial, int numInteractions, double* kappaVals, Database* db, 
-								 int* particleTypes, double* Tconst, std::vector<int> ground, 
+								 int* particleTypes, int numTypes, double* Tconst, std::vector<int> ground, 
 								 std::vector<int> targets, double* g) {
 	//compute the gradient of the hitting probability in kappa
 	//returns the hitting probability at current point
@@ -1100,7 +1103,8 @@ double computeGradHP(int initial, int numInteractions, double* kappaVals, Databa
 	double h = 1e-5; //step size for finite differences
 
 	//get the hitting probability at the current kappa vals
-	double f0 = solveAbsorbProblem(initial, kappaVals, db, particleTypes, Tconst, ground, targets);
+	double f0 = solveAbsorbProblem(initial, kappaVals, db, particleTypes, numTypes,
+																 Tconst, ground, targets);
 
 	//std::cout << "Hitting Prob = " << f0 << "\n";
 
@@ -1111,7 +1115,8 @@ double computeGradHP(int initial, int numInteractions, double* kappaVals, Databa
 		}
 		else {
 			kappaVals[k] += h;
-			double f1 = solveAbsorbProblem(initial, kappaVals, db, particleTypes, Tconst, ground, targets);
+			double f1 = solveAbsorbProblem(initial, kappaVals, db, particleTypes, numTypes,
+																		 Tconst, ground, targets);
 			kappaVals[k] -= h;
 
 			g[k] = (f1 - f0) / h;
@@ -1183,7 +1188,7 @@ void hittingProbMaxTOYperms(int N, Database* db, int initial, int target) {
 		//optimization - steepest ascent
 		for (int it = 0; it < max_its; it++) {
 			//compute the gradient of kappa
-			hit = computeGradHP(initial, numInteractions, kappaVals, db, particleTypes, 
+			hit = computeGradHP(initial, numInteractions, kappaVals, db, particleTypes, numTypes,
 												Tconst,  ground, targets, g);
 
 			//update kappa - set to 0.1 if it goes negative
@@ -1276,7 +1281,7 @@ void hittingProbMaxTOY(int N, Database* db, int initial, int target, bool useFil
 	//optimization - steepest ascent
 	for (int it = 0; it < max_its; it++) {
 		//compute the gradient of kappa
-		hit = computeGradHP(initial, numInteractions, kappaVals, db, particleTypes, 
+		hit = computeGradHP(initial, numInteractions, kappaVals, db, particleTypes, numTypes,
 											Tconst,  ground, targets, g);
 
 		//update kappa - set to 0.1 if it goes negative
@@ -1300,7 +1305,7 @@ void hittingProbMaxTOY(int N, Database* db, int initial, int target, bool useFil
 
 	std::cout << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << ' ' << "\n";
 
-	double R = getRate(initial, kappaVals, db, particleTypes, Tconst, targets);
+	double R = getRate(initial, kappaVals, db, particleTypes, numTypes, Tconst, targets);
 	printf("The average transition rate with this kappa is %f\n", R);
 
 
@@ -1316,7 +1321,7 @@ void hittingProbMaxTOY(int N, Database* db, int initial, int target, bool useFil
 /****************************************************/
 
 double printEqProb(int initial, double* kappaVals, Database* db, 
-								 int* particleTypes, std::vector<int> targets) {
+								 int* particleTypes, int numTypes, std::vector<int> targets) {
 	//do re-weighting and get the eqiulibrium probability sum of all target states
 
 	//get parameters from database
@@ -1331,7 +1336,7 @@ double printEqProb(int initial, double* kappaVals, Database* db,
 
 	//compute the eq probability at the current kappa vals
 	//make the map
-	makeKappaMap(2, kappaVals, kappa);
+	makeKappaMap(numTypes, kappaVals, kappa);
 	//do rewieght
 	reweight(N, num_states, db, particleTypes, eq, kappa);
 
@@ -1349,7 +1354,7 @@ double printEqProb(int initial, double* kappaVals, Database* db,
 }
 
 double getEqProb(int initial, double* kappaVals, Database* db, 
-								 int* particleTypes, std::vector<int> targets) {
+								 int* particleTypes, int numTypes,  std::vector<int> targets) {
 	//do re-weighting and get the eqiulibrium probability sum of all target states
 
 	//get parameters from database
@@ -1364,7 +1369,7 @@ double getEqProb(int initial, double* kappaVals, Database* db,
 
 	//compute the eq probability at the current kappa vals
 	//make the map
-	makeKappaMap(2, kappaVals, kappa);
+	makeKappaMap(numTypes, kappaVals, kappa);
 	//do rewieght
 	reweight(N, num_states, db, particleTypes, eq, kappa);
 
@@ -1381,7 +1386,7 @@ double getEqProb(int initial, double* kappaVals, Database* db,
 }
 
 double computeGradEQ(int initial, int numInteractions, double* kappaVals, Database* db, 
-								 int* particleTypes, std::vector<int> targets, double* g) {
+								 int* particleTypes, int numTypes, std::vector<int> targets, double* g) {
 	//compute the gradient of the eqiluibrium probability in kappa
 	//returns the eq probability at current point
 
@@ -1389,7 +1394,7 @@ double computeGradEQ(int initial, int numInteractions, double* kappaVals, Databa
 	double h = 1e-5; //step size for finite differences
 
 	//get the hitting probability at the current kappa vals
-	double f0 = getEqProb(initial, kappaVals, db, particleTypes, targets);
+	double f0 = getEqProb(initial, kappaVals, db, particleTypes, numTypes, targets);
 
 	//std::cout << "Hitting Prob = " << f0 << "\n";
 
@@ -1403,7 +1408,7 @@ double computeGradEQ(int initial, int numInteractions, double* kappaVals, Databa
 		}
 		else {
 			kappaVals[k] += h;
-			double f1 = getEqProb(initial, kappaVals, db, particleTypes, targets);
+			double f1 = getEqProb(initial, kappaVals, db, particleTypes, numTypes, targets);
 			kappaVals[k] -= h;
 
 			g[k] = (f1 - f0) / h;
@@ -1456,7 +1461,7 @@ void eqProbMaxTOY(int N, Database* db, int initial, int target, bool useFile) {
 	//optimization - steepest ascent
 	for (int it = 0; it < max_its; it++) {
 		//compute the gradient of kappa
-		eq = computeGradEQ(initial, numInteractions, kappaVals, db, particleTypes, 
+		eq = computeGradEQ(initial, numInteractions, kappaVals, db, particleTypes, numTypes,
 											targets, g);
 
 		//update kappa - set to 0.1 if it goes negative
@@ -1535,7 +1540,7 @@ void eqProbMaxTOYperms(int N, Database* db, int initial, int target) {
 		//optimization - steepest ascent
 		for (int it = 0; it < max_its; it++) {
 			//compute the gradient of kappa
-			eq = computeGradEQ(initial, numInteractions, kappaVals, db, particleTypes, 
+			eq = computeGradEQ(initial, numInteractions, kappaVals, db, particleTypes, numTypes,
 												targets, g);
 
 			//update kappa - set to 0.1 if it goes negative
@@ -1580,7 +1585,7 @@ void eqProbMaxTOYperms(int N, Database* db, int initial, int target) {
 /****************************************************/
 
 double getRate(int initial, double* kappaVals, Database* db, int* particleTypes, 
-							 double* Tconst, std::vector<int> targets) {
+							 int numTypes, double* Tconst, std::vector<int> targets) {
 	//get transition rate as 1/mfpt to targets
 
 	//get parameters from database
@@ -1596,7 +1601,7 @@ double getRate(int initial, double* kappaVals, Database* db, int* particleTypes,
 	double* eq = new double[num_states];
 	//declare and fill kappa map
 	std::map<std::pair<int,int>,double> kappa;
-	makeKappaMap(2, kappaVals, kappa);   
+	makeKappaMap(numTypes, kappaVals, kappa);   
 	//do reweight to fill eq
 	reweight(N, num_states, db, particleTypes, eq, kappa);
 
@@ -1618,7 +1623,7 @@ double getRate(int initial, double* kappaVals, Database* db, int* particleTypes,
 }
 
 double getRateTPT(int initial, double* kappaVals, Database* db, int* particleTypes, 
-							 double* Tconst, std::vector<int> targets) {
+							 		int numTypes, double* Tconst, std::vector<int> targets) {
 	//do re-weighting and get the transition rate to the target state - reactive traj
 
 	//get parameters from database
@@ -1634,7 +1639,7 @@ double getRateTPT(int initial, double* kappaVals, Database* db, int* particleTyp
 	double* eq = new double[num_states];
 	//declare and fill kappa map
 	std::map<std::pair<int,int>,double> kappa;
-	makeKappaMap(2, kappaVals, kappa);   
+	makeKappaMap(numTypes, kappaVals, kappa);   
 	//do reweight to fill eq
 	reweight(N, num_states, db, particleTypes, eq, kappa);
 
@@ -1662,7 +1667,8 @@ double getRateTPT(int initial, double* kappaVals, Database* db, int* particleTyp
 }
 
 double computeGradRate(int initial, int numInteractions, double* kappaVals, Database* db, 
-								 int* particleTypes, double* Tconst, std::vector<int> targets, double* g) {
+								 int* particleTypes, int numTypes, double* Tconst, std::vector<int> targets, 
+								 double* g) {
 	//compute the gradient of the avg transition rate in kappa
 	//returns the avg transition rate at current point
 
@@ -1670,7 +1676,7 @@ double computeGradRate(int initial, int numInteractions, double* kappaVals, Data
 	double h = 1e-5; //step size for finite differences
 
 	//get the hitting probability at the current kappa vals
-	double f0 = getRate(initial, kappaVals, db, particleTypes, Tconst, targets);
+	double f0 = getRate(initial, kappaVals, db, particleTypes, numTypes, Tconst, targets);
 
 	//std::cout << "Hitting Prob = " << f0 << "\n";
 
@@ -1681,7 +1687,7 @@ double computeGradRate(int initial, int numInteractions, double* kappaVals, Data
 		}
 		else {
 			kappaVals[k] += h;
-			double f1 = getRate(initial, kappaVals, db, particleTypes, Tconst, targets);
+			double f1 = getRate(initial, kappaVals, db, particleTypes, numTypes, Tconst, targets);
 			kappaVals[k] -= h;
 
 			g[k] = (f1 - f0) / h;
@@ -1751,7 +1757,7 @@ void rateMaxTOY(int N, Database* db, int initial, int target, bool useFile) {
 	//optimization - steepest ascent
 	for (int it = 0; it < max_its; it++) {
 		//compute the gradient of kappa
-		R = computeGradRate(initial, numInteractions, kappaVals, db, particleTypes, 
+		R = computeGradRate(initial, numInteractions, kappaVals, db, particleTypes, numTypes,
 											Tconst, targets, g);
 
 		//update kappa - set to 0.1 if it goes negative
@@ -1779,8 +1785,8 @@ void rateMaxTOY(int N, Database* db, int initial, int target, bool useFile) {
 
 	std::cout << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << ' ' << "\n";
 
-	double eq = getEqProb(initial, kappaVals, db, particleTypes, targets);
-	double hp = solveAbsorbProblem(initial, kappaVals, db, particleTypes, Tconst, 
+	double eq = getEqProb(initial, kappaVals, db, particleTypes, numTypes, targets);
+	double hp = solveAbsorbProblem(initial, kappaVals, db, particleTypes, numTypes, Tconst, 
 																 ground, targets);
 	printf("The equilibrium probability at this kappa is %f\n", eq);
 
@@ -1851,7 +1857,7 @@ void rateMaxTOYperms(int N, Database* db, int initial, int target) {
 		//optimization - steepest ascent
 		for (int it = 0; it < max_its; it++) {
 			//compute the gradient of kappa
-			R = computeGradRate(initial, numInteractions, kappaVals, db, particleTypes, 
+			R = computeGradRate(initial, numInteractions, kappaVals, db, particleTypes, numTypes,
 												Tconst, targets, g);
 
 			//update kappa - set to 0.1 if it goes negative
@@ -1902,9 +1908,10 @@ void applyRateConstraint(double R, double c, double r, int numInteractions,
 }
 
 
-double lineSearchHit(int initial, int numInteractions, double* kappaVals, Database* db, int* particleTypes, 
-									double* Tconst, std::vector<int> ground, std::vector<int> targets, 
-									double c, double r, double H, double R, double* g, double& step) {
+double lineSearchHit(int initial, int numInteractions, double* kappaVals, Database* db, 
+										 int* particleTypes, int numTypes, double* Tconst, 
+										 std::vector<int> ground, std::vector<int> targets, 
+										 double c, double r, double H, double R, double* g, double& step) {
 	//perform a line search to get a step size for the objective fn
 	//step is passed by reference, returns difference in obj fn
 
@@ -1936,9 +1943,9 @@ double lineSearchHit(int initial, int numInteractions, double* kappaVals, Databa
 		checkPositive(numInteractions, testKappa);
 
 		//evaluate the objective
-		double Hnew = solveAbsorbProblem(initial, testKappa, db, particleTypes, Tconst, 
+		double Hnew = solveAbsorbProblem(initial, testKappa, db, particleTypes, numTypes, Tconst, 
 																	 ground, targets);
-		double Rnew = getRate(initial, testKappa, db, particleTypes, Tconst, targets);
+		double Rnew = getRate(initial, testKappa, db, particleTypes, numTypes, Tconst, targets);
 		int applyNew = 0;
 		if (Rnew < c) {
 			applyNew = 1;
@@ -1961,9 +1968,10 @@ double lineSearchHit(int initial, int numInteractions, double* kappaVals, Databa
 	return delta;
 }
 
-double lineSearchEq(int initial, int numInteractions, double* kappaVals, Database* db, int* particleTypes, 
-									double* Tconst, std::vector<int> targets, 
-									double c, double r, double H, double R, double* g, double& step) {
+double lineSearchEq(int initial, int numInteractions, double* kappaVals, Database* db, 
+										int* particleTypes, int numTypes, double* Tconst, 
+										std::vector<int> targets, double c, double r, double H, double R, 
+										double* g, double& step) {
 	//perform a line search to get a step size for the objective fn
 	//step is passed by reference, returns difference in obj fn
 
@@ -1995,8 +2003,8 @@ double lineSearchEq(int initial, int numInteractions, double* kappaVals, Databas
 		checkPositive(numInteractions, testKappa);
 
 		//evaluate the objective
-		double Enew = getEqProb(initial, testKappa, db, particleTypes, targets);
-		double Rnew = getRate(initial, testKappa, db, particleTypes, Tconst, targets);
+		double Enew = getEqProb(initial, testKappa, db, particleTypes, numTypes, targets);
+		double Rnew = getRate(initial, testKappa, db, particleTypes, numTypes, Tconst, targets);
 		int applyNew = 0;
 		if (Rnew < c) {
 			applyNew = 1;
@@ -2019,9 +2027,10 @@ double lineSearchEq(int initial, int numInteractions, double* kappaVals, Databas
 	return delta;
 }
 
-double lineSearchRate(int initial, int numInteractions, double* kappaVals, Database* db, int* particleTypes, 
-									double* Tconst, std::vector<int> targets, 
-									double c, double r, double eq, double R, double* g, double& step) {
+double lineSearchRate(int initial, int numInteractions, double* kappaVals, Database* db, 
+											int* particleTypes, int numTypes, double* Tconst, 
+											std::vector<int> targets, double c, double r, double eq, double R, 
+											double* g, double& step) {
 	//perform a line search to get a step size for the objective fn
 	//step is passed by reference, returns difference in obj fn
 
@@ -2047,8 +2056,8 @@ double lineSearchRate(int initial, int numInteractions, double* kappaVals, Datab
 		checkPositive(numInteractions, testKappa);
 
 		//evaluate the objective
-		double Enew = getEqProb(initial, testKappa, db, particleTypes, targets);
-		double Rnew = getRate(initial, testKappa, db, particleTypes, Tconst, targets);
+		double Enew = getEqProb(initial, testKappa, db, particleTypes, numTypes, targets);
+		double Rnew = getRate(initial, testKappa, db, particleTypes, numTypes, Tconst, targets);
 		
 		objNew = Rnew - r * (Enew - c) * (Enew - c);
 		//printf("New obj: %f\n", objNew);
@@ -2131,9 +2140,9 @@ void eqProbMaxTOYc(int N, Database* db, int initial, int target, bool useFile) {
 	//optimization - steepest ascent w/ line search
 	for (int it = 0; it < max_its; it++) {
 		//compute the gradient of hitting prob and rate
-		eq = computeGradEQ(initial, numInteractions, kappaVals, db, particleTypes, 
+		eq = computeGradEQ(initial, numInteractions, kappaVals, db, particleTypes, numTypes,
 												targets, gH);
-		R = computeGradRate(initial, numInteractions, kappaVals, db, particleTypes, 
+		R = computeGradRate(initial, numInteractions, kappaVals, db, particleTypes, numTypes,
 												Tconst, targets, gR);
 
 		double obj = eq;
@@ -2147,7 +2156,7 @@ void eqProbMaxTOYc(int N, Database* db, int initial, int target, bool useFile) {
 
 		//find a step size to give decrease in obj fn
 		double step = 0; 
-		double delta = lineSearchEq(initial, numInteractions, kappaVals, db, particleTypes, 
+		double delta = lineSearchEq(initial, numInteractions, kappaVals, db, particleTypes, numTypes, 
 															Tconst, targets, c, r, eq, R, gH, step);
 
 		//take the step
@@ -2170,7 +2179,7 @@ void eqProbMaxTOYc(int N, Database* db, int initial, int target, bool useFile) {
 
 	std::cout << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << ' ' << "\n";
 
-	double Rf = getRate(initial, kappaVals, db, particleTypes, Tconst, targets);
+	double Rf = getRate(initial, kappaVals, db, particleTypes, numTypes, Tconst, targets);
 	printf("The average transition rate with this kappa is %f\n", Rf);
 
 
@@ -2242,9 +2251,9 @@ void hittingProbMaxTOYc(int N, Database* db, int initial, int target, bool useFi
 	//optimization - steepest ascent w/ line search
 	for (int it = 0; it < max_its; it++) {
 		//compute the gradient of hitting prob and rate
-		hit = computeGradHP(initial, numInteractions, kappaVals, db, particleTypes, 
+		hit = computeGradHP(initial, numInteractions, kappaVals, db, particleTypes, numTypes,
 											Tconst,  ground, targets, gH);
-		R = computeGradRate(initial, numInteractions, kappaVals, db, particleTypes, 
+		R = computeGradRate(initial, numInteractions, kappaVals, db, particleTypes, numTypes, 
 												Tconst, targets, gR);
 
 		double obj = hit;
@@ -2259,7 +2268,7 @@ void hittingProbMaxTOYc(int N, Database* db, int initial, int target, bool useFi
 		//find a step size to give decrease in obj fn
 		double step = 0; 
 		double delta = lineSearchHit(initial, numInteractions, kappaVals, db, particleTypes, 
-															Tconst, ground, targets, c, r, hit, R, gH, step);
+															numTypes, Tconst, ground, targets, c, r, hit, R, gH, step);
 
 		//take the step
 		for (int i = 0; i < numInteractions; i++) {
@@ -2281,7 +2290,7 @@ void hittingProbMaxTOYc(int N, Database* db, int initial, int target, bool useFi
 
 	std::cout << kappaVals[0] << ' ' << kappaVals[1] << ' ' << kappaVals[2] << ' ' << "\n";
 
-	double Rf = getRate(initial, kappaVals, db, particleTypes, Tconst, targets);
+	double Rf = getRate(initial, kappaVals, db, particleTypes, numTypes, Tconst, targets);
 	printf("The average transition rate with this kappa is %f\n", Rf);
 
 
@@ -2352,9 +2361,9 @@ void rateMaxTOYc(int N, Database* db, double c, int initial, int target, bool us
 	//optimization - steepest ascent w/ line search
 	for (int it = 0; it < max_its; it++) {
 		//compute the gradient of hitting prob and rate
-		eq = computeGradEQ(initial, numInteractions, kappaVals, db, particleTypes, 
+		eq = computeGradEQ(initial, numInteractions, kappaVals, db, particleTypes, numTypes,
 												targets, gH);
-		R = computeGradRate(initial, numInteractions, kappaVals, db, particleTypes, 
+		R = computeGradRate(initial, numInteractions, kappaVals, db, particleTypes, numTypes,
 												Tconst, targets, gR);
 
 		//define the objevtive function
@@ -2368,7 +2377,7 @@ void rateMaxTOYc(int N, Database* db, double c, int initial, int target, bool us
 		//find a step size to give decrease in obj fn
 		double step = 0; 
 		double delta = lineSearchRate(initial, numInteractions, kappaVals, db, particleTypes, 
-															Tconst, targets, c, r, eq, R, gR, step);
+															numTypes, Tconst, targets, c, r, eq, R, gR, step);
 
 		//take the step
 		for (int i = 0; i < numInteractions; i++) {
@@ -2570,7 +2579,7 @@ void printHitProbability(int num_states, int initial, std::vector<int> targets, 
 }
 
 void solveAbsorbProblem(int initial, double* kappaVals, Database* db, int* particleTypes, 
-								 					double* Tconst, std::vector<int> targets) {
+								 				int numTypes, double* Tconst, std::vector<int> targets) {
 	//set up and solve the absorbtion probability problem - only to targets
 
 	//get parameters from database
@@ -2588,7 +2597,7 @@ void solveAbsorbProblem(int initial, double* kappaVals, Database* db, int* parti
 
 	//compute the hitting probability at the current kappa vals
 	//make the map
-	makeKappaMap(2, kappaVals, kappa);
+	makeKappaMap(numTypes, kappaVals, kappa);
 	//do rewieght
 	reweight(N, num_states, db, particleTypes, eq, kappa);
 	//reset transition matrices
@@ -2670,11 +2679,11 @@ void evalStats(int N, Database* db, int initial, int target, bool useFile) {
 	double* gR = new double[numInteractions];
 	
 	//eval eq, hit prob, rate
-	double hit = solveAbsorbProblem(initial, kappaVals, db, particleTypes, Tconst, 
+	double hit = solveAbsorbProblem(initial, kappaVals, db, particleTypes, numTypes, Tconst, 
 																	 ground, targets);
-	double eq = computeGradEQ(initial, numInteractions, kappaVals, db, particleTypes, 
+	double eq = computeGradEQ(initial, numInteractions, kappaVals, db, particleTypes, numTypes, 
 												targets, gE);
-	double rate = computeGradRate(initial, numInteractions, kappaVals, db, particleTypes, 
+	double rate = computeGradRate(initial, numInteractions, kappaVals, db, particleTypes, numTypes,
 												Tconst, targets, gR);
 
 	double dydx = gR[0]/gE[0] + gR[1]/gE[1] + gR[2]/gE[2];
@@ -2691,12 +2700,12 @@ void evalStats(int N, Database* db, int initial, int target, bool useFile) {
 
 	//print the eq prob of each permutation individually
 	std::cout << "Equilibrium Probabilities:\n";
-	printEqProb(initial, kappaVals, db, particleTypes, targets);
+	printEqProb(initial, kappaVals, db, particleTypes, numTypes, targets);
 	std::cout << "\n";
 
 	//print the hitting prob of each permutation individually
 	std::cout << "Hitting Probabilities:\n";
-	solveAbsorbProblem(initial, kappaVals, db, particleTypes, Tconst, targets);
+	solveAbsorbProblem(initial, kappaVals, db, particleTypes, numTypes, Tconst, targets);
 	std::cout << "\n";
 
 	//print the bond types
@@ -2774,9 +2783,9 @@ void computeParetoFront(int N, Database* db, int initial, int target, bool useFi
 	//move along the discrete pareto front?
 	int M = 250;
 	for (int i = 0; i < M; i++) {
-		double eq = computeGradEQ(initial, numInteractions, kappaVals, db, particleTypes, 
+		double eq = computeGradEQ(initial, numInteractions, kappaVals, db, particleTypes, numTypes,
 												targets, gE);
-		double rate = computeGradRate(initial, numInteractions, kappaVals, db, particleTypes, 
+		double rate = computeGradRate(initial, numInteractions, kappaVals, db, particleTypes, numTypes,
 													Tconst, targets, gR);
 
 		printf("rate grad: %f, %f, %f\n", gR[0], gR[1], gR[2]);
@@ -2826,7 +2835,7 @@ void computeParetoFront(int N, Database* db, int initial, int target, bool useFi
 }
 
 double rateMaxPareto(double& c, int initial, Database* db, int num_states, int* particleTypes, 
-										 int numInteractions, double* kappaVals, double* Tconst, 
+										 int numTypes, int numInteractions, double* kappaVals, double* Tconst, 
 										 std::vector<int> ground, std::vector<int> targets) {
 	//use optimization scheme to get max rate for target in toy model
 	//has equality constraint for equilibrium prob
@@ -2848,9 +2857,9 @@ double rateMaxPareto(double& c, int initial, Database* db, int num_states, int* 
 	for (int it = 0; it < max_its; it++) {
 		//compute the gradient of hitting prob and rate
 		std::cout << it << "\n";
-		eq = computeGradEQ(initial, numInteractions, kappaVals, db, particleTypes, 
+		eq = computeGradEQ(initial, numInteractions, kappaVals, db, particleTypes, numTypes,
 												targets, gH);
-		R = computeGradRate(initial, numInteractions, kappaVals, db, particleTypes, 
+		R = computeGradRate(initial, numInteractions, kappaVals, db, particleTypes, numTypes, 
 												Tconst, targets, gR);
 
 		//define the objevtive function
@@ -2864,7 +2873,7 @@ double rateMaxPareto(double& c, int initial, Database* db, int num_states, int* 
 		//find a step size to give decrease in obj fn
 		double step = 0; 
 		double delta = lineSearchRate(initial, numInteractions, kappaVals, db, particleTypes, 
-															Tconst, targets, c, r, eq, R, gR, step);
+															numTypes, Tconst, targets, c, r, eq, R, gR, step);
 
 		//take the step
 		for (int i = 0; i < numInteractions; i++) {
@@ -2945,8 +2954,8 @@ void computeParetoFrontGD(int N, Database* db, int initial, int target, bool use
 	ofile.open("rateEqPareto.txt");
 
 	//get the initial rate and eq, output it
-	double r = getRate(initial, kappaVals, db, particleTypes, Tconst, targets);
-	double eq = getEqProb(initial, kappaVals, db, particleTypes, targets);
+	double r = getRate(initial, kappaVals, db, particleTypes, numTypes, Tconst, targets);
+	double eq = getEqProb(initial, kappaVals, db, particleTypes, numTypes, targets);
 	//ofile << eq << ' ' << r << ' ' << kappaVals[0] << ' ' << kappaVals[1] << 
 	//	' ' << kappaVals[2] <<  "\n";
 	eq = 0.01; 
@@ -2960,7 +2969,7 @@ void computeParetoFrontGD(int N, Database* db, int initial, int target, bool use
 		//eq -= h;
 
 		//find the new r
-		r = rateMaxPareto(eq, initial, db, num_states, particleTypes, numInteractions, kappaVals, 
+		r = rateMaxPareto(eq, initial, db, num_states, particleTypes, numTypes, numInteractions, kappaVals, 
 											Tconst, ground, targets);
 
 		//output to console for progress check and file for analysis

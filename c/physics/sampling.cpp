@@ -177,7 +177,7 @@ void addToDB(int N, Database* db) {
 	int rho = RANGE;
 	double beta = BETA;
 	int method = 1;       //solve sde with em
-	int steps = 5000;      //number of time steps to take
+	int steps = 30000;      //number of time steps to take
 
 	//initialize interaction matrices
 	int* types = new int[N];
@@ -206,6 +206,8 @@ void addToDB(int N, Database* db) {
 	std::vector<State> new_states;
 	int count = 1;
 
+	int broke_count = 0;
+
 	//do the time evolution
 	for (int i = 0; i < steps; i++) {
 		//solve sde
@@ -221,10 +223,20 @@ void addToDB(int N, Database* db) {
 		//std::cout << state << "\n";
 		if (state == -2) {
 			printf("BROKEN \n");
+			broke_count++;
+			if (broke_count > 100) { //100 broken in a row will trigger reset
+				setupChain(X,N);
+				broke_count = 0;
+			}	
 		}
+		else { //reset broke count if it becomes valid
+			broke_count = 0;
+		}
+
 		if (state == -1) {
 			//add the new state to vector
 			addState(N, X, AM, new_states);
+			printAM(N,AM);
 			printf("Found new state. Total found this run: %d\n", count);
 			count++;
 		}

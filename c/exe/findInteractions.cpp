@@ -41,7 +41,7 @@ int main(int argc, char* argv[]) {
 
 	//make surface of hitting probs w/ fixed AB interactions
 	//bd::constructSurfaceTOY(N, db, initial, target, useFile);
-	bd::constructScatterTOY(N, db, initial, target, useFile);
+	//bd::constructScatterTOY(N, db, initial, target, useFile);
 	//bd::constructScatterTOY1(N, db, initial, target);
 	//bd::constructScatterTOYsensitivity(N, db, initial, target, useFile);
 
@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
 	//bd::estimateHittingProbability(N, db, target);
 
 	//evaluate the eq prob and rate at kappa in file
-	//bd::evalStats(N, db, initial, target, useFile);
+	bd::evalStats(N, db, initial, target, useFile);
 	//bd::computeParetoFront(N, db, initial, target, useFile);
 	//bd::computeParetoFrontGD(N, db, initial, target, useFile);
 

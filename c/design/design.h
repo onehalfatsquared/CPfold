@@ -43,13 +43,15 @@ void perturbDBconstP(Database* db);
 void printHitProbability(int num_states, int initial, std::vector<int> targets, double* U);
 double getHitProbability(int num_states, int initial, std::vector<int> targets, double* U);
 double solveAbsorbProblem(int initial, double* kappaVals, Database* db, int* particleTypes, 
-								 					double* Tconst, std::vector<int> ground, std::vector<int> targets);
+								 					int numTypes, double* Tconst, std::vector<int> ground, 
+								 					std::vector<int> targets);
 void solveAbsorbProblem(int initial, double* kappaVals, Database* db, int* particleTypes, 
 								 					double* Tconst, std::vector<int> targets);
 
-double computeGradHP(int initial, int numInteractions, double* kappaVals, Database* db, 
-								 int* particleTypes, double* Tconst, std::vector<int> ground, 
-								 std::vector<int> targets, double* g);
+double computeGradHP(int initial, int numInteractions,  double* kappaVals, 
+										 Database* db, int* particleTypes, int numTypes, 
+										 double* Tconst, std::vector<int> ground, 
+								 		 std::vector<int> targets, double* g);
 
 void hittingProbMaxTOY(int N, Database* db, int initial, int target, bool useFile);
 void hittingProbMaxTOYperms(int N, Database* db, int initial, int target);
@@ -58,35 +60,39 @@ void hittingProbMaxTOYperms(int N, Database* db, int initial, int target);
 void eqProbMaxTOY(int N, Database* db, int initial, int target, bool useFile);
 void eqProbMaxTOYperms(int N, Database* db, int initial, int target);
 double computeGradEQ(int initial, int numInteractions, double* kappaVals, Database* db, 
-								 int* particleTypes, std::vector<int> targets, double* g);
+								 int* particleTypes, int numTypes, std::vector<int> targets, double* g);
 double getEqProb(int initial, double* kappaVals, Database* db, 
-								 int* particleTypes, std::vector<int> targets);
+								 int* particleTypes, int numTypes, std::vector<int> targets);
 double printEqProb(int initial, double* kappaVals, Database* db, 
-								 int* particleTypes, std::vector<int> targets);
+								 int* particleTypes, int numTypes, std::vector<int> targets);
 
 //average transition rate optimization
 void rateMaxTOY(int N, Database* db, int initial, int target, bool useFile);
 void rateMaxTOYperms(int N, Database* db, int initial, int target);
 double computeGradRate(int initial, int numInteractions, double* kappaVals, Database* db, 
-								 int* particleTypes, double* Tconst, std::vector<int> targets, double* g);
-double getRateTPT(int initial, double* kappaVals, Database* db, int* particleTypes, 
+								 int* particleTypes, int numTypes, double* Tconst, std::vector<int> targets, 
+								 double* g);
+double getRateTPT(int initial, double* kappaVals, Database* db, int* particleTypes, int numTypes,
 							 double* Tconst, std::vector<int> targets);
-double getRate(int initial, double* kappaVals, Database* db, int* particleTypes, 
+double getRate(int initial, double* kappaVals, Database* db, int* particleTypes, int numTypes,
 							 double* Tconst, std::vector<int> targets);
 
 //hitting probability optimization with rate constraints
 void hittingProbMaxTOYc(int N, Database* db, int initial, int target, bool useFile);
 void eqProbMaxTOYc(int N, Database* db, int initial, int target, bool useFile);
 void rateMaxTOYc(int N, Database* db, double c, int initial, int target, bool useFile);
-double lineSearchHit(int initial, int numInteractions, double* kappaVals, Database* db, int* particleTypes, 
-									double* Tconst, std::vector<int> ground, std::vector<int> targets, 
-									double c, double r, double H, double R, double* g, double& step);
-double lineSearchEq(int initial, int numInteractions, double* kappaVals, Database* db, int* particleTypes, 
-									double* Tconst, std::vector<int> targets, 
-									double c, double r, double H, double R, double* g, double& step);
-double lineSearchRate(int initial, int numInteractions, double* kappaVals, Database* db, int* particleTypes, 
-									double* Tconst, std::vector<int> targets, 
-									double c, double r, double eq, double R, double* g, double& step);
+double lineSearchHit(int initial, int numInteractions, double* kappaVals, Database* db, 
+										 int* particleTypes, int numTypes, double* Tconst, 
+										 std::vector<int> ground, std::vector<int> targets, 
+										 double c, double r, double H, double R, double* g, double& step);
+double lineSearchEq(int initial, int numInteractions, double* kappaVals, Database* db, 
+										int* particleTypes, int numTypes, double* Tconst, 
+										std::vector<int> targets, double c, double r, double H, double R, 
+										double* g, double& step);
+double lineSearchRate(int initial, int numInteractions, double* kappaVals, Database* db, 
+											int* particleTypes, int numTypes, double* Tconst, 
+											std::vector<int> targets, double c, double r, double eq, double R, 
+											double* g, double& step);
 void applyRateConstraint(double R, double c, double r, int numInteractions, 
 												 double* gH, double* gR); 
 
@@ -100,7 +106,7 @@ void estimateHittingProbability(int N, Database* db, int target);
 void evalStats(int N, Database* db, int initial, int target, bool useFile);
 void computeParetoFront(int N, Database* db, int initial, int target, bool useFile);
 double rateMaxPareto(double& c, int initial, Database* db, int num_states, int* particleTypes, 
-										 int numInteractions, double* kappaVals, double* Tconst, 
+										 int numInteractions, int numTypes, double* kappaVals, double* Tconst, 
 										 std::vector<int> ground, std::vector<int> targets);
 void computeParetoFrontGD(int N, Database* db, int initial, int target, bool useFile);
 

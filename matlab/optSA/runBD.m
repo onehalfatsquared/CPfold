@@ -7,7 +7,7 @@ clear
 
 %set parameters
 rng(33) %set random seed   
-N = 8; %Number of particles
+N = 7; %Number of particles
 r = 6; %Range parameter to pair potential
 K = [1,5,2]; %vector of sticky parameters. (1->1, 1<->2, 2->2). 
 beta = 2; %inverse temp

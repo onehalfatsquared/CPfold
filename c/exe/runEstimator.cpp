@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
 		source = atoi(argv[3]); 
 	} 
 
-	bool created = false;
+	bool created = true;
 	//build a database if one does not exist
 	if (rType == -1) {
 		if (created) { //the database file has been created. fill it
@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
 			bd::addToDB(N, db);
 		}
 		else { //no file exists 
-			bd::buildEmptyDB(8); //this line will construct a new database file to fill
+			bd::buildEmptyDB(6); //this line will construct a new database file to fill
 		}
 	}
 

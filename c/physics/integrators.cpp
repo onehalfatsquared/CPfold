@@ -84,8 +84,8 @@ void fillP(int N, int* particleTypes, int* P, double* E,
 	//fill interaction matrices with values
 
 	for (int i = 0; i < N-1; i++) {
-		P[toIndex(i,i+1,N)] = 1; E[toIndex(i,i+1,N)] = 11; 
-		P[toIndex(i+1,i,N)] = 1; E[toIndex(i+1,i,N)] = 11; 
+		P[toIndex(i,i+1,N)] = 1; E[toIndex(i,i+1,N)] = 14; 
+		P[toIndex(i+1,i,N)] = 1; E[toIndex(i+1,i,N)] = 14; 
 		for (int j = i+2; j < N; j++) {
 			int p1 = particleTypes[i]; 
 			int p2 = particleTypes[j];
@@ -133,7 +133,9 @@ void readKappaFile(int numInteractions, double* kappa) {
 
 	//check if the number of entries in file matches the db we recieved
 	if (count != numInteractions) {
-		fprintf(stderr, "The supplied design file is incompatible with the database file.");
+		fprintf(stderr, "The supplied design file is incompatible with the database file.\n");
+		fprintf(stderr, "You supplied %d strengths, but the system needs %d.\n", count, numInteractions);
+		abort();
 		return;
 	}
 
@@ -176,7 +178,9 @@ int readDesignFile(int N, int* particleTypes) {
 
 	//check if the number of entries in file matches the db we recieved
 	if (count != N) {
-		fprintf(stderr, "The supplied design file is incompatible with the database file.");
+		fprintf(stderr, "The supplied design file is incompatible with the database file.\n");
+		fprintf(stderr, "You supplied %d types, but the system has %d particles.\n", count, N);
+		abort();
 		return -1;
 	}
 

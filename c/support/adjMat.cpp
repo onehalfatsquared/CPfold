@@ -75,6 +75,11 @@ bool checkSame(int* M1, int* M2, int N) {
 void getAdj(double* X, int N, int* M) {
 	//get the adjacnecy matrix from a cluster X
 
+	//clear out AM
+	for (int i = 0; i < N*N; i++) {
+		M[i] = 0;
+	}
+	
 	//init a particle array to 0, then fill it from X
 	double* particles = new double[DIMENSION*N]; double* Z = new double[DIMENSION];
 	for (int p = 0; p < DIMENSION*N; p++) {

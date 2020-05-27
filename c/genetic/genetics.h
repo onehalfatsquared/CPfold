@@ -44,7 +44,7 @@ public:
 	Person();
 	~Person();
 
-	Person(int N, int num_interactions, int* types, double* kappaVals);
+	Person(int N, int num_interactions, int numTypes,  int* types, double* kappaVals);
 
 	void copy(const Person& old);
 	Person(const Person& old) {
@@ -62,7 +62,7 @@ public:
 	}
 
 	//parameters
-	int num_interactions;
+	int num_interactions; int numTypes;
 	int N;
 	double Rate;
 	double Eq;
@@ -88,7 +88,7 @@ private:
 double sampleKappa(int N, RandomNo* rngee);
 int sampleType(int N, int numInteractions, RandomNo* rngee);
 void sampleParameters(int N, int numInteractions, double* kappaVals, int* particleTypes, 
-											bool useFile, RandomNo* rngee);
+											int numTypes, bool useFile, RandomNo* rngee);
 
 
 
