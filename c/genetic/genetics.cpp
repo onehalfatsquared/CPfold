@@ -128,7 +128,7 @@ Person Person::mate(Person partner, bool useFile, RandomNo* rngee) {
 				t[i] = partner.types[i];
 			}
 			else { //mutate
-				t[i] = sampleType(N, 2, rngee);
+				t[i] = sampleType(N, numTypes, rngee);
 			}
 		}
 	}
@@ -260,11 +260,14 @@ void non_dominated_set(int pop_size, double* xAll, double* yAll, std::vector<int
 
 void printPopulation(std::vector<Person> population, int pop_size, std::ofstream& ofile ) {
 	//print the current population and stats to file
+	int nt = population[0].num_interactions;
+
 	for (int i = 0; i < pop_size; i++) {
 		ofile << population[i].Eq << ' ' << population[i].Rate << ' ';
-		ofile << population[i].kappaVals[0] << ' ';
-		ofile << population[i].kappaVals[1] << ' ';
-		ofile << population[i].kappaVals[2] << ' ' << "\n";;
+		for (int j = 0; j < nt; j++) {
+			ofile << population[i].kappaVals[j] << ' ';
+		}
+		ofile << "\n";
 	}
 }
 
