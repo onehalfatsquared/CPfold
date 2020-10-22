@@ -531,6 +531,7 @@ bool findMatrix(int* M, int* old, int old_bonds, int N, bd::Database* db,
 				new_state = i; 
 			}
 			else {// 2 states at once transition. just delete this sample
+				//new_state = i;
 				reset = true; 
 			}
 			return 1; 

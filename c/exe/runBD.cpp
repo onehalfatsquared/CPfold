@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
 	bd::setupChain(X0, N);
 
 	//set potential type
-	int pot = POTENTIAL; //0 morse, 1 lj
+	int pot = 0; //0 morse, 1 lj
 
 	//run bd
 	bd::solveSDE(X0, N, T, rho, beta, E, P, method, pot);

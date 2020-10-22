@@ -16,6 +16,7 @@ function [t,T] = EM(X0,N,k,Nt,rho,E,beta,SS,P)
         %a = -morseGrad(particles,rho,E,N,P)*k; %det part
         a = -mGrad(particles, rho, E, N, P)*k;
         b = randn(3*N,1)*sqrt(2/beta*k); %stoch part
+        b(3:3:end) = 0;
         X = X + a + b; %EM step
         %subsample
         if mod(i,SS)==0

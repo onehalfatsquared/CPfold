@@ -199,5 +199,6 @@ void estimateEqProbs(int N, Database* db);
 
 //design functions
 void constructScatterTOYL(int N, Database* db, int initial, int target, bool useFile);
+void HPscatter(int N, Database* db, int initial, int target);
 
 }

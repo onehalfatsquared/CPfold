@@ -74,7 +74,7 @@ int State::sumP() const{
 
 bool State::isInteracting(int i, int j) const {
 	if (abs(i-j) >= 2) {
-		return am[j*N+i];
+		return (am[j*N+i] || am[i*N+j]);
 	}
 	else if (abs(i-j) == 1) {
 		return true;
@@ -762,6 +762,7 @@ void updatePDB(int N, Database* db) {
 				//add the new state to vector
 				addState(N, chain, AM, new_states);
 				printf("Found new state. Total found this run: %d\n", count);
+				printChain(N, chain);
 				count++;
 			}
 		}
@@ -808,12 +809,17 @@ void sampleStats(double* X, int N, double& M, double& V) {
 	M = 0; V = 0;
 
 	//compute the mean
-	for (int i = 0; i < N; i++) M += X[i];
+	for (int i = 0; i < N; i++) {
+		M += X[i];
+	}
 	M /= float(N);
 
 	//compute the variance 
-	for (int i = 0; i < N; i++) V += (X[i]-M) * (X[i]-M);
-	V /= (N-1);
+	for (int i = 0; i < N; i++) {
+		V += (X[i]-M) * (X[i]-M);
+	}
+	V /= float(N-1.0);
+
 }
 
 void sampleStats(std::vector<double> X, double& M, double& V) {
@@ -1142,6 +1148,9 @@ void estimateMFPT(int N, int state, Database* db) {
 		//get sample means and variances
 		double M; double V;
 		sampleStats(mfptVec, M, V);
+		if (mfptVec.size() == 0) {
+			M = 0; V = 0;
+		}
 		mfptSamples[omp_get_thread_num()] = M;
 		mfptVar[omp_get_thread_num()] = V;
 
@@ -1281,6 +1290,7 @@ void estimateEqProbs(int N, Database* db) {
 		//for each state, do a critical step to get mean and variance over threads
 		for (int i = 0; i < num_states; i++) {
 			X[omp_get_thread_num()] = eqPrivate[i];
+			//printf("Thread: %d, i: %d, value %f\n", omp_get_thread_num(), i, eqPrivate[i]);
 			#pragma omp barrier
 			#pragma omp single
 			{
@@ -1306,7 +1316,7 @@ void estimateEqProbs(int N, Database* db) {
 
 	//print out final estimates - test & debug
 	for (int i = 0; i < num_states; i++) {
-		printf("State %d: Eq = %f, Std = %f\n", i, eqShared[i], eqVar[i]);
+		printf("State %d: Eq = %f, Std = %f\n", i, eqShared[i], sqrt(eqVar[i]));
 	}
 	
 	
@@ -1320,7 +1330,7 @@ void estimateEqProbs(int N, Database* db) {
 /******************************************************************************/
 
 double getStickyProductL(int N, int state,  Database* db, int* particleTypes, 
-												std::map<std::pair<int,int>,double> kappa) {
+												const std::map<std::pair<int,int>,double>& kappa) {
 	//return the product of sticky param ^ num bonds for each type
 
 	double stickyProd = 1.0;
@@ -1331,7 +1341,7 @@ double getStickyProductL(int N, int state,  Database* db, int* particleTypes,
 		for (int j = i+2; j < N; j++) {
 			if ((*db)[state].isInteracting(i,j)) {
 				int p1 = particleTypes[i]; int p2 = particleTypes[j];
-				stickyProd *= kappa[{p1,p2}];
+				stickyProd *= kappa.find({p1,p2})->second;
 			}
 		}
 	}
@@ -1340,7 +1350,7 @@ double getStickyProductL(int N, int state,  Database* db, int* particleTypes,
 }
 
 void reweightL(int N, int num_states, Database* db, int* particleTypes, double* eq,
-						  std::map<std::pair<int,int>,double> kappa) {
+						  const std::map<std::pair<int,int>,double>& kappa) {
 	//perform the re-weighting of the eq measure for new sticky params
 
 	double kap0 = exp(EPS);            //sticky parameter for initial measurement
@@ -1355,7 +1365,7 @@ void reweightL(int N, int num_states, Database* db, int* particleTypes, double* 
 		double prob = (*db)[i].getFrequency();
 
 		//get the denominator of reweight factor - KAP^b_i
-		double denom = pow(KAP, ntBonds);
+		double denom = pow(kap0, ntBonds);
 
 		//get the numerator of the re-weight factor
 		double num = getStickyProductL(N, i, db, particleTypes, kappa); 
@@ -1392,14 +1402,23 @@ void createTransitionMatrix(double* T, int num_states, Database* db,
 	//declare storage for each state
 	double mfpt; int S;
 
+	//loop over all states to get max bonds number
+	int maxB = 0;
+	for (int i = 0; i < num_states; i++) {
+		int b = (*db)[i].getBonds();
+		if (b > maxB) {
+			maxB = b;
+		}
+	}
+
 	//loop over all states information
 	for (int state = 0; state < num_states; state++) {
 		//get all relevant data
-		mfpt = (*db)[state].getMFPT();
+		mfpt = (*db)[state].getMFPT(); 
 		S = (*db)[state].sumP(); //get normalizing constant for this row
 
 		//if S = 0, this is end state, add it to vector
-		if (S == 0) {
+		if ((*db)[state].getBonds() == maxB) {
 			endStates.push_back(state);
 		}
 
@@ -1463,34 +1482,15 @@ void findIsomorphic(int N, int num_states, int state, Database* db, std::vector<
 	} 
 }
 
-double getEqProb(int initial, double* kappaVals, Database* db, 
-								 int* particleTypes, std::vector<int> targets) {
-	//do re-weighting and get the eqiulibrium probability sum of all target states
-
-	//get parameters from database
-	int N = db->getN();
-	int num_states = db->getNumStates();
-
-	//declare rate matrix, probability transition matrix, equilibrium measure
-	double* eq = new double[num_states];           //equilibrium measure
-
-	//declare the kappa map
-	std::map<std::pair<int,int>,double> kappa;
-
-	//compute the eq probability at the current kappa vals
-	//make the map
-	bd::makeKappaMap(2, kappaVals, kappa);
-	//do rewieght
-	reweightL(N, num_states, db, particleTypes, eq, kappa);
+double getEqProb(double* eq, std::vector<int> targets) {
+	//sum the equilibrium probabilities of the target states
+	//if cond == true, return eq prob conditional on being in a ground state
 
 	//get the new equilibrium probability of target state
 	double prob = 0;
 	for (int i = 0;  i< targets.size(); i++) {
 		prob += eq[targets[i]];
 	}
-
-	//free memory
-	delete []eq;
 
 	return prob;
 }
@@ -1610,7 +1610,7 @@ void constructScatterTOYL(int N, Database* db, int initial, int target, bool use
 				//do rewieght
 				reweightL(N, num_states, db, particleTypes, eq, kappa);
 				//get eq prob
-				double eqProb = getEqProb(initial, kappaVals, db, particleTypes, targets);
+				double eqProb = getEqProb(eq, targets);
 				//copy Tconst into T
 				std::copy(Tconst, Tconst+num_states*num_states, T);
 				//fill in transposed entries such that T satisfies detailed balance
@@ -1656,6 +1656,118 @@ void constructScatterTOYL(int N, Database* db, int initial, int target, bool use
 	delete []ek; delete []rk;
 }
 
+
+
+
+void HPscatter(int N, Database* db, int initial, int target) {
+	/*Construct a scatter plot of avg rate vs equilibrium probability using 
+	  every combination of A and B particles under the HP model
+	  Here H = A, P = B, and AA = -1, AB = 0, BB = 0 */
+
+	//get database info
+	int num_states = db->getNumStates(); 
+
+	//set up particle identity
+	int* particleTypes = new int[N];
+	int numTypes = 2;
+	int numInteractions = numTypes*(numTypes+1)/2;
+
+	//set up sticky parameter values
+	double* kappaVals = new double[numInteractions];
+	bd::readKappaFile(numInteractions, kappaVals);
+
+	//declare rate matrix, probability transition matrix, equilibrium measure
+	double* T = new double[num_states*num_states]; //rate matrix
+	double* Tconst = new double[num_states*num_states]; //rate matrix - only forward entries
+	double* eq = new double[num_states];           //equilibrium measure
+	double* m = new double[num_states];            //mfpts 
+
+	//init the rate matrix with zeros
+	for (int i = 0; i < num_states*num_states; i++) {
+		Tconst[i] = 0;
+	}
+
+	//get bonds->bonds+1 entries from mfpt estimates
+	std::vector<int> ground; //vector to hold all ground states
+	createTransitionMatrix(Tconst, num_states, db, ground);
+	for (int i = 0; i < ground.size(); i++) {
+		std::cout << ground[i] << "\n";
+	}
+
+	//find all target states consistent with input target
+	std::vector<int> targets; targets.push_back(target);
+
+	//the following doesnt work for distinguishing lattice ground states
+
+	/*
+	findIsomorphic(N, num_states, target, db, targets);
+	for (int i = 0; i < targets.size(); i++) {
+		std::cout << targets[i] << "\n";
+	}
+	*/
+
+	//declare the kappa mapping
+	std::map<std::pair<int,int>,double> kappa;
+	bd::makeKappaMap(numTypes, kappaVals, kappa);
+
+	//declare outfile
+	std::ofstream ofile;
+	ofile.open("rateEqScatter.txt");
+
+	//loop over all permutations
+	std::deque<std::string> perms; 
+	bd::allPerms(N,perms);
+	//bd::distinctPerms(N, perms);
+	int num_perms = perms.size();
+	double* permProb = new double[num_perms];
+	double* permRate = new double[num_perms];
+
+	for (int p = 0; p < num_perms; p++) {
+		//get the permutation
+		bd::setTypes(N, particleTypes, perms, p);
+
+		printf("Testing permutation %d of %d\n", p+1, num_perms);
+
+		//do rewieght
+		reweightL(N, num_states, db, particleTypes, eq, kappa);
+		//get eq prob - conditional on being in a ground state
+		double eqProb = getEqProb(eq, targets);
+		double groundProb = getEqProb(eq, ground);
+		//printf("Eq %f, ground %f\n", eqProb, groundProb);
+		eqProb /= groundProb;
+		//copy Tconst into T
+		std::copy(Tconst, Tconst+num_states*num_states, T);
+		//fill in transposed entries such that T satisfies detailed balance
+		//for (int q = 0; q < num_states; q++) eq[q] = 1.0;
+		//for (int q = 0; q < num_states*num_states; q++) T[q] = 100.0;
+		satisfyDB(T, num_states, db, eq);
+
+		//fill in diagonal with negative sum of row entries
+		bd::fillDiag(T, num_states);
+		//get the transition rate
+		bd::computeMFPTsSP(num_states, T, targets, m);
+		double rate = 1/m[initial];
+
+		permProb[p] = eqProb; permRate[p] = rate;
+
+		//output to file
+		ofile << eqProb << ' ' << rate << "\n";
+
+		
+	}
+
+	//print out the probability and rate with permutation
+	for (int p = 0; p < num_perms; p++) {
+		printf("Eq Prob: %f, Rate: %f, ID: %s\n", permProb[p], permRate[p], perms[p].c_str());
+	}
+
+
+	//free memory
+	delete []particleTypes; delete []kappaVals; 
+	delete []Tconst; delete []T; delete []eq; delete []m;
+	delete []permProb; delete []permRate;
+
+}
 
 
 

@@ -25,6 +25,7 @@ double morseP(double r, double rho, double E);
 double morseEval(double* particles, int rho, double* E, int N, int* P);
 //evaluate gradient of morse potential
 void morseGrad(double* particles, int rho, double* E, int N, int* P, double* g);
+void morseGradR(double* particles, int rho, double* E, int N, int* P, double* g);
 //evlauate lj potential
 double ljP(double r, double rho, double E);
 //evaluate total potential energy of system of particles

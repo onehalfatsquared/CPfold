@@ -144,11 +144,15 @@ void computeMFPTs(int num_states, double* T, std::vector<int> targets, double* m
 		}
 	}
 
+	//std::cout << QM << "\n";
+
 	//fill b with -1
 	b.fill(-1.0);
 
 	//solve for tau
 	tau = QM.lu().solve(b);
+
+	//std::cout << tau << "\n";
 
 	//store solution in m - re-add lost zeros
 	int lostIndex = 0;
@@ -288,7 +292,11 @@ void fillDiag(double* T, int num_states) {
 		for (int target = 0; target < num_states; target++) {
 			S += T[toIndex(state, target, num_states)];
 		}
+		if (S == 0) { //if state is inaccesible, set to 1 so system is solvable
+			S = 1;
+		}
 		T[toIndex(state, state, num_states)] = -S;
+		//printf("row %d, value %f\n", state, S);
 	}
 }
 

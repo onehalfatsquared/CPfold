@@ -25,10 +25,11 @@ int main(int argc, char* argv[]) {
 	bd::updateFreq(db, infile2);
 
 	//output the new database to a file
-	std::string out = infile1.substr(6,2);
+	std::string out = infile1;
 	out = out + "new.txt";
 	std::ofstream out_str(out);
 	out_str << *db; 
+	std::cout << "Saving new Database to " << out << "\n";
 
 	//free memory 
 	delete db; 

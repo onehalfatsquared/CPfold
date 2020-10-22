@@ -69,6 +69,8 @@ void getAdj(double* X, int N, int* M, double cutoff);
 void checkState(int N, double* X, int state, Database* db,
 							  bool& reset, int& new_state);
 void determineTransitions(HCC* hc, Database* db, double tps);
+void determineTransitionTimes(HCC* hc, Database* db, double tps, std::ostream& ofile);
+void determineTransitionStates(HCC* hc, Database* db, double tps, std::ostream& ofile);
 
 //functions to compute statistics
 void distributionFHT(HCC* hc, Database* db, std::vector<double>& q, int which);

@@ -109,6 +109,13 @@ double rateMaxPareto(double& c, int initial, Database* db, int num_states, int* 
 										 int numInteractions, int numTypes, double* kappaVals, double* Tconst, 
 										 std::vector<int> ground, std::vector<int> targets);
 void computeParetoFrontGD(int N, Database* db, int initial, int target, bool useFile);
+void miskinOptimize(int N, Database* db, int initial, int target, bool useFile);
+double analyticEqGradient(Database* db, int* particleTypes, int numTypes, int numInteractions, 
+												double* kappaVals, double* eq, double* gE, std::vector<int> targets);
+void makeIndexMap(int numTypes, int* indexVals, 
+									std::map<std::pair<int,int>,int>& index);
+int searchForBonds(int N, Database* db, int state, int type, int* particleTypes,
+									 std::map<std::pair<int,int>,int>& index);
 
 /* designTPT functions. Intended as an interfacing layer between design code and 
   TPT code. TPT code was built before support for several particle types. 
@@ -149,6 +156,11 @@ void graphQuenches(int N, Database* db, int initial);
 
 void evolveProbability(int N, Database* db, int initial, bool useFile);
 void testTransitionTimes(int N, Database* db, int initial, int scheme);
+
+
+// Time dependent plotting stuff
+void getNEQparameters(std::string& p_file, Eigen::VectorXd& beta, Eigen::MatrixXd& E);
+void phaseTrajectory(int N, Database* db, int initial, int target, bool, std::string& p_file);
 
 
 

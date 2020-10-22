@@ -232,22 +232,31 @@ std::ostream& operator<<(std::ostream& out_str, const Database& db) {
 
 
 
-void makeNM(int N, int state, Database* db, Eigen::VectorXd x, Eigen::MatrixXd& J, Eigen::VectorXd& F) {
+void makeNM(int N, int state, Database* db, Eigen::VectorXd x, Eigen::MatrixXd& J, 
+						Eigen::VectorXd& F) {
 	//make the matrix and vector to solve for Newtons method
 
 	double XD, YD;
+	double ZD = 0;
 	int count = 0;
 
 	//loop over and construct system
-	for (int i = 0; i <N; i ++) {
+	for (int i = 0; i < N; i ++) {
 		for (int j = i+1; j < N; j++) {
 			if ((*db)[state].isInteracting(i,j,N)) {
-				XD = x(2*i) - x(2*j);
-				YD = x(2*i+1) - x(2*j+1);
-				F(count) = XD*XD + YD*YD -1.0;
-				J(count, 2*i) = 2*XD; J(count, 2*j) = -2*XD;
-				J(count, 2*i+1) = 2*YD; J(count, 2*j+1) = -2*YD;
-				count +=1;
+				XD = x(DIMENSION*i) - x(DIMENSION*j);
+				YD = x(DIMENSION*i+1) - x(DIMENSION*j+1);
+#if (DIMENSION == 3)
+				ZD = x(DIMENSION*i+2) - x(DIMENSION*j+2);
+#endif
+
+				F(count) = XD*XD + YD*YD + ZD*ZD -1.0;
+				J(count, DIMENSION*i) = 2*XD; J(count, DIMENSION*j) = -2*XD;
+				J(count, DIMENSION*i+1) = 2*YD; J(count, DIMENSION*j+1) = -2*YD;
+#if (DIMENSION == 3) 
+				J(count, DIMENSION*i+2) = 2*ZD; J(count, DIMENSION*j+2) = -2*ZD;
+#endif
+				count += 1;
 			}
 		}
 	}
@@ -256,6 +265,8 @@ void makeNM(int N, int state, Database* db, Eigen::VectorXd x, Eigen::MatrixXd& 
 
 bool checkPhysicalState(int N, int state, Database* db) {
 	//check if a state is physical - use as start point in Newtons method
+
+	//todo - make 3d
 
 	//check if there are any example coordinates
 	int coord = (*db)[state].getNumCoords();
@@ -272,15 +283,19 @@ bool checkPhysicalState(int N, int state, Database* db) {
 	int b = (*db)[state].getBonds(); 
 
 	//initialize the matrix and vectors
-	Eigen::MatrixXd J(b,2*N); 
+	Eigen::MatrixXd J(b,DIMENSION*N); 
 	Eigen::VectorXd F(b); 
-	Eigen::VectorXd dx(2*N);  
-	Eigen::VectorXd x(2*N); 
+	Eigen::VectorXd dx(DIMENSION*N);  
+	Eigen::VectorXd x(DIMENSION*N); 
 
 	//initialize x. fill others with zeros.
 	const Cluster& xc = (*db)[state].getRandomIC();
 	for (int i = 0; i < N; i++) {
-		x(2*i) = xc.points[i].x; x(2*i+1) = xc.points[i].y;
+		x(DIMENSION*i) = xc.points[i].x; 
+		x(DIMENSION*i+1) = xc.points[i].y;
+#if (DIMENSION == 3)
+		x(DIMENSION*i+2) = xc.points[i].z;
+#endif
 	}
 	dx.fill(0.0); F.fill(0.0); J.fill(0.0);
 
@@ -335,7 +350,7 @@ bool checkPhysicalState(int N, int state, Database* db) {
 
 	//get adjacnecy matrix of post newton state
 	int* AM = new int[N*N]; for (int i = 0; i < N*N; i++) AM[i] = 0;
-	double* X = new double[2*N]; for (int i = 0; i < 2*N; i++) X[i]=x(i);
+	double* X = new double[DIMENSION*N]; for (int i = 0; i < DIMENSION*N; i++) X[i]=x(i);
 	getAdj(X, N, AM);
 
 	//make graph

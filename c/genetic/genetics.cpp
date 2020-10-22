@@ -92,7 +92,7 @@ Person Person::mate(Person partner, bool useFile, RandomNo* rngee) {
 		}
 
 		//include a chance to make a large parameter even larger
-		if (kV[i] > 100 && kV[i] < 1e4) {
+		if (kV[i] > 10 && kV[i] < 1e4) {
 			double p2 = rngee->getU();
 			if (p2 < 0.45) {
 				kV[i] *= 10;
@@ -302,9 +302,9 @@ void perform_evolution(int N, bd::Database* db, int initial, int target, bool us
 
 	//parameters to the genetic algorithm
 	int generations = 500;
-	int pop_size    = 1200;
+	int pop_size    = 400;
 	double elite_p  = 0.1;
-	double mates_p  = 0.5;
+	double mates_p  = 0.3;
 	bool printAll   = false;         //set true to make movie of output
 	bool perturb    = false;          //set true for sensitivity testing
 

@@ -11,6 +11,7 @@
 // Run Type: -1 to build a database
 //					 0 for full run
 //					 1 for chain estimate, with resets
+//						2 for getttng trajectories
 
 // Chain State: index of the linear chain in the DB. 1 for 6, 0 for 7.
 
@@ -24,7 +25,7 @@ int main(int argc, char* argv[]) {
 	std::string infile (argv[1]);
 	int rType = atoi(argv[2]); 
 	int source;
-	if (rType == 1) {
+	if (rType > 0) {
 		if (argc != 4) {
 			fprintf(stderr, "Usage: <Input File> <Run Type> <Chain State> %s\n", argv[0]);
 			return 1;
@@ -58,12 +59,12 @@ int main(int argc, char* argv[]) {
 
 	//tell user information
 	printf("Database of states has been read.\n");
-	printf("Mean first passage time estimator beginning.\n");
 
 
 	if (rType == 0) {
 		//do a full run over all states in DB
 
+		printf("Mean first passage time estimator beginning.\n");
 		//call estimator over every state, i. if i has 11 bonds (N=7), do nothing.
 		for (int i = 0; i < num_states; i++) {
 			if (((*db)[i].getBonds() >= 11 && N == 7) || ((*db)[i].getBonds() >= 9 && N == 6)) {//these states are rigid
@@ -100,9 +101,16 @@ int main(int argc, char* argv[]) {
 		*/
 
 		//estimate a quantity at the first hitting time
-		bd::sampleFirstExit(N, source, db);
+		//bd::sampleFirstExitR(N, source, db);
 		//bd::sampleSecondExit(N, source, db);
 		//bd::sampleSecondExit(N, db);
+
+		//bd::sampleQSD(N, db);
+	}
+
+		else if (rType == 2) {
+		//get some trajectories
+		sampleTrajectories(N, db, source);
 	}
 
 	//free memory - delete database

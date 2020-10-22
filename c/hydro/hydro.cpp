@@ -10,7 +10,7 @@
 #include <iostream>
 #include "../defines.h"
 
-#define HYDRO_CUT 1.08
+#define HYDRO_CUT 1.2 //1.12 for long range (noHD), 1.2 for short range (HD)
 namespace bd {
 
 // ********************************************************************** //
@@ -44,6 +44,9 @@ HCC::HCC(int num_clusters_, int N_, int maxT_) {
 		if (N_ == 6) {
 			(hc)[i].cNum = 1;
 		}
+		if (N == 7) {
+			(hc)[i].cNum = 0;
+		}
 		(hc)[i].clusters = new double[N_*DIMENSION*maxT_];
 		for (int j = 0; j < N_* DIMENSION * maxT_; j++) {
 			(hc)[i].clusters[j] = 0;
@@ -60,6 +63,7 @@ HCC::~HCC() {
 HCC* extractData(std::string& filename, int N, int maxT) {
 	//read data from HD file and put into a HC class
 
+	//the last particle coordinates for n=7 have been deleted. ignore these
 	std::ifstream in_str(filename);
 
 	//check if the file can be opened
@@ -69,9 +73,20 @@ HCC* extractData(std::string& filename, int N, int maxT) {
 	}
 
 	//read first line, N = number of particles
-	int num_clusters;
-	in_str >> num_clusters;
+	int num_clusters; int file_clusters; bool bug_flag = false;
+	in_str >> file_clusters; num_clusters = file_clusters;
+	if (N == 7) { //addresses the output bug for n=7
+		num_clusters = 3087;
+	}
+	if (file_clusters != num_clusters) {
+		bug_flag = true;
+	}
+	//std::cout << "First line reads " << num_clusters << "\n";
 	num_clusters /= N;
+	if (bug_flag) {
+		num_clusters--;
+	}
+	//std::cout << "Number of clusters is " << num_clusters << "\n";
 
 	std::cout << "Number of clusters in file: " << num_clusters << "\n";
 
@@ -95,12 +110,27 @@ HCC* extractData(std::string& filename, int N, int maxT) {
 		(*hc)[cluster].clusters[placement] = x;
 		(*hc)[cluster].clusters[placement+1] = y;
 
+		//printf("particle %d, x is %f and y is %f\n", particle, x, y);
+		
+
+		//cycle through the useless data
+		for (int i = 0; i < 5; i++) {
+			in_str >> temp;
+		}
+
 		//update indices
 		particle++;
 		if (particle == N) {              //increment cluster by 1 every N particles
 			cluster++; particle = 0;
 			if (cluster == num_clusters) {  //increment timestep by 1 after all clusters
 				timestep++; cluster = 0;
+				if (bug_flag) {//skip last particle data - 6 lines
+					for (int line = 0; line < 6; line++) {
+						for (int i = 0; i < 7; i++) {
+							in_str >> temp;
+						}
+					}
+				}
 				in_str >> temp;               //extra value when timestep changes
 				if (timestep == maxT) {       //break if run out of storage
 					break;                      
@@ -108,10 +138,6 @@ HCC* extractData(std::string& filename, int N, int maxT) {
 			}
 		}
 
-		//cycle through the useless data
-		for (int i = 0; i < 5; i++) {
-			in_str >> temp;
-		}
 
 		//std::cout << "Time step " << timestep << "\n";
 
@@ -236,6 +262,8 @@ void determineTransitions(HCC* hc, Database* db, double tps) {
 	bool reset;
 	int bonds;
 
+	int folded = 0;
+
 	//loop over each cluster in HHC
 	for (int i = 0; i < nc; i++) {
 		//create a reference to the i-th collection of clusters
@@ -260,9 +288,20 @@ void determineTransitions(HCC* hc, Database* db, double tps) {
 
 			//check if state changed
 			checkState(N, X, old_state, db, reset, new_state);
+			//printf("Old state %d, new state %d\n", old_state, new_state);
+			/*
+			for (int x = 0; x < DIMENSION*N; x++) {
+				std::cout << X[x] << ' ';
+			}
+			std::cout << "\n";
+			*/
+			
 
 
 			if (reset) { //either a bond broke, or two bonds formed at once - ignore rest of traj.
+				printf("Trajectory %d is broken at timestep %d\n", i, time);
+				printf("Current state is %d\n", new_state);
+				for (int coord = 0; coord < N*DIMENSION; coord++) std::cout << X[coord] << "\n";
 				break;
 			}
 
@@ -275,6 +314,7 @@ void determineTransitions(HCC* hc, Database* db, double tps) {
 				//check if ground state has been reached
 				bonds = (*db)[new_state].getBonds();
 				if (bonds >= 2*N-3) {
+					folded++;
 					break;
 				}
 			}
@@ -334,8 +374,222 @@ void determineTransitions(HCC* hc, Database* db, double tps) {
 
 	}
 
+	printf("%d of the %d trajectories succesfully folded\n", folded, nc);
+
 	//free the memory
 	delete []X; delete []Xold; delete []transition_times;
+
+
+}
+
+void determineTransitionTimes(HCC* hc, Database* db, double tps, std::ostream& ofile) {
+	//takes a collection of cluster trajectories, determines the folding pathway and
+	//times, outputs times of transition
+
+	//get info from the db and HCC
+	int N = db->getN();             //number of particles
+	int ns = db->getNumStates();    //number of states
+	int nc = hc->getNumClusters();  //number of clusters
+	int maxT = hc->getMaxT();       //max timestep for clusters evo
+
+	//declare all the things we need
+	double* X = new double[N*DIMENSION];    //store a configuration
+	double* Xold = new double[N*DIMENSION]; //store previous config
+	int timer = 0;                          //store time since last bond
+	//array of vectors to compute a probability distribution, and time distribution
+	std::vector<int>* transition_times = new std::vector<int>[nc];
+	bool* broken = new bool[nc];
+	for (int i = 0; i < nc; i++) broken[i] = false;
+	
+	//variables for state change check
+	int old_state;
+	int new_state;
+	bool reset;
+	int bonds;
+
+	int folded = 0;
+
+	//loop over each cluster in HHC
+	for (int i = 0; i < nc; i++) {
+		//create a reference to the i-th collection of clusters
+		HydroCluster& currentCluster = (*hc)[i];
+		printf("Now analyzing cluster %d of %d\n", i+1, nc);
+
+		//put the 0-th cluster in temp - get details
+		getCoordinates(currentCluster, Xold, N, 0);
+		old_state = currentCluster.cNum; 
+		new_state = currentCluster.cNum; 
+
+		//loop over all the timesteps - detect transitions
+		for (int time = 1; time < maxT; time++) {
+
+			//get the next set of coordinates - increment timer
+			getCoordinates(currentCluster, X, N, time);
+			if (X[0] == 0) { //check if we reached the end of the time series
+				//std::cout << time << "\n";
+				break;
+			}
+			timer++;
+
+			//check if state changed
+			checkState(N, X, old_state, db, reset, new_state);
+			//printf("Old state %d, new state %d\n", old_state, new_state);
+			/*
+			for (int x = 0; x < DIMENSION*N; x++) {
+				std::cout << X[x] << ' ';
+			}
+			std::cout << "\n";
+			*/
+			
+
+
+			if (reset) { //either a bond broke, or two bonds formed at once - ignore rest of traj.
+				broken[i] = true;
+				printf("Cluster %d broke. Ignoring trajectory\n", i);
+				break;
+			}
+
+			if (new_state != old_state) { //new state reached, update data
+				printf("Transition %d to %d in time %d\n", old_state, new_state, timer);
+				transition_times[i].push_back(time);
+				old_state = new_state;
+				timer = 0;
+
+				//check if ground state has been reached
+				bonds = (*db)[new_state].getBonds();
+				if (bonds >= 2*N-3) {
+					folded++;
+					break;
+				}
+			}
+			
+			//copy new state to old state
+			if (!reset) {
+				memcpy(Xold, X, DIMENSION*N*sizeof(double)); // copy X to Xold
+			}
+		}
+	}
+
+	//transition_times now has all the data, put it into db
+	//loop over transitions from every initial -> final state
+	for (int i = 0; i < nc; i++) {
+		if (!broken[i]) {
+			for (int t = 0; t < transition_times[i].size(); t++) {
+				ofile << transition_times[i][t] << " ";
+			}
+			ofile << "\n";
+		}
+	}
+
+
+	//free the memory
+	delete []X; delete []Xold; delete []transition_times; delete []broken;
+
+
+}
+
+void determineTransitionStates(HCC* hc, Database* db, double tps, std::ostream& ofile) {
+	//takes a collection of cluster trajectories, determines the folding pathway and
+	//times, outputs times of transition
+
+	//get info from the db and HCC
+	int N = db->getN();             //number of particles
+	int ns = db->getNumStates();    //number of states
+	int nc = hc->getNumClusters();  //number of clusters
+	int maxT = hc->getMaxT();       //max timestep for clusters evo
+
+	//declare all the things we need
+	double* X = new double[N*DIMENSION];    //store a configuration
+	double* Xold = new double[N*DIMENSION]; //store previous config
+	int timer = 0;                          //store time since last bond
+	//array of vectors to compute a probability distribution, and time distribution
+	std::vector<int>* transition_times = new std::vector<int>[nc];
+	bool* broken = new bool[nc];
+	for (int i = 0; i < nc; i++) broken[i] = false;
+	
+	//variables for state change check
+	int old_state;
+	int new_state;
+	bool reset;
+	int bonds;
+
+	int folded = 0;
+
+	//loop over each cluster in HHC
+	for (int i = 0; i < nc; i++) {
+		//create a reference to the i-th collection of clusters
+		HydroCluster& currentCluster = (*hc)[i];
+		printf("Now analyzing cluster %d of %d\n", i+1, nc);
+
+		//put the 0-th cluster in temp - get details
+		getCoordinates(currentCluster, Xold, N, 0);
+		old_state = currentCluster.cNum; 
+		new_state = currentCluster.cNum; 
+
+		//loop over all the timesteps - detect transitions
+		for (int time = 1; time < maxT; time++) {
+
+			//get the next set of coordinates - increment timer
+			getCoordinates(currentCluster, X, N, time);
+			if (X[0] == 0) { //check if we reached the end of the time series
+				//std::cout << time << "\n";
+				break;
+			}
+			timer++;
+
+			//check if state changed
+			checkState(N, X, old_state, db, reset, new_state);
+			//printf("Old state %d, new state %d\n", old_state, new_state);
+			/*
+			for (int x = 0; x < DIMENSION*N; x++) {
+				std::cout << X[x] << ' ';
+			}
+			std::cout << "\n";
+			*/
+			
+
+
+			if (reset) { //either a bond broke, or two bonds formed at once - ignore rest of traj.
+				broken[i] = true;
+				printf("Cluster %d broke. Ignoring trajectory\n", i);
+				break;
+			}
+
+			if (new_state != old_state) { //new state reached, update data
+				printf("Transition %d to %d in time %d\n", old_state, new_state, timer);
+				transition_times[i].push_back(db->lumpMap[new_state]);
+				old_state = new_state;
+				timer = 0;
+
+				//check if ground state has been reached
+				bonds = (*db)[new_state].getBonds();
+				if (bonds >= 2*N-3) {
+					folded++;
+					break;
+				}
+			}
+			
+			//copy new state to old state
+			if (!reset) {
+				memcpy(Xold, X, DIMENSION*N*sizeof(double)); // copy X to Xold
+			}
+		}
+	}
+
+	//transition_times now has all the data, put it into db
+	//loop over transitions from every initial -> final state
+	for (int i = 0; i < nc; i++) {
+		if (!broken[i]) {
+			for (int t = 0; t < transition_times[i].size(); t++) {
+				ofile << transition_times[i][t] << " ";
+			}
+			ofile << "\n";
+		}
+	}
+
+
+	//free the memory
+	delete []X; delete []Xold; delete []transition_times; delete []broken;
 
 
 }
@@ -511,7 +765,7 @@ void distributionFHT(HCC* hc, Database* db, std::vector<double>& q, int which) {
 				break;
 			}
 
-			if (new_state != old_state && old_state == 13) { //new state reached, update data
+			if (new_state != old_state) { //new state reached, update data
 				printf("Transition %d to %d in time %d\n", old_state, new_state, timer);
 				double quantity;
 				if (which == 0) {
@@ -670,7 +924,7 @@ void distributionFHT2(HCC* hc, Database* db, std::vector<double>& q, int which) 
 				break;
 			}
 
-			if (new_state != old_state && new_bonds == 7) { //new state reached, update data
+			if (new_state != old_state && new_bonds == 8) { //new state reached, update data
 				printf("Transition %d to %d in time %d\n", old_state, new_state, timer);
 				double quantity;
 				if (which == 0) {

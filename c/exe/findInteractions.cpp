@@ -23,15 +23,19 @@
 int main(int argc, char* argv[]) {
 
 	//handle input
-	if (argc != 5) {
+	if (argc < 5 || argc > 6) {
 		fprintf(stderr, "Usage: <Unlumped File> <Initial State>"
-		" <Target State> <use file> %s\n", argv[0]);
+		" <Target State> <use file> <optional file> %s\n", argv[0]);
 		return 1;
 	}
 	std::string infile (argv[1]);
 	int initial = atoi(argv[2]);
 	int target = atoi(argv[3]);
 	bool useFile = atoi(argv[4]);
+	std::string opt_file;
+	if (argc == 6) {
+		opt_file = (argv[5]);
+	}
 
 	//build database from both files
 	bd::Database* db = bd::readData(infile);
@@ -65,6 +69,7 @@ int main(int argc, char* argv[]) {
 
 	//evaluate the eq prob and rate at kappa in file
 	bd::evalStats(N, db, initial, target, useFile);
+	//bd::miskinOptimize(N, db, initial, target, useFile);
 	//bd::computeParetoFront(N, db, initial, target, useFile);
 	//bd::computeParetoFrontGD(N, db, initial, target, useFile);
 
@@ -79,6 +84,9 @@ int main(int argc, char* argv[]) {
 
 	//bd::evolveProbability(N, db, initial, useFile);
 	//bd::testTransitionTimes(N, db, initial, target);
+
+	//time dependent stuff
+	//phaseTrajectory(N, db, initial, target, useFile, opt_file);
 
 
 

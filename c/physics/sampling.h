@@ -62,8 +62,13 @@ bool findMatrix(int* M, int* old, int old_bonds, int N, Database* db, int& timer
 
 //sampling quantities at exit times
 void sampleFirstExit(int N, int state, Database* db);
+void sampleFirstExitR(int N, int initial, Database* db);
 void sampleSecondExit(int N, int state, Database* db);
 void sampleSecondExit(int N, Database* db);
+
+void sampleQSD(int N, Database* db);
+
+void sampleTrajectories(int N, Database* db, int initial);
 
 //order parameters
 double gyrationRadius(int N, double* X);

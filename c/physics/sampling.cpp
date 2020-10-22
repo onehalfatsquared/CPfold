@@ -307,6 +307,24 @@ double sampleSTD(double* X, int n) {
 	return sqrt(std);
 }
 
+int findMatrix(int* M, int N, Database* db) {
+	//find state by transition matrix, return the state
+
+	int* old = new int[N*N];
+
+	for (int i = 0; i < (*db).getNumStates(); i++) {
+		extractAM(N, i, old, db);
+		bool S = checkSame(old, M, N); 
+		if (S) {//found matrix
+			delete []old;
+			return i;
+		}
+	}
+
+	delete []old;
+	return -1;
+}
+
 
 bool findMatrix(int* M, int* old, int old_bonds, int N, Database* db, int& timer, int& reset, int& reflect, 
 																					int& new_state) {
@@ -340,6 +358,7 @@ void checkState(double* X, int N, int state, int& new_state, Database* db, int& 
 	//get adjacnecy matrix of the current state
 	int* M = new int[N*N]; for (int i = 0; i < N*N; i++) M[i]=0;
 	getAdj(X, N, M);
+	//printAM(N,M);
 
 	//check if state is connected
 	bool C = checkConnected(M, N);
@@ -356,6 +375,7 @@ void checkState(double* X, int N, int state, int& new_state, Database* db, int& 
 	bool S = checkSame(old, M, N);
 
 	if (S) {//same matrix
+		new_state = state;        //warning, may mess up mfpt sampler????
 		delete []M; delete []old;
 		return;
 	}
@@ -778,7 +798,146 @@ void estimateChain(int N, int state, Database* db) {
 }
 
 
+/******************************************************************/
+/**************** Functions to sample exit times ******************/
+/******************************************************************/
 
+void sampleTrajectories(int N, Database* db, int initial) {
+	//run some number of trajectories, output states and times to file
+
+	//set parameters
+	int rho = 40; double beta = 0.99; double DT = 0.01;
+	int pot = 0;  //set potential. 0 = morse, 1 = LJ
+	int method = 1; //solve SDEs with EM
+	int samples = 800; 
+	double tf = 400;
+
+	//fill in the lumpMap for the DB
+	printf("Getting indices of lumped permutation states...\n");
+	lumpPerms(db);
+
+	//initialize interaction matrices
+	int* types = new int[N];
+	int numTypes = bd::readDesignFile(N, types);
+	int numInteractions = numTypes*(numTypes+1)/2;
+	double* kappa = new double[numInteractions];
+	bd::readKappaFile(numInteractions, kappa);
+	std::map<std::pair<int,int>, double> kmap; 
+	bd::makeKappaMap(numTypes, kappa, kmap);
+	int* P = new int[N*N];
+	double* E = new double[N*N];
+	fillP(N, types, P, E, kmap);
+
+	//init file to store output
+	std::ofstream ofile;
+	ofile.open("samplingTrajectories.txt");
+
+	//print the number of trajectories and final time
+	ofile << samples << "\n";
+	ofile << tf << "\n";
+
+	//make array of vectors to store output for parallel run
+	std::vector<double>* output = new std::vector<double>[samples];
+
+	//do the simulations
+	#pragma omp parallel for
+	for (int sample = 0; sample < samples; sample++) {
+
+		//set the initial and final state storage
+		double* X0 = new double[DIMENSION*N];
+		int* M = new int[N*N]; 
+
+		//print update
+		printf("Beginning sample %d of %d\n", sample+1, samples);
+
+		//init in linear chain
+		setupChain(X0, N);
+		int state = initial; int new_state = initial;
+		double time = 0; 
+
+		//print initial state to file
+		//ofile << time << " " << db->lumpMap[state] << " ";
+		output[sample].push_back(time); output[sample].push_back(db->lumpMap[state]);
+
+		//solve the sde and check for state changes
+		while (time < tf) {
+			bd::solveSDE(X0, N, DT, rho, beta, E, P, method, pot);
+			time += DT;
+
+			//exclude bonds with no interaction possible
+			for (int i = 0; i < N*N; i++) M[i]=0;	
+			getAdjCut(X0, N, M, 1.1);
+			for (int i = 0; i < N*N; i++) {
+				if (P[i] == 0 && M[i] == 1) {
+					M[i] = 0;
+				}
+			}
+			new_state = findMatrix(M,N,db);
+
+			if (state != new_state) {
+				//determine the bond that formed
+				int p1 = 0; int p2 = 0; int done = 0;
+				for (p1 = 0; p1 < N; p1++) {
+					for (p2 = 0; p2 < N; p2++) {
+						if ((*db)[state].isInteracting(p1,p2,N) != (*db)[new_state].isInteracting(p1,p2,N)) {
+							done = 1;
+							break;
+						}
+					}
+					if (done == 1) break;
+				}
+
+				//print time and index of state change to file
+				//printf("Transition from %d to %d at time %f\n", db->lumpMap[state],
+								//db->lumpMap[new_state], time);
+				//printf("Bond is between %d and %d\n", p1, p2);
+
+				//if AA breaks, kick out of well
+				if (types[p1] == 0 && types[p2] == 0 && 
+					(*db)[state].getBonds() > (*db)[new_state].getBonds()) {
+					//printCluster(X0,N);
+					double x1 = X0[p1*2]; double y1 = X0[p1*2+1];  
+					double x2 = X0[p2*2]; double y2 = X0[p2*2+1]; 
+					double ux = x2-x1; double uy = y2-y1;
+
+					//add unit vector to p1, subtract from p2
+					X0[p1*2] -= 0.02 * ux; X0[p1*2+1] -= 0.02* uy;
+					X0[p2*2] += 0.02 * ux; X0[p2*2+1] += 0.02* uy;
+
+					//printf("Original %f, %f  Final %f, %f\n", x1, y1, X0[p1*2], X0[p1*2+1]);
+				}
+
+				state = new_state;
+				//ofile << time << " " << db->lumpMap[state] << " ";
+				output[sample].push_back(time); output[sample].push_back(db->lumpMap[state]);
+
+			}
+		}
+
+		//print a new line and go to the next trajectory
+		//ofile << "\n";
+
+		delete []X0; delete []M;
+
+	}
+
+	//print the results to a file
+	for (int i = 0; i < samples; i++) {
+		for (int j = 0; j < output[i].size(); j++) {
+			ofile << output[i][j] << " ";
+		}
+		ofile << "\n";
+	}
+
+
+	//close file
+	ofile.close();
+
+	//free memory
+	delete []types; delete []kappa; delete []P;
+	delete []E; 
+
+}
 
 
 
@@ -934,13 +1093,13 @@ void sampleFirstExit(int N, int initial, Database* db) {
 	/*get samples of some quantity at the firste exit time, starting from a linear chain */
 
 	//set parameters
-	int rho = 40; double beta = 1; double DT = 0.01; int Kh = 1850;
+	int rho = 35; double beta = 1; double DT = 0.01; int Kh = 1000;
 	int pot = 0;  //set potential. 0 = morse, 1 = LJ
 	int method = 1; //solve SDEs with EM
 	int samples = 500; //number of samples to get
 
 	//cutoff for qsd
-	int t_cut = 30;
+	int t_cut = 100;
 
 	//setup simulation
 	double Eh = stickyNewton(8, rho, Kh, beta); //get energy corresponding to kappa
@@ -986,15 +1145,17 @@ void sampleFirstExit(int N, int initial, Database* db) {
 
 			if (reflect == 0 && reset == 0) { //no hit, proceed
 				memcpy(temp, X, DIMENSION*N*sizeof(double)); // copy x to temp
+				//printf("Proceed %d\n", i);
 
 			}
 			else if (reflect == 1) {//hit new state, get sample of quantity
 				if (i > t_cut) {
-					//double q = gyrationRadius(N, X);
+					double q = gyrationRadius(N, X);
 					//double q = boop2d(N, X);
-					double q = end2end(N, X);
+					//double q = end2end(N, X);
 					q_samples.push_back(q);
 					std::cout << i << "\n";
+					//printCluster(X,N);
 					break;
 				}
 				else {
@@ -1003,7 +1164,17 @@ void sampleFirstExit(int N, int initial, Database* db) {
 
 			}
 			else {//chain broke, reset previous config
-				memcpy(X, temp, DIMENSION*N*sizeof(double));//copy temp to x -> reset step
+				//printCluster(X,N);
+				//memcpy(X, temp, DIMENSION*N*sizeof(double));//copy temp to x -> reset step
+				//printCluster(X,N);
+				if (i > t_cut) {
+					double q = gyrationRadius(N, X);
+					//double q = boop2d(N, X);
+					//double q = end2end(N, X);
+					q_samples.push_back(q);
+					std::cout << i << "\n";
+					break;
+				}
 
 			}
 		}
@@ -1023,17 +1194,39 @@ void sampleFirstExit(int N, int initial, Database* db) {
 	delete []E; delete []P; 
 }
 
+void setupTriangle(double* X, int N) {
+	//init a triangle at the end of a linear chain
+
+	for (int i = 0; i < N; i++) {
+		X[2*i] = i; X[2*i+1] = 0;
+	}
+	X[2*N-2] = N-2.0-0.5; X[2*N-1] = sqrt(3.0)/2.0-0.01;
+}
+
+void setupRing(double* X, int N) {
+	//init a triangle at the end of a linear chain
+
+	double pi = 3.1415926;
+	double r = sqrt(2-2*sin(3*pi/(2.0*N)));
+
+
+	for (int i = 0; i < N; i++) {
+		X[2*i] = cos(2.0*pi*double(i)/double(N)) / r; 
+		X[2*i+1] = sin(2.0*pi*double(i)/double(N)) / r;
+	}
+}
+
 void sampleSecondExit(int N, int initial, Database* db) {
 	/*get samples of some quantity at the firste exit time, starting from a linear chain */
 
 	//set parameters
-	int rho = 40; double beta = 1; double DT = 0.01; int Kh = 1850;
+	int rho = 35; double beta = 1; double DT = 0.01; int Kh = 1650;
 	int pot = 0;  //set potential. 0 = morse, 1 = LJ
 	int method = 1; //solve SDEs with EM
-	int samples = 300; //number of samples to get
+	int samples = 100; //number of samples to get
 
 	//cutoff for qsd
-	int t_cut = 500;
+	int t_cut = 2000;
 
 	//setup simulation
 	double Eh = stickyNewton(8, rho, Kh, beta); //get energy corresponding to kappa
@@ -1054,13 +1247,17 @@ void sampleSecondExit(int N, int initial, Database* db) {
 	for (int times = 0; times < samples; times++) {
 
 		printf("Running estimate %d\n", times+1);
-		setupChain(X,N); 
+		//setupChain(X,N); 
+		setupTriangle(X,N);
+		//printCluster(X,N);
 		int state = initial;
 
 		//intiailize temp storage and set parameters
 	  memcpy(temp, X, N*DIMENSION*sizeof(double));
-		int reset; int reflect; int new_state = state; int max_it = 2000;
+		int reset; int reflect; int new_state = state; int max_it = 4000;
 		int timer = 0; 
+
+		int bhit = 0;
 
 		//solve sde and update
 		for (int i = 0; i < max_it; i++) {
@@ -1072,21 +1269,28 @@ void sampleSecondExit(int N, int initial, Database* db) {
 			checkState(X, N, state, new_state, db, timer, reset, reflect);
 			int new_bonds = (*db)[new_state].getBonds();
 
-			if (new_bonds < 7 && reset == 0) { //no hit, proceed
+			if (new_bonds < 8 && reset == 0) { //no hit, proceed
 				memcpy(temp, X, DIMENSION*N*sizeof(double)); // copy x to temp
 				state = new_state;
 			}
-			else if (new_bonds == 7 && reflect == 1) {//hit new state, get sample of quantity
+			else if (new_bonds == 8 && reflect == 1) {//hit new state, get sample of quantity
 				if (i > t_cut) {
-					//double q = gyrationRadius(N, X);
+					double q = gyrationRadius(N, X);
 					//double q = boop2d(N, X);
-					double q = end2end(N, X);
+					//double q = end2end(N, X);
 					q_samples.push_back(q);
 					std::cout << i << "\n";
+					printCluster(X,N);
 					break;
 				}
 				else {
 					memcpy(X, temp, DIMENSION*N*sizeof(double));//copy temp to x -> reset step
+					bhit++;
+					/*
+					if (omp_get_thread_num() == 0) {
+						printf("Bhit %d at time %d\n", bhit, i);
+					}
+					*/
 				}
 
 			}
@@ -1255,6 +1459,332 @@ void sampleSecondExit(int N, Database* db) {
 	delete []q_samples;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+/********************************************************/
+/************** Sampling QSD ****************************/
+/********************************************************/
+
+void getTrajectory(int N, int sample, double* configs, double* X) {
+	//extract the sample trajectory from the config and place in X
+
+	for (int j = 0; j < N*DIMENSION; j++) {
+		X[j] = configs[sample*N*DIMENSION+j];
+	}
+
+}
+
+void putTrajectory(int N, int sample, double* configs, double* X) {
+	//put the trajectory in X into the appropriate place in config
+
+	for (int j = 0; j < N*DIMENSION; j++) {
+		configs[sample*N*DIMENSION+j] = X[j];
+	}
+
+}
+
+void replaceTrajectories(int N, int samples, double* configs, bool* hit, RandomNo* rngee) {
+	//replace any trajectories to be killed
+
+	//build a vector of each living trajectory
+	std::vector<int> alive;
+	for (int i = 0; i < samples; i++) {
+		if (!hit[i]) {
+			alive.push_back(i);
+		}
+	}
+
+	//check if they are all living
+	if (alive.size() == samples) {
+		return;
+	}
+
+	//check if they are all dead
+	if (alive.size() == 0) {
+		printf("Error, All trajectories died at once. Aborting...\n");
+		abort();
+	}
+
+	//if not, replace the dead with a random living one
+	double* X = new double[N*DIMENSION];
+
+	for (int i = 0; i < samples; i++) {
+		if (hit[i]) {
+			//choose a random replacement
+			int u = rngee->getU() * alive.size();
+			int replacement = alive[u];
+
+			//do the replacing
+			getTrajectory(N, replacement, configs, X); //get trajectory replacement
+			putTrajectory(N, i, configs, X);           //put X in i-th slot
+			hit[i] = false;
+
+			printf("Trajectory %d has been replaced with trajectory %d\n", i, replacement);
+		}
+	}
+
+	delete []X;
+}
+
+void sampleQSD(int N, Database* db) {
+	//sample the QSD at a given final time t.
+	//evaluate the distribution of some quantity with the samples
+
+	//needs 1) initial configuration
+	//      2) kill condition
+	//		  3) final time
+	//		  
+
+	//set parameters
+	//set parameters
+	int rho = 35; double beta = 1; double DT = 0.01; int Kh = 1000;
+	int pot = 0;  //set potential. 0 = morse, 1 = LJ
+	int method = 1; //solve SDEs with EM
+	int samples = 3000; //number of samples to get
+	double Tmax = 3000; //stop simulation if no bonds up to this point
+
+	//cutoff for qsd
+	int t_cut = 100;    //ensure no bonds form until this time
+
+	//setup simulation
+	double Eh = stickyNewton(8, rho, Kh, beta); //get energy corresponding to kappa
+	//initialize interaction matrices
+	int* P = new int[N*N]; double* E = new double[N*N];
+	setupSimMFPT(N, Eh, P, E);
+	printf("E = %f\n", Eh);
+
+	//make arrays to store clusters and samples
+	double* configs    = new double[samples*N*DIMENSION]; //store all trajectories, shared
+	double* quantities = new double[samples];             //to evaluate quantity at hit time
+	bool*   hit        = new bool[samples];               //check if hit was made this timestep
+	double* X          = new double[N*DIMENSION];         //just to set IC
+
+	//init the rng
+	RandomNo* rngee = new RandomNo();
+
+	//initialize the configurations
+	setupChain(X,N);
+	for (int i = 0; i < samples; i++) {
+		putTrajectory(N, i, configs, X);
+	}
+
+	//get the state index in db of this config
+	int dummy = 0; int state;
+	checkState(X, N, 0, state, db, dummy, dummy, dummy);
+	int old_bonds = (*db)[state].getBonds();
+
+	printf("The starting state is %d\n", state);
+
+	delete []X;
+
+	//begin the time-stepping
+	for (int time = 0; time < Tmax; time++) {
+
+		//set hit flag to 0 for this timestep, if t < tcut
+		if (time <= t_cut) {
+			for (int i = 0; i < samples; i++) {
+				hit[i] = false;
+			}
+		}
+
+		//parallel for over configs
+		#pragma omp parallel for shared(configs,hit,state)
+		for (int sample = 0; sample < samples; sample++) {
+			//first check if hit is false
+			double* X          = new double[N*DIMENSION];         
+
+			if (!hit[sample]) {
+				//store the current position of the cluster
+				getTrajectory(N, sample, configs, X);
+				
+				//update the positions by solving SDE
+				int reset = 0; int reflect = 0;
+				printf("Updating trajectory %d\n", sample);
+				solveSDE(X, N, DT, rho, beta, E, P, method, pot);
+
+				//replace the entry in the array
+				putTrajectory(N, sample, configs, X);
+
+				//check if state changed
+				int new_state;
+				checkState(X, N, state, new_state, db, dummy, dummy, dummy);
+				int new_bonds = (*db)[new_state].getBonds();
+
+				//check kill conditions
+				if (new_bonds > old_bonds) {
+					hit[sample] = true;
+					printf("Trajectory %d formed a bond\n", sample);
+					printCluster(X,N);
+				}
+				//printf("Sample %d, state %d, hit %d\n", sample, new_state, hit[sample]);
+			}
+
+			delete []X;
+			
+		}
+
+		//check which trajectories are to be killed and replaced
+		if (time < t_cut) {
+			replaceTrajectories(N, samples, configs, hit, rngee);
+			printf("Completed forced timestep %d of %d\n", time, t_cut);
+		}
+		else { //count how many have finished
+			int hits = 0;
+			for (int i = 0; i < samples; i++) {
+				if (hit[i]) {
+					hits++;
+				}
+			}
+			printf("Completed timestep %d. Finished trajectories: %d of %d\n", time, hits, samples);
+			//if all samples are finished, break
+			if (hits == samples) {
+				break;
+			}
+		}
+		
+	}
+	//configs now has all samples from the QSD. extract distribution
+	printf("All trajectories completed. Computing quantities for each sample\n");
+	//#pragma omp parallel for
+	for (int i = 0; i < samples; i++) {
+		getTrajectory(N,i, configs, X);
+		quantities[i] = gyrationRadius(N, X);
+		printCluster(X,N);
+		printf("Grad %f\n", quantities[i]);
+	}
+
+	//output to file
+	printf("Writing samples to file\n");
+	std::ofstream ofile;
+	ofile.open("qsdBD.txt");
+	for (int i = 0; i < samples; i++) {
+		ofile << quantities[i] << "\n";
+	}
+	ofile.close();
+
+	delete []P; delete []E;
+	delete []configs; delete []quantities; delete []hit;
+	delete rngee;
+
+
+}
+
+/********************************************************/
+/************** Repulsive force sampling ****************/
+/********************************************************/
+
+void sampleFirstExitR(int N, int initial, Database* db) {
+	/*get samples of some quantity at the firste exit time, starting from a linear chain */
+	// equilibrates for t_cut time, using a repulsive potential to prevent bonds
+
+	//set parameters
+	int rho = 35; double beta = 1; double DT = 0.01; int Kh = 1000;
+	int pot = -1;  //set potential. 0 = morse, 1 = LJ, -1 = morse w/ repulsion
+	int method = 1; //solve SDEs with EM
+	int samples = 300; //number of samples to get
+
+	//cutoff for qsd
+	int t_cut = 61;
+
+	//setup simulation
+	double Eh = stickyNewton(8, rho, Kh, beta); //get energy corresponding to kappa
+	//initialize interaction matrices
+	int* P = new int[N*N]; double* E = new double[N*N];
+	setupSimMFPT(N, Eh, P, E);
+	printf("E = %f\n", Eh);
+
+	//make a vector to store samples
+	std::vector<double> q_samples;
+
+	//run BD
+	#pragma omp parallel 
+	{
+	//setup position storage
+	double* X = new double[DIMENSION*N];
+	double* temp = new double[DIMENSION*N];
+	#pragma omp parallel for
+	for (int times = 0; times < samples; times++) {
+
+		printf("Running estimate %d\n", times+1);
+		setupTriangle(X,N); 
+		//get the state index in db of this config
+		int dummy = 0; int state;
+		checkState(X, N, 0, state, db, dummy, dummy, dummy);
+		printf("The starting state is %d\n", state);
+
+		//intiailize temp storage and set parameters
+	  memcpy(temp, X, N*DIMENSION*sizeof(double));
+		int reset; int reflect; int new_state = state; int max_it = 1000;
+		int timer = 0; 
+
+		//these lines are debug to find the index of a state defined by coordinates
+		//checkState(X, N, state, new_state, db, timer, reset, reflect);
+		//printf("First state is %d\n", new_state);
+		//abort();
+
+		//solve sde and update
+		for (int i = 0; i < max_it; i++) {
+			reset = 0; reflect = 0;
+			//solve SDE
+			if (i <= t_cut) {
+				solveSDE(X, N, DT, rho, beta, E, P, method, -1);
+			}
+			else {
+				solveSDE(X, N, DT, rho, beta, E, P, method, 0);
+			}
+
+			//check if state changed
+			checkState(X, N, state, new_state, db, timer, reset, reflect);
+
+			if (state == new_state) { //no hit, proceed
+				memcpy(temp, X, DIMENSION*N*sizeof(double)); // copy x to temp
+				//printf("Step %d\n", i);
+				//printCluster(X,N);
+				//printf("Proceed %d\n", i);
+
+			}
+			else  {//hit new state, get sample of quantity
+				if (i > t_cut) {
+					double q = gyrationRadius(N, X);
+					//double q = boop2d(N, X);
+					//double q = end2end(N, X);
+					q_samples.push_back(q);
+					printf("Folded at step %d, q is %f\n", i, q);
+					printCluster(X,N);
+					break;
+				}
+				else {
+					printf("BOnd formed before t_cut, t = %d\n", i);
+					break;
+				}
+
+			}
+		}
+	}
+	delete []X; delete []temp;
+	}
+
+	//output the samples to a file
+	std::ofstream ofile;
+	ofile.open("fhtBD.txt");
+	for (int i = 0; i < q_samples.size(); i++) {
+		ofile << q_samples[i] << "\n";
+	}
+	ofile.close();
+	
+	//free memory
+	delete []E; delete []P; 
+}
 
 
 

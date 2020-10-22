@@ -21,6 +21,9 @@ void EM(double* X0, int N, int Nt, double k,
 	//apply the EM scheme
 	for (int i = 0; i < Nt; i++) {
 		c2p(X0, particles, N);
+		if (pot == -1) {
+			morseGradR(particles, rho, E, N, P, g);
+		}
 		if (pot == 0) {//use morse potential
 			morseGrad(particles, rho, E, N, P, g);
 		}
@@ -72,8 +75,8 @@ void makeKappaMap(int numTypes, double* kappaVals,
 
 	for (int i = 0; i < numTypes; i++) {
 		for (int j = i; j < numTypes; j++) {
-			kappa[{i,j}] = kappaVals[counter];
-			kappa[{j,i}] = kappaVals[counter];
+			kappa[std::make_pair(i,j)] = kappaVals[counter];
+			kappa[std::make_pair(j,i)] = kappaVals[counter];
 			counter++;
 		}
 	}
@@ -97,8 +100,8 @@ void fillP(int N, int* particleTypes, int* P, double* E,
 				P[toIndex(j,i,N)] = 1; E[toIndex(j,i,N)] = energy; 
 			}
 			else{
-				P[toIndex(i,j,N)] = 1; E[toIndex(i,j,N)] = 0.01; 
-				P[toIndex(j,i,N)] = 1; E[toIndex(j,i,N)] = 0.01; 
+				P[toIndex(i,j,N)] = 0; E[toIndex(i,j,N)] = 0.01; 
+				P[toIndex(j,i,N)] = 0; E[toIndex(j,i,N)] = 0.01; 
 			}
 		}
 	}

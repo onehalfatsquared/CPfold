@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <iostream>
 #include <fstream>
+#include "../defines.h"
 #include "bDynamics.h"
 #include "database.h"
 #include "sampling.h"
@@ -48,9 +49,15 @@ int main(int argc, char* argv[]) {
 
 		//call estimator over every state, i. if i has 11 bonds (N=7), do nothing.
 		for (int i = 0; i < num_states; i++) {
+#if (DIMENSION == 2)
 			if (((*db)[i].getBonds() >= 11 && N == 7) || ((*db)[i].getBonds() >= 9 && N == 6)) {//these states are rigid
 				//do nothing
 			}
+#elif (DIMENSION == 3) 
+			if ((*db)[i].getBonds() >= 12 && N == 6) {//these states are rigid
+				//do nothing
+			}
+#endif
 			else{
 				//call the estimator
 				mcm::estimateMFPTreflect(N, i, db, rngee);

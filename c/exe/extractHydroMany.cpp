@@ -24,7 +24,11 @@ int main(int argc, char* argv[]) {
 	std::string db_file (argv[3]);
 	int maxT = 2000;
 
-	std::string base = "input/hydro/"; 
+	int runType = 2;
+	std::ofstream ofile;
+	ofile.open("N7transitions.txt");
+
+	std::string base = "input/hydro/N7/chain/"; 
 	double dt; int n_save;
 	//check if hydrodynamics were on or off, set parameters accordingly
 	if (hydro == 0) { //hydro is off
@@ -35,7 +39,7 @@ int main(int argc, char* argv[]) {
 	else { //hydro is on
 		dt = 0.1;
 		n_save = 40;
-		base += "HD/HD";
+		base += "realHD/HD";
 	}
 
 	//get timestep info
@@ -50,14 +54,23 @@ int main(int argc, char* argv[]) {
 
 
 	//fill HCC data structure with hydrodynamics data
-	std::string file1 = base + "1.config";
+	std::string file1 = base + "0.config";
 	bd::HCC* hc = bd::extractData(file1, N, maxT);
 	//use HD data to fill a database 
-	bd::determineTransitions(hc, dbMaster, tps);
+	if (runType == 0) {
+		bd::determineTransitions(hc, dbMaster, tps);
+	}
+	else if (runType == 1) {
+		lumpPerms(dbMaster);
+		bd::determineTransitionStates(hc, dbMaster, tps, ofile);
+	}
+	else if (runType == 2) {
+		bd::determineTransitionTimes(hc, dbMaster, tps, ofile);
+	}
 
 	//delete hc, loop over the rest of the files, creating hc and db, and combine db
 	delete hc;
-	for (int i = 2; i <= num_files; i++) {
+	for (int i = 1; i <= num_files; i++) {
 		//create the i-th filename
 		std::stringstream ss;
 		ss << i;
@@ -68,10 +81,19 @@ int main(int argc, char* argv[]) {
 
 		//construct empty db, get hd data, fill the db
 		bd::Database* db = bd::readData(db_file);
+		lumpPerms(db);
 		bd::HCC* hc = bd::extractData(file, N, maxT);
-		bd::determineTransitions(hc, db, tps);
+		if (runType == 0) {
+			bd::determineTransitions(hc, db, tps);
+			bd::combineHittingData(dbMaster, db);
+		}
+		else if (runType == 1) {
+			bd::determineTransitionStates(hc, db, tps, ofile);
+		}
+		else if (runType == 2) {
+			bd::determineTransitionTimes(hc, db, tps, ofile);
+		}
 
-		bd::combineHittingData(dbMaster, db);
 		delete hc; delete db;
 	}
 
@@ -79,6 +101,9 @@ int main(int argc, char* argv[]) {
 	std::string out = base + "DB.txt";
 	std::ofstream out_str(out);
 	out_str << *dbMaster; 
+
+	out_str.close();
+	ofile.close();
 
 	//free the memory - just delete the class objects
 	delete dbMaster;

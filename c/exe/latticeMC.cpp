@@ -26,44 +26,52 @@ int main(int argc, char* argv[]) {
 		target = 0;
 	}
 
-	//get the database here
-	lattice::Database* db = lattice::readData(dbFile);
 
 	//test the MCMC functions
 	//lattice::runMCMC(N, useFile);
 
 	//build initial database, and update database to get all states
-	//lattice::buildPDB(N);
-	//lattice::updatePDB(N, db);
+	if (runType == -2) { //build an initial database
+		lattice::buildPDB(N);
+	}
+	if (runType == -1) {//update a database with worm entry
+		lattice::Database* db = lattice::readData(dbFile);
+		lattice::updatePDB(N, db);
+		delete db;
+	}
 
 
 
 	//do mfpt estimation for each state
 	if (runType == 0) { //mfpt estimator
+		lattice::Database* db = lattice::readData(dbFile);
 		int num_states = db->getNumStates();
 		for (int i = 0; i < num_states; i++) {
-			printf("Beginning estimation for state %d of %d\n", i+1, num_states);
+			printf("Beginning estimation for state %d of %d\n", i, num_states-1);
 			lattice::estimateMFPT(N, i, db);
 		}
 		//print the new db
 		std::string out = "N" + std::to_string(N) + "mfpt.txt";
 		std::ofstream out_str(out);
 		out_str << *db;
+		delete db;
 	}
 	else if (runType == 1) { //equilibrium probability estimator
+		lattice::Database* db = lattice::readData(dbFile);
 		lattice::estimateEqProbs(N, db);
 		std::string out = "N" + std::to_string(N) + "eq.txt";
 		std::ofstream out_str(out);
 		out_str << *db;
+		delete db;
 	}
 	else if (runType == 2) { //perform reweighting to get scatter plot data
-		lattice::constructScatterTOYL(N, db, 0, target, useFile);
+
+		lattice::Database* db = lattice::readData(dbFile);
+
+		//lattice::constructScatterTOYL(N, db, 0, target, useFile);
+		lattice::HPscatter(N, db, 0, target);
+		delete db;
 	}
-
-
-
-	//free memory
-	delete db;
 
 	return 0;
 }

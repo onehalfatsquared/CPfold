@@ -1,5 +1,6 @@
 #include <math.h>
 #include <stdlib.h>
+#include <iostream>
 namespace bd{
 
 void stickyF(double E, double rho, double beta, double k0, double& f, double& fprime) {
@@ -11,7 +12,7 @@ void stickyF(double E, double rho, double beta, double k0, double& f, double& fp
 
 double stickyNewton(double E, double rho, double k0, double beta) {
 	//newton method to solve for E
-	int cutoff = 100; double tol = 1e-4; double x0 = E; double x1;
+	int cutoff = 2000; double tol = 1e-6; double x0 = E; double x1;
 	double f = 0; double fprime = 0;
 	for (int step = 0; step < cutoff; step++) {
 		stickyF(x0, rho, beta, k0, f, fprime);
@@ -20,6 +21,7 @@ double stickyNewton(double E, double rho, double k0, double beta) {
 			return x1;
 		}
 		x0 = x1;
+		//std::cout << x0 << "\n";
 	}
 	return x1;
 }

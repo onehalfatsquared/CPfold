@@ -4,6 +4,8 @@ project(folding)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -std=c++11")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fopenmp ")
 
+add_subdirectory(/home/anthony/libraries/dlib dlib_build)
+
 add_subdirectory(nauty)
 include_directories(nauty)
 
@@ -21,6 +23,9 @@ include_directories(tpt)
 
 add_subdirectory(design)
 include_directories(design)
+
+add_subdirectory(non_eq_protocol)
+include_directories(non_eq_protocol)
 
 add_subdirectory(lattice)
 include_directories(lattice)

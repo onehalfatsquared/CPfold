@@ -112,6 +112,11 @@ Graph* makeGraph(Database* db) {
 			}
 		}
 		bond_num++; 
+		if (bond_num > 12) {
+			printf("Warning: The graph encoded in the database is not connected. "
+				"Undefined behavior may occur.\n");
+			break;
+		}
 	}
 
 	//set number of end states
