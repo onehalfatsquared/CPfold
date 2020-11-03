@@ -78,6 +78,9 @@ public:
 								 double* eq, double* Tconst, double* T, double* m);
 	void evalFitness(double eq, double rate);
 
+	void evalStats(double Tf, int samples, int* M_target);
+	void applyBound(double lower, double upper);
+
 private:
 
 
@@ -90,9 +93,15 @@ int sampleType(int N, int numInteractions, RandomNo* rngee);
 void sampleParameters(int N, int numInteractions, double* kappaVals, int* particleTypes, 
 											int numTypes, bool useFile, RandomNo* rngee);
 
+void non_dominated_set(int pop_size, double* xAll, double* yAll, std::vector<int>& nonDom);
+
 
 
 void perform_evolution(int N, bd::Database* db, int initial, int target, bool useFile);
+void perform_evolution_sampling(int N, bool useFile);
+
+void printPopulation(std::vector<Person> population, int pop_size, std::ofstream& ofile );
+void printTypes(std::vector<Person> population, int pop_size, int N);
 
 
 

@@ -95,7 +95,7 @@ void fillP(int N, int* particleTypes, int* P, double* E,
 			double kval = kappa[{p1,p2}];
 			if (kval > 0.09) {
 				double energy = stickyNewton(8.0, RANGE, kval, BETA); 
-				printf("Energy is %f\n", energy);
+				//printf("Energy is %f\n", energy);
 				P[toIndex(i,j,N)] = 1; E[toIndex(i,j,N)] = energy; 
 				P[toIndex(j,i,N)] = 1; E[toIndex(j,i,N)] = energy; 
 			}

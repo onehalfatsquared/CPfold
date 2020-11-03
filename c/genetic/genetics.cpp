@@ -190,7 +190,9 @@ void Person::evalFitness(double eqMax, double rateMax) {
 double sampleKappa(int N, RandomNo* rngee) {
 	//sample a kappa value
 
+
 	double u = rngee->getU();
+	/*
 	if (N != 7) { //get any number from 0 to pi/2
 		u *= PI * 0.5;
 	}
@@ -199,6 +201,10 @@ double sampleKappa(int N, RandomNo* rngee) {
 	}
 
 	return tan(u);
+	*/
+
+	double E = 11.0*u + 0.8;
+	return exp(E) / sqrt(2.0*40*40*E);
 }
 
 int sampleType(int N, int numTypes, RandomNo* rngee) {
@@ -301,8 +307,8 @@ void perform_evolution(int N, bd::Database* db, int initial, int target, bool us
 	Eigen::setNbThreads(0);
 
 	//parameters to the genetic algorithm
-	int generations = 500;
-	int pop_size    = 400;
+	int generations = 200;
+	int pop_size    = 50;
 	double elite_p  = 0.1;
 	double mates_p  = 0.3;
 	bool printAll   = false;         //set true to make movie of output

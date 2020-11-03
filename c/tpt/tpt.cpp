@@ -391,6 +391,7 @@ void createTransitionMatrix(double* T, int num_states, Database* db,
 		//get all relevant data
 		mfpt = (*db)[state].getMFPT();
 		S = (*db)[state].sumP(); //get normalizing constant for this row
+		//printf("MFPT %f, sum %f\n", mfpt, S);
 
 		//if S = 0, this is end state, add it to vector
 		if (S == 0) {

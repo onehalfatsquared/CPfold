@@ -20,7 +20,7 @@ method = 1; % SDE solver. 1 -> EM. 2-> RK.
 P = createPI(types);          %create interaction matrix
 P(2,4) = 0; P(2,6) = 0; P(4,6) = 0;
 Ek = [stickyNewton(8,r,K(1)), stickyNewton(8,r,K(2)), stickyNewton(8,r,K(3))];
-Ek = [8, 6, 0];
+Ek = [11, 7, 0];
 E = createE(types,Ek);  
 for i = 1:N-1
     E(i,i+1) = 10;
@@ -60,7 +60,7 @@ function [t,T] = solveSDE(X0,N,T,rho,E,beta,P,method,frames)
     %solve SDE with EM. Subsample every SS timesteps. Output trajectory. 
     % method 1 -> EM. method 2 -> RK scheme. 
     if method == 1
-        k = 2e-6; Nt = round(T/k); %time step, num time steps
+        k = 100e-6; Nt = round(T/k); %time step, num time steps
         SS = round(Nt/frames); %Sub-sampling interval
         [t,T] = EM(X0,N,k,Nt,rho,E,beta,SS,P);
     elseif method == 2 %Not sure if working correctly. 

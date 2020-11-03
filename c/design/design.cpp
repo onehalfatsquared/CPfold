@@ -32,6 +32,7 @@ void getBondTypes(int N, int* particleTypes, Database* db, std::vector<int> targ
 		for (int i = 0; i < N; i++) {
 			for (int j = i+2; j < N; j++) {
 				if ( (*db)[state].isInteracting(i,j,N)) {
+			    printf("%d %d ", i,j);
 					int p1 = particleTypes[i];
 					int p2 = particleTypes[j];
 					if (p1 == 0 && p2 == 0) {
@@ -46,8 +47,8 @@ void getBondTypes(int N, int* particleTypes, Database* db, std::vector<int> targ
 				}
 			}
 		}
-
-		printf("State: %d, AA: %d, AB %d, BB %d\n", state, AA, AB, BB);
+		printf("\n");
+		//printf("\n State: %d, AA: %d, AB %d, BB %d\n", state, AA, AB, BB);
 	}
 }
 
