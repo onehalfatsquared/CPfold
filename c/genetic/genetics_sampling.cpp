@@ -2,11 +2,20 @@
 #include "bDynamics.h"
 
 #define PI 3.1415926
+#define CUT 1.1
 
 namespace ga {
 
+void printChain(double* X, int N) {
+	//print out the chain
 
-void readTargetFile(int N, int* M_target) {
+	for (int i = 0; i < N; i++) {
+		printf("(%f,%f)\n", X[DIMENSION*i], X[DIMENSION*i+1]);
+	}
+
+}
+
+void readTargetFile(int* M_target, double* X_target) {
 	//read in bonds present in the target state
 
 	//file location
@@ -21,14 +30,37 @@ void readTargetFile(int N, int* M_target) {
 		return;
 	}
 
-	//store the entries
+	//get the top of file data
+	int N; int c; //number of particles and number of constraints
+	in_str >> N; in_str >> c;
+
+	//store the adjacency matrix
 	int p1; int p2;
-	while (in_str >> p1) {
+	int count = 0;
+	while (count < c) {
 		//read line by line, add entry into AM
-		in_str >> p2;
+		in_str >> p1; in_str >> p2;
 
 		M_target[bd::toIndex(p1,p2,N)] = 1;
 		M_target[bd::toIndex(p2,p1,N)] = 1;
+
+		count++;
+	}
+
+	//store the coordinates
+	double x; double y; double z; count = 0;
+	while (in_str >> x) {
+		in_str >> y;
+
+		X_target[count*DIMENSION] = x;
+		X_target[count*DIMENSION+1] = y;
+
+#if (DIMENSION == 3)
+		in_str >> z;
+		X_target[count*DIMENSION+2] = z;
+#endif
+
+		count++;
 	}
 
 	//fill in super and sub diagonal
@@ -38,79 +70,182 @@ void readTargetFile(int N, int* M_target) {
 	}
 }
 
+double eqSample(int N, double Tf, double DT, double rho, double beta, double* E, int* P,
+								int method, int pot, int* M_target, double* X_target) {
+	//start in the target configuration and see what fraction of sim time is spent there
+
+	//set the target config
+	double* X = new double[N*DIMENSION];
+	for (int i = 0; i < N*DIMENSION; i++) {
+		X[i] = X_target[i];
+	}
+
+	//set the adjacncy matrix
+	int* M = new int[N*N]; for (int i = 0; i < N*N; i++) M[i] = 0;
+
+	//solve sde, increment time in target state
+	double t = 0; double eqTime = 0;
+	while (t < Tf) {
+		bd::solveSDE(X, N, DT, rho, beta, E, P, method, pot);
+		t += DT;
+
+		bd::getAdjCut(X, N, M, CUT);
+		int same = bd::checkSame(M, M_target, N);
+
+		if (same) {
+			eqTime += DT;
+		}
+	}
+
+	//free memory
+	delete []X; delete []M;
+
+	//return sample
+	return eqTime / Tf;
+}
+
+double rateSample(int N, double Tf, double DT, double rho, double beta, double* E, int* P,
+								int method, int pot, int* M_target) {
+	//start in chain. determine minimal time to form target. 
+	//if target does not form, return -1
+
+	//set the target config
+	double* X = new double[N*DIMENSION];
+	bd::setupChain(X,N);
+
+	//set the adjacncy matrix
+	int* M = new int[N*N]; for (int i = 0; i < N*N; i++) M[i] = 0;
+
+	//solve sde, check if target state is hit
+	double t = 0; double hitTime = -1; 
+	while (t < Tf) {
+		bd::solveSDE(X, N, DT, rho, beta, E, P, method, pot);
+		t += DT;
+
+		bd::getAdjCut(X, N, M, CUT);
+		int same = bd::checkSame(M, M_target, N);
+
+		if (same) {
+			hitTime = t;
+			break;
+		}
+	}
+
+	//free memory
+	delete []X; delete []M;
+
+	//return sample
+	return hitTime;
+}
+
+double getMisfoldEnergy(int N, int* M, int* M_target, double* E) {
+	//compute bond energy for bonds not present in target
+
+	double badVibes = 0;
+	for (int i = 0; i < N; i++) {
+		for (int j = i+2; j < N; j++) {
+			int inSim = M[bd::toIndex(i,j,N)];
+			int inTarget = M_target[bd::toIndex(i,j,N)];
+			if (inSim == 1 && inTarget == 0) {
+				badVibes += E[bd::toIndex(i,j,N)];
+			}
+		}
+	}
+
+	return badVibes;
+}
+
+double rateSampleBarrier(int N, double Tf, double DT, double rho, double beta, double* E, int* P,
+								         int method, int pot, int* M_target) {
+	//run trajectory until Tf. Compute a time average of the energy corresponding 
+	//to incorrect bonds. Divide by 4? 
+
+
+	//set the target config
+	double* X = new double[N*DIMENSION];
+	bd::setupChain(X,N);
+
+	//set the adjacncy matrix
+	int* M = new int[N*N]; for (int i = 0; i < N*N; i++) M[i] = 0;
+
+	//solve sde, check if target state is hit
+	double t = 0; double misfoldE = 0;
+	while (t < Tf) {
+		bd::solveSDE(X, N, DT, rho, beta, E, P, method, pot);
+		t += DT;
+
+		//get current adj mat
+		bd::getAdjCut(X, N, M, CUT);
+
+		//determine the energy of inccorect bonds
+		misfoldE += getMisfoldEnergy(N, M, M_target, E);
+		//std::cout << "Bad energy " << misfoldE << "\n";
+		
+	}
+
+	//free memory
+	delete []X; delete []M;
+
+	double Nt = Tf/DT;
+	//return sample
+	return misfoldE / Nt;
+}
+
+
+
 void doSampling(int N, double Tf, int* types, std::map<std::pair<int,int>,double> kappa,
-							  double& eq, double& time, int* M_target) {
+							  double& eq, double& time, int* M_target, double* X_target) {
 	//sample a trajectory and compute the fraction of time spent in target as well
 	//as the minimum time the target was hit
 
-	//init a chain
-	double* X = new double[DIMENSION*N];
-	int* M = new int[N*N]; for (int i = 0; i < N*N; i++) M[i] = 0;
-	bd::setupChain(X,N);
-
-	bool firstHit = true;
-	double firstHitTime = 0;
-	double eqTime = 0;
-
-	//set parameters
-	double t = 0; double DT = 0.01;
+	//set parameters for sde solve
+	double DT = 0.01;
 	double beta = 1.0;  double rho = 10;
 	double method = 1; double pot = 0;
-	double cut = 1.1;
 
 	int* P = new int[N*N];
 	double* E = new double[N*N];
 	bd::fillP(N, types, P, E, kappa);
 
-	while (t < Tf) {
-		bd::solveSDE(X, N, DT, rho, beta, E, P, method, pot);
-		t += DT;
+	eq = eqSample(N, Tf, DT, rho, beta, E, P,method, pot, M_target, X_target);
+	//time = rateSample(N, Tf, DT, rho, beta, E, P,method, pot, M_target);
+	time = exp(-rateSampleBarrier(N, Tf, DT, rho, beta, E, P,method, pot, M_target));
 
-		bd::getAdjCut(X,N,M,cut);
-		/*
-		bd::printAM(N,M);
-		std::cout << "\n";
-		bd::printAM(N,M_target);
-		abort();
-		*/
-		int same = bd::checkSame(M, M_target, N);
-
-		if (same) {
-			eqTime += DT;
-			//printf("HIT\n");
-			if (firstHit) {
-				firstHitTime = t;
-				firstHit = false;
-			}
-		}
-	}
-
-	eq = eqTime / Tf; time = firstHitTime;
 }
 
-void Person::evalStats(double Tf, int samples, int* M_target) {
+void Person::evalStats(double Tf, int samples, int* M_target, double* X_target) {
 	//evaluate a rate and eq prob surrogate by sampling
 
 	//estimate objectives from given number of sample trajectories
 	double eqEstimate = 0; double rateEstimate = 0;
+	double hits = 0;
 
 	//get the samples
 	for (int i = 0; i < samples; i++) {
 		//get sample
 		double eqSample = 0; double timeSample = 0;
-		doSampling(N, Tf, types, kappa, eqSample, timeSample, M_target);
+		doSampling(N, Tf, types, kappa, eqSample, timeSample, M_target, X_target);
 
 		//update eq time estimate
 		eqEstimate += eqSample; 
 
 		//update rate estimate. gets 0 if structure did not form
+		/*
 		if (timeSample > 0.001) {
 			rateEstimate += 1.0 / timeSample;
+			hits++;
 		}
+		*/
+		rateEstimate += timeSample;
 	}
 
 	//weight by num samples
 	eqEstimate /= double(samples);
+	/*
+	if (hits > 0) {
+		rateEstimate /= double(hits);
+	}
+	*/
 	rateEstimate /= double(samples);
 
 	//set the class variables
@@ -147,19 +282,19 @@ void perform_evolution_sampling(int N, bool useFile) {
 	Eigen::setNbThreads(0);
 
 	//parameters to the genetic algorithm
-	int generations = 100;
-	int pop_size    = 70;
+	int generations = 20;
+	int pop_size    = 50;
 	double elite_p  = 0.1;
-	double mates_p  = 0.2;
+	double mates_p  = 0.4;
 	bool printAll   = false;         //set true to make movie of output
 
 	//sampling parameters
 	double Tf = 5.0;
-	int samples = 40;
+	int samples = 30;
 
 	//if we have prior estimates of the max rate and eqProb, set here.
 	//otherwise, this will update, adaptively. 
-	double rateMax = 0.1; double eqMax = 0.1;
+	double rateMax = 1.0; double eqMax = 1.0;
 
 	//set up particle identity
 	int* particleTypes = new int[N];
@@ -179,7 +314,11 @@ void perform_evolution_sampling(int N, bool useFile) {
 
 	//set up target
 	int* M_target = new int[N*N]; for (int i = 0; i < N*N; i++) M_target[i] = 0;
-	readTargetFile(N, M_target);
+	double* X_target = new double[N*DIMENSION];
+	for (int i = 0; i < N*DIMENSION; i++) X_target[i] = 0;
+	readTargetFile(M_target, X_target);
+	
+
 
 	//construct the initial population
 	printf("Generating the initial population\n");
@@ -199,7 +338,7 @@ void perform_evolution_sampling(int N, bool useFile) {
 		//create a person, evaluate their stats
 		Person p = Person(N, numInteractions, numTypes, particleTypes, kappaVals);
 		p.applyBound(0.1, 1000);
-		p.evalStats(Tf, samples, M_target);
+		p.evalStats(Tf, samples, M_target, X_target);
 		p.evalFitness(eqMax, rateMax);
 		pop_array[i] = p;
 		//printf("e %f, r %f, f %f\n", pop_array[i].Eq, pop_array[i].Rate, pop_array[i].fitness);
@@ -292,7 +431,7 @@ void perform_evolution_sampling(int N, bool useFile) {
 			Person p2 = population[r2];
 			Person kid = p1.mate(p2, useFile, rngee);
 			kid.applyBound(0.1, 1000);
-			kid.evalStats(Tf, samples, M_target);
+			kid.evalStats(Tf, samples, M_target, X_target);
 			kid.evalFitness(eqMax, rateMax);
 			pop_array[i] = kid;
 		}
@@ -331,7 +470,7 @@ void perform_evolution_sampling(int N, bool useFile) {
 
 
 	//free memory
-	delete []particleTypes; delete []kappaVals; delete []M_target;
+	delete []particleTypes; delete []kappaVals; delete []M_target; delete []X_target;
 	delete []popRate; delete []popEq; delete []popFitness;
 
 

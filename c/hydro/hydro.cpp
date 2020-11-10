@@ -10,7 +10,7 @@
 #include <iostream>
 #include "../defines.h"
 
-#define HYDRO_CUT 1.2 //1.12 for long range (noHD), 1.2 for short range (HD)
+#define HYDRO_CUT 1.17 //1.12 for long range (noHD), 1.2 for short range (HD)
 namespace bd {
 
 // ********************************************************************** //

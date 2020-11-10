@@ -307,10 +307,10 @@ void perform_evolution(int N, bd::Database* db, int initial, int target, bool us
 	Eigen::setNbThreads(0);
 
 	//parameters to the genetic algorithm
-	int generations = 200;
-	int pop_size    = 50;
+	int generations = 300;
+	int pop_size    = 1500;
 	double elite_p  = 0.1;
-	double mates_p  = 0.3;
+	double mates_p  = 0.5;
 	bool printAll   = false;         //set true to make movie of output
 	bool perturb    = false;          //set true for sensitivity testing
 

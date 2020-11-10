@@ -78,7 +78,7 @@ public:
 								 double* eq, double* Tconst, double* T, double* m);
 	void evalFitness(double eq, double rate);
 
-	void evalStats(double Tf, int samples, int* M_target);
+	void evalStats(double Tf, int samples, int* M_target, double* X_target);
 	void applyBound(double lower, double upper);
 
 private:
